@@ -115,7 +115,7 @@ struct RideConfirmSlider: View {
 
     private func completeSlide() {
         isConfirmed = true
-        hapticFeedback(style: .success)
+        successHapticFeedback()
 
         // Trigger the callback after a brief delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -129,6 +129,11 @@ struct RideConfirmSlider: View {
     private func hapticFeedback(style: UIImpactFeedbackGenerator.FeedbackStyle) {
         let generator = UIImpactFeedbackGenerator(style: style)
         generator.impactOccurred()
+    }
+
+    private func successHapticFeedback() {
+        let generator = UINotificationFeedbackGenerator()
+        generator.notificationOccurred(.success)
     }
 }
 
