@@ -12,6 +12,7 @@ struct RideLocationCard: View {
     @Binding var destinationText: String
     @FocusState.Binding var focusedField: LocationField?
 
+    var configuration: RideRequestConfiguration = .default
     var onPickupTap: () -> Void
     var onDestinationTap: () -> Void
 
@@ -24,7 +25,7 @@ struct RideLocationCard: View {
         VStack(spacing: 0) {
             // Card Header
             HStack {
-                Text("Plan your ride")
+                Text(configuration.cardTitle)
                     .font(.title3)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
@@ -37,7 +38,7 @@ struct RideLocationCard: View {
             // Pickup Location Input
             HStack(spacing: 12) {
                 Circle()
-                    .fill(.green)
+                    .fill(configuration.pickupPinColor)
                     .frame(width: 12, height: 12)
 
                 TextField("Pickup Location", text: $pickupText)
@@ -75,10 +76,10 @@ struct RideLocationCard: View {
             // Destination Location Input
             HStack(spacing: 12) {
                 Circle()
-                    .fill(.blue)
+                    .fill(configuration.destinationPinColor)
                     .frame(width: 12, height: 12)
 
-                TextField("Where to?", text: $destinationText)
+                TextField(configuration.destinationPlaceholder, text: $destinationText)
                     .focused($focusedField, equals: .destination)
                     .textFieldStyle(.plain)
                     .font(.body)

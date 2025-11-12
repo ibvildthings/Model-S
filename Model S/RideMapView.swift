@@ -12,6 +12,7 @@ struct RideMapView: View {
     @ObservedObject var viewModel: MapViewModel
     @State private var showPickupPin = false
     @State private var showDestinationPin = false
+    var configuration: RideRequestConfiguration = .default
 
     var body: some View {
         Map(
@@ -22,7 +23,8 @@ struct RideMapView: View {
             MapAnnotation(coordinate: annotation.coordinate) {
                 PinView(
                     type: annotation.type,
-                    isVisible: annotation.type == .pickup ? showPickupPin : showDestinationPin
+                    isVisible: annotation.type == .pickup ? showPickupPin : showDestinationPin,
+                    configuration: configuration
                 )
                 .onTapGesture {
                     // Allow tapping the pin to interact
@@ -53,7 +55,7 @@ struct RideMapView: View {
                 hapticFeedback()
             }
         }
-        .mapStyle(.standard(elevation: .flat, emphasis: .muted))
+        .mapStyle(configuration.mapStyle)
         .accessibilityLabel("Ride request map")
     }
 
@@ -106,6 +108,7 @@ struct MapPinAnnotation: Identifiable {
 struct PinView: View {
     let type: MapPinAnnotation.PinType
     let isVisible: Bool
+    var configuration: RideRequestConfiguration = .default
 
     var body: some View {
         VStack(spacing: 0) {
@@ -132,9 +135,9 @@ struct PinView: View {
     private var pinColor: Color {
         switch type {
         case .pickup:
-            return .green
+            return configuration.pickupPinColor
         case .destination:
-            return .blue
+            return configuration.destinationPinColor
         }
     }
 

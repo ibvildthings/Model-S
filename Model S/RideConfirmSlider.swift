@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct RideConfirmSlider: View {
+    var configuration: RideRequestConfiguration = .default
     var onConfirmRide: () -> Void
     @State private var offset: CGFloat = 0
     @State private var isConfirmed = false
@@ -49,7 +50,7 @@ struct RideConfirmSlider: View {
                 // Text Label
                 HStack {
                     Spacer()
-                    Text(isRequesting ? "Requesting Ride..." : "Slide to Request")
+                    Text(isRequesting ? configuration.requestingText : configuration.sliderText)
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(.white.opacity(0.9))
@@ -67,7 +68,7 @@ struct RideConfirmSlider: View {
                         .overlay(
                             Image(systemName: "arrow.right")
                                 .font(.system(size: 24, weight: .semibold))
-                                .foregroundColor(Color(red: 0.1, green: 0.4, blue: 0.9))
+                                .foregroundColor(configuration.accentColor)
                         )
                         .offset(x: 4 + offset)
                         .gesture(

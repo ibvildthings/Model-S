@@ -9,20 +9,34 @@ import SwiftUI
 
 struct RideRequestView: View {
     @StateObject private var mapViewModel = MapViewModel()
-    @State private var pickupText = "Current Location"
+    @State private var pickupText: String
     @State private var destinationText = ""
     @FocusState private var focusedField: RideLocationCard.LocationField?
     @State private var showSlider = false
     @State private var rideState: RideRequestState = .selectingPickup
 
+    var configuration: RideRequestConfiguration = .default
     var onPickupSelected: ((String) -> Void)?
     var onDestinationSelected: ((String) -> Void)?
     var onConfirmRide: (() -> Void)?
 
+    init(
+        configuration: RideRequestConfiguration = .default,
+        onPickupSelected: ((String) -> Void)? = nil,
+        onDestinationSelected: ((String) -> Void)? = nil,
+        onConfirmRide: (() -> Void)? = nil
+    ) {
+        self.configuration = configuration
+        self._pickupText = State(initialValue: configuration.defaultPickupText)
+        self.onPickupSelected = onPickupSelected
+        self.onDestinationSelected = onDestinationSelected
+        self.onConfirmRide = onConfirmRide
+    }
+
     var body: some View {
         ZStack {
             // Map Background
-            RideMapView(viewModel: mapViewModel)
+            RideMapView(viewModel: mapViewModel, configuration: configuration)
                 .ignoresSafeArea()
 
             // Location Card Overlay (Top)
@@ -31,6 +45,7 @@ struct RideRequestView: View {
                     pickupText: $pickupText,
                     destinationText: $destinationText,
                     focusedField: $focusedField,
+                    configuration: configuration,
                     onPickupTap: {
                         focusedField = .pickup
                         rideState = .selectingPickup
@@ -63,10 +78,13 @@ struct RideRequestView: View {
                 VStack {
                     Spacer()
 
-                    RideConfirmSlider(onConfirmRide: {
-                        rideState = .rideRequested
-                        onConfirmRide?()
-                    })
+                    RideConfirmSlider(
+                        configuration: configuration,
+                        onConfirmRide: {
+                            rideState = .rideRequested
+                            onConfirmRide?()
+                        }
+                    )
                     .padding(.horizontal, 24)
                     .padding(.bottom, 40)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -80,7 +98,7 @@ struct RideRequestView: View {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
 
-                        Text("Finding your driver...")
+                        Text(configuration.findingDriverText)
                             .font(.headline)
                             .foregroundColor(.white)
                     }
