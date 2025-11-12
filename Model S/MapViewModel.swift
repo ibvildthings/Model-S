@@ -14,8 +14,12 @@ class MapViewModel: NSObject, ObservableObject {
     @Published var destinationLocation: LocationPoint?
     @Published var region: MKCoordinateRegion
     @Published var routePolyline: MKPolyline?
+    @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
+    @Published var locationError: RideRequestError?
+    @Published var userLocation: CLLocation?
 
     private let locationManager = CLLocationManager()
+    var onLocationUpdate: ((CLLocation) -> Void)?
 
     override init() {
         // Default region - San Francisco
@@ -28,11 +32,38 @@ class MapViewModel: NSObject, ObservableObject {
 
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        requestLocationPermission()
+        locationManager.distanceFilter = 10 // Update every 10 meters
+
+        locationAuthorizationStatus = locationManager.authorizationStatus
+        checkLocationAuthorization()
     }
 
     func requestLocationPermission() {
-        locationManager.requestWhenInUseAuthorization()
+        switch locationManager.authorizationStatus {
+        case .notDetermined:
+            locationManager.requestWhenInUseAuthorization()
+        case .denied, .restricted:
+            locationError = .locationPermissionDenied
+        default:
+            break
+        }
+    }
+
+    private func checkLocationAuthorization() {
+        switch locationManager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            if CLLocationManager.locationServicesEnabled() {
+                locationManager.startUpdatingLocation()
+            } else {
+                locationError = .locationServicesDisabled
+            }
+        case .denied, .restricted:
+            locationError = .locationPermissionDenied
+        case .notDetermined:
+            requestLocationPermission()
+        @unknown default:
+            break
+        }
     }
 
     func updatePickupLocation(_ coordinate: CLLocationCoordinate2D, name: String? = nil) {
@@ -45,6 +76,19 @@ class MapViewModel: NSObject, ObservableObject {
         updateRouteIfNeeded()
     }
 
+    func updateRouteFromMKRoute(_ route: MKRoute) {
+        self.routePolyline = route.polyline
+
+        // Center map on route
+        let padding: Double = 50
+        let rect = route.polyline.boundingMapRect
+        let region = MKCoordinateRegion(rect.insetBy(dx: -padding, dy: -padding))
+
+        withAnimation {
+            self.region = region
+        }
+    }
+
     private func updateRouteIfNeeded() {
         guard let pickup = pickupLocation,
               let destination = destinationLocation else {
@@ -52,19 +96,24 @@ class MapViewModel: NSObject, ObservableObject {
             return
         }
 
-        // Create a simple straight-line polyline for now (fake route)
-        // In a real app, you'd use MKDirections API
+        // Create a simple straight-line polyline as fallback
         let coordinates = [pickup.coordinate, destination.coordinate]
         routePolyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
     }
 
     func centerOnUserLocation() {
-        if let location = locationManager.location {
-            region = MKCoordinateRegion(
-                center: location.coordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-            )
+        if let location = userLocation {
+            withAnimation {
+                region = MKCoordinateRegion(
+                    center: location.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+                )
+            }
         }
+    }
+
+    func stopUpdatingLocation() {
+        locationManager.stopUpdatingLocation()
     }
 }
 
@@ -73,21 +122,46 @@ extension MapViewModel: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
 
-        // Update region to user's location
-        region = MKCoordinateRegion(
-            center: location.coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-        )
+        userLocation = location
+        locationError = nil
+
+        // Update region to user's location on first update
+        if region.center.latitude == 37.7749 && region.center.longitude == -122.4194 {
+            region = MKCoordinateRegion(
+                center: location.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            )
+        }
 
         // Auto-set pickup location to user's location if not already set
         if pickupLocation == nil {
             updatePickupLocation(location.coordinate, name: "Current Location")
         }
+
+        onLocationUpdate?(location)
     }
 
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        if status == .authorizedWhenInUse || status == .authorizedAlways {
-            locationManager.startUpdatingLocation()
+        locationAuthorizationStatus = status
+
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            if CLLocationManager.locationServicesEnabled() {
+                locationManager.startUpdatingLocation()
+                locationError = nil
+            } else {
+                locationError = .locationServicesDisabled
+            }
+        case .denied, .restricted:
+            locationError = .locationPermissionDenied
+        case .notDetermined:
+            break
+        @unknown default:
+            break
         }
+    }
+
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        locationError = .locationUnavailable
     }
 }
