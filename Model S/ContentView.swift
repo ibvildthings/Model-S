@@ -9,17 +9,8 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        RideRequestView(
-            onPickupSelected: { location in
-                print("Pickup: \(location)")
-            },
-            onDestinationSelected: { location in
-                print("Destination: \(location)")
-            },
-            onConfirmRide: {
-                print("Ride confirmed!")
-            }
-        )
+        // Production-ready implementation with full features
+        ProductionExampleView()
     }
 }
 
