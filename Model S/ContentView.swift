@@ -12,14 +12,15 @@ struct ContentView: View {
     @State private var pickupText = "Current Location"
     @State private var destinationText = ""
     @FocusState private var focusedField: RideLocationCard.LocationField?
+    @State private var showSlider = false
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             // Map Background
             RideMapView(viewModel: mapViewModel)
                 .ignoresSafeArea()
 
-            // Location Card Overlay
+            // Location Card Overlay (Top)
             VStack {
                 RideLocationCard(
                     pickupText: $pickupText,
@@ -33,8 +34,29 @@ struct ContentView: View {
                     }
                 )
                 .padding(.top, 60)
+                .onChange(of: destinationText) { _ in
+                    // Show slider when both locations are set
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        showSlider = !pickupText.isEmpty && !destinationText.isEmpty
+                    }
+                }
 
                 Spacer()
+            }
+
+            // Confirm Slider (Bottom)
+            if showSlider {
+                VStack {
+                    Spacer()
+
+                    RideConfirmSlider(onConfirmRide: {
+                        print("Ride requested!")
+                        // Handle ride request
+                    })
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 40)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
         }
     }
