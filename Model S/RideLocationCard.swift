@@ -44,6 +44,8 @@ struct RideLocationCard: View {
                     .focused($focusedField, equals: .pickup)
                     .textFieldStyle(.plain)
                     .font(.body)
+                    .accessibilityLabel("Pickup location")
+                    .accessibilityHint("Enter your pickup address")
                     .onTapGesture {
                         onPickupTap()
                     }
@@ -80,6 +82,8 @@ struct RideLocationCard: View {
                     .focused($focusedField, equals: .destination)
                     .textFieldStyle(.plain)
                     .font(.body)
+                    .accessibilityLabel("Destination")
+                    .accessibilityHint("Enter your destination address")
                     .onTapGesture {
                         onDestinationTap()
                     }

@@ -38,17 +38,23 @@ struct RideMapView: View {
             handleMapTap(at: location)
         }
         .onChange(of: viewModel.pickupLocation) { _ in
-            withAnimation(.easeInOut(duration: 0.4)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                 showPickupPin = viewModel.pickupLocation != nil
+            }
+            if viewModel.pickupLocation != nil {
+                hapticFeedback()
             }
         }
         .onChange(of: viewModel.destinationLocation) { _ in
-            withAnimation(.easeInOut(duration: 0.4)) {
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                 showDestinationPin = viewModel.destinationLocation != nil
+            }
+            if viewModel.destinationLocation != nil {
+                hapticFeedback()
             }
         }
         .mapStyle(.standard(elevation: .flat, emphasis: .muted))
-        .preferredColorScheme(.dark)
+        .accessibilityLabel("Ride request map")
     }
 
     private var annotations: [MapPinAnnotation] {
@@ -76,6 +82,11 @@ struct RideMapView: View {
     private func handleMapTap(at point: CGPoint) {
         // Note: In a real implementation, you'd convert the tap point to coordinates
         // For now, this is a placeholder for the interaction logic
+    }
+
+    private func hapticFeedback() {
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
     }
 }
 
@@ -115,6 +126,7 @@ struct PinView: View {
         }
         .scaleEffect(isVisible ? 1.0 : 0.5)
         .opacity(isVisible ? 1.0 : 0.0)
+        .accessibilityLabel(type == .pickup ? "Pickup location pin" : "Destination location pin")
     }
 
     private var pinColor: Color {

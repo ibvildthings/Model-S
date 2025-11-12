@@ -111,6 +111,8 @@ struct RideConfirmSlider: View {
             }
         }
         .frame(height: sliderHeight)
+        .accessibilityLabel(isRequesting ? "Requesting ride" : "Slide to request ride")
+        .accessibilityHint("Drag the slider to the right to confirm your ride request")
     }
 
     private func completeSlide() {
