@@ -9,9 +9,16 @@ import Foundation
 import CoreLocation
 
 // MARK: - LocationPoint
+
+/// Represents a location point with coordinates and optional name
 struct LocationPoint: Identifiable, Equatable {
+    /// Unique identifier for the location point
     let id = UUID()
+
+    /// Geographic coordinates of the location
     var coordinate: CLLocationCoordinate2D
+
+    /// Optional display name for the location
     var name: String?
 
     // Custom Equatable conformance since CLLocationCoordinate2D doesn't conform to Equatable by default
@@ -24,9 +31,18 @@ struct LocationPoint: Identifiable, Equatable {
 }
 
 // MARK: - RideRequestState
+
+/// Represents the current state of the ride request flow
 enum RideRequestState {
+    /// User is selecting or editing the pickup location
     case selectingPickup
+
+    /// User is selecting or editing the destination location
     case selectingDestination
+
+    /// Both locations are set and the route is ready to be confirmed
     case routeReady
+
+    /// Ride has been requested and is being processed
     case rideRequested
 }

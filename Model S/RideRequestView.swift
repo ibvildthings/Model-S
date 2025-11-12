@@ -7,6 +7,23 @@
 
 import SwiftUI
 
+/// A reusable SwiftUI component that provides a complete ride request experience
+/// with an interactive map, location inputs, and slide-to-confirm interaction.
+///
+/// Example usage:
+/// ```swift
+/// RideRequestView(
+///     onPickupSelected: { location in
+///         print("Pickup: \(location)")
+///     },
+///     onDestinationSelected: { location in
+///         print("Destination: \(location)")
+///     },
+///     onConfirmRide: {
+///         print("Ride confirmed!")
+///     }
+/// )
+/// ```
 struct RideRequestView: View {
     @StateObject private var mapViewModel = MapViewModel()
     @State private var pickupText: String
@@ -20,6 +37,13 @@ struct RideRequestView: View {
     var onDestinationSelected: ((String) -> Void)?
     var onConfirmRide: (() -> Void)?
 
+    /// Creates a new RideRequestView with optional configuration and callbacks
+    ///
+    /// - Parameters:
+    ///   - configuration: Visual and behavioral configuration options. Defaults to `.default`.
+    ///   - onPickupSelected: Called when the pickup location text changes.
+    ///   - onDestinationSelected: Called when the destination location text changes.
+    ///   - onConfirmRide: Called when the user completes the slide-to-confirm gesture.
     init(
         configuration: RideRequestConfiguration = .default,
         onPickupSelected: ((String) -> Void)? = nil,
