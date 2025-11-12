@@ -8,7 +8,9 @@
 import Foundation
 import MapKit
 import Combine
+import SwiftUI
 
+@MainActor
 class MapViewModel: NSObject, ObservableObject {
     @Published var pickupLocation: LocationPoint?
     @Published var destinationLocation: LocationPoint?
@@ -82,10 +84,13 @@ class MapViewModel: NSObject, ObservableObject {
         // Center map on route
         let padding: Double = 50
         let rect = route.polyline.boundingMapRect
-        let region = MKCoordinateRegion(rect.insetBy(dx: -padding, dy: -padding))
+        let newRegion = MKCoordinateRegion(rect.insetBy(dx: -padding, dy: -padding))
 
-        withAnimation {
-            self.region = region
+        // Animate the region change
+        Task { @MainActor in
+            withAnimation {
+                self.region = newRegion
+            }
         }
     }
 
@@ -103,11 +108,15 @@ class MapViewModel: NSObject, ObservableObject {
 
     func centerOnUserLocation() {
         if let location = userLocation {
-            withAnimation {
-                region = MKCoordinateRegion(
-                    center: location.coordinate,
-                    span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                )
+            let newRegion = MKCoordinateRegion(
+                center: location.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            )
+
+            Task { @MainActor in
+                withAnimation {
+                    region = newRegion
+                }
             }
         }
     }
