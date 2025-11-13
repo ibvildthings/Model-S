@@ -149,6 +149,7 @@ struct RideRequestViewWithViewModel: View {
                     if configuration.enableGeocoding {
                         debounceGeocoding(newValue, isPickup: true)
                     }
+                    updateSliderVisibility()
                 }
                 .onChange(of: destinationText) { newValue in
                     if configuration.enableGeocoding {
@@ -181,7 +182,7 @@ struct RideRequestViewWithViewModel: View {
             }
 
             // Confirm Slider
-            if showSlider && viewModel.rideState == .routeReady {
+            if showSlider {
                 VStack {
                     Spacer()
 
@@ -271,12 +272,19 @@ struct RideRequestViewWithViewModel: View {
 
     private func updateSliderVisibility() {
         withAnimation(.easeInOut(duration: 0.4)) {
-            showSlider = !pickupText.isEmpty && !destinationText.isEmpty &&
-                        viewModel.pickupLocation != nil && viewModel.destinationLocation != nil
+            showSlider = !pickupText.isEmpty && !destinationText.isEmpty
         }
     }
 
     private func handleConfirmRide() {
+        // If geocoding is still in progress, wait for it
+        if configuration.enableGeocoding {
+            if viewModel.pickupLocation == nil || viewModel.destinationLocation == nil {
+                viewModel.error = .geocodingFailed
+                return
+            }
+        }
+
         guard configuration.enableValidation else {
             proceedWithRideRequest()
             return
@@ -290,6 +298,7 @@ struct RideRequestViewWithViewModel: View {
     private func proceedWithRideRequest() {
         guard let pickup = viewModel.pickupLocation,
               let destination = viewModel.destinationLocation else {
+            viewModel.error = .invalidPickupLocation
             return
         }
 
