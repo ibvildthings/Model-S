@@ -88,16 +88,13 @@ struct MainAppPlaceholder: View {
 }
 
 /// Enhanced RideRequestView that integrates with RideRequestViewModel
+/// SIMPLIFIED using RideRequestCoordinator for all business logic
 struct RideRequestViewWithViewModel: View {
-    @ObservedObject var viewModel: RideRequestViewModel
-    @StateObject private var mapViewModel = MapViewModel()
+    @StateObject private var coordinator: RideRequestCoordinator
     @State private var pickupText: String
     @State private var destinationText = ""
     @FocusState private var focusedField: RideLocationCard.LocationField?
-    @State private var showSlider = false
-    @State private var debounceTask: Task<Void, Never>?
 
-    var configuration: RideRequestConfiguration
     var onRideConfirmed: (LocationPoint, LocationPoint) -> Void
     var onCancel: () -> Void
 
@@ -107,8 +104,8 @@ struct RideRequestViewWithViewModel: View {
         onRideConfirmed: @escaping (LocationPoint, LocationPoint) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        self._viewModel = ObservedObject(wrappedValue: viewModel)
-        self.configuration = configuration
+        // Create coordinator with configuration
+        self._coordinator = StateObject(wrappedValue: RideRequestCoordinator(configuration: configuration))
         self._pickupText = State(initialValue: configuration.defaultPickupText)
         self.onRideConfirmed = onRideConfirmed
         self.onCancel = onCancel
@@ -116,16 +113,15 @@ struct RideRequestViewWithViewModel: View {
 
     var body: some View {
         ZStack {
-            // Map
-            RideMapView(viewModel: mapViewModel, configuration: configuration)
+            // Map (managed by coordinator)
+            RideMapView(viewModel: coordinator.mapViewModel, configuration: RideRequestConfiguration.default)
                 .ignoresSafeArea()
 
             VStack {
                 // Error Banner
-                if configuration.showErrorBanner,
-                   let error = viewModel.error {
+                if let error = coordinator.viewModel.error {
                     ErrorBannerView(error: error, onDismiss: {
-                        viewModel.error = nil
+                        coordinator.viewModel.error = nil
                     })
                     .padding(.top, 60)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -136,28 +132,30 @@ struct RideRequestViewWithViewModel: View {
                     pickupText: $pickupText,
                     destinationText: $destinationText,
                     focusedField: $focusedField,
-                    configuration: configuration,
-                    userLocation: mapViewModel.userLocation?.coordinate,
+                    configuration: RideRequestConfiguration.default,
+                    userLocation: coordinator.mapViewModel.userLocation?.coordinate,
                     onPickupTap: {
                         focusedField = .pickup
-                        viewModel.rideState = .selectingPickup
+                        coordinator.didFocusPickup()
                     },
                     onDestinationTap: {
                         focusedField = .destination
-                        viewModel.rideState = .selectingDestination
+                        coordinator.didFocusDestination()
                     },
                     onLocationSelected: { coordinate, name, isPickup in
-                        handleLocationSelection(coordinate: coordinate, name: name, isPickup: isPickup)
+                        // Simplified - just call coordinator
+                        Task {
+                            await coordinator.selectLocation(coordinate: coordinate, name: name, isPickup: isPickup)
+                        }
                     }
                 )
-                .padding(.top, configuration.showErrorBanner && viewModel.error != nil ? 8 : 60)
+                .padding(.top, coordinator.viewModel.error != nil ? 8 : 60)
 
                 // Route Info
-                if configuration.showRouteInfo,
-                   viewModel.route != nil {
+                if coordinator.viewModel.route != nil {
                     RouteInfoView(
-                        travelTime: viewModel.formattedTravelTime(),
-                        distance: viewModel.formattedDistance()
+                        travelTime: coordinator.viewModel.formattedTravelTime(),
+                        distance: coordinator.viewModel.formattedDistance()
                     )
                     .padding(.top, 8)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -166,7 +164,7 @@ struct RideRequestViewWithViewModel: View {
                 Spacer()
 
                 // Cancel Button
-                if viewModel.rideState != .rideRequested {
+                if coordinator.viewModel.rideState != .rideRequested {
                     Button("Cancel") {
                         onCancel()
                     }
@@ -175,13 +173,13 @@ struct RideRequestViewWithViewModel: View {
                 }
             }
 
-            // Confirm Slider
-            if showSlider {
+            // Confirm Slider (managed by coordinator)
+            if coordinator.showConfirmSlider {
                 VStack {
                     Spacer()
 
                     RideConfirmSlider(
-                        configuration: configuration,
+                        configuration: RideRequestConfiguration.default,
                         onConfirmRide: handleConfirmRide
                     )
                     .padding(.horizontal, 24)
@@ -191,13 +189,13 @@ struct RideRequestViewWithViewModel: View {
             }
 
             // Status Banner
-            if viewModel.rideState == .rideRequested {
+            if coordinator.viewModel.rideState == .rideRequested {
                 VStack {
                     HStack {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
 
-                        Text(configuration.findingDriverText)
+                        Text("Finding your driver...")
                             .font(.headline)
                             .foregroundColor(.white)
                     }
@@ -214,7 +212,7 @@ struct RideRequestViewWithViewModel: View {
             }
 
             // Loading Overlay
-            if viewModel.isLoading {
+            if coordinator.viewModel.isLoading {
                 Color.black.opacity(0.2)
                     .ignoresSafeArea()
 
@@ -223,113 +221,22 @@ struct RideRequestViewWithViewModel: View {
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
             }
         }
-        .onChange(of: viewModel.route) { route in
-            if let route = route {
-                mapViewModel.updateRouteFromMKRoute(route)
-            }
+        .onChange(of: pickupText) { newValue in
+            coordinator.viewModel.pickupAddress = newValue
         }
-        .task {
-            // Setup location callback
-            mapViewModel.onLocationUpdate = { location in
-                if configuration.autoSetPickupLocation,
-                   viewModel.pickupLocation == nil {
-                    Task {
-                        await viewModel.reverseGeocodeLocation(location.coordinate, isPickup: true)
-                        pickupText = viewModel.pickupAddress
-                    }
-                }
-            }
+        .onChange(of: destinationText) { newValue in
+            coordinator.viewModel.destinationAddress = newValue
         }
     }
 
-    private func handleLocationSelection(coordinate: CLLocationCoordinate2D, name: String, isPickup: Bool) {
-        // Cancel any pending geocoding
-        debounceTask?.cancel()
-
-        // Update ViewModels directly with the selected location
-        let locationPoint = LocationPoint(coordinate: coordinate, name: name)
-
-        if isPickup {
-            viewModel.pickupLocation = locationPoint
-            viewModel.pickupAddress = name
-            mapViewModel.updatePickupLocation(coordinate, name: name)
-        } else {
-            viewModel.destinationLocation = locationPoint
-            viewModel.destinationAddress = name
-            mapViewModel.updateDestinationLocation(coordinate, name: name)
-        }
-
-        // Calculate route if both locations are set
-        if configuration.enableRouteCalculation,
-           viewModel.pickupLocation != nil,
-           viewModel.destinationLocation != nil {
-            Task {
-                await viewModel.calculateRoute()
-                if let route = viewModel.route {
-                    mapViewModel.updateRouteFromMKRoute(route)
-                }
-            }
-        }
-
-        updateSliderVisibility()
-    }
-
-    private func debounceGeocoding(_ text: String, isPickup: Bool) {
-        debounceTask?.cancel()
-
-        debounceTask = Task {
-            try? await Task.sleep(nanoseconds: UInt64(configuration.geocodingDebounceDelay * 1_000_000_000))
-
-            guard !Task.isCancelled else { return }
-
-            await viewModel.geocodeAddress(text, isPickup: isPickup)
-
-            if let location = isPickup ? viewModel.pickupLocation : viewModel.destinationLocation {
-                if isPickup {
-                    mapViewModel.updatePickupLocation(location.coordinate, name: location.name)
-                } else {
-                    mapViewModel.updateDestinationLocation(location.coordinate, name: location.name)
-                }
-            }
-
-            updateSliderVisibility()
-        }
-    }
-
-    private func updateSliderVisibility() {
-        withAnimation(.easeInOut(duration: 0.4)) {
-            showSlider = !pickupText.isEmpty && !destinationText.isEmpty
-        }
-    }
+    // MARK: - Actions
+    // All complex logic is now in the coordinator - view is just presentation!
 
     private func handleConfirmRide() {
-        // If geocoding is still in progress, wait for it
-        if configuration.enableGeocoding {
-            if viewModel.pickupLocation == nil || viewModel.destinationLocation == nil {
-                viewModel.error = .geocodingFailed
-                return
-            }
+        // Coordinator handles all validation and state management
+        if let result = coordinator.confirmRide() {
+            onRideConfirmed(result.pickup, result.destination)
         }
-
-        guard configuration.enableValidation else {
-            proceedWithRideRequest()
-            return
-        }
-
-        if viewModel.validateLocations() {
-            proceedWithRideRequest()
-        }
-    }
-
-    private func proceedWithRideRequest() {
-        guard let pickup = viewModel.pickupLocation,
-              let destination = viewModel.destinationLocation else {
-            viewModel.error = .invalidPickupLocation
-            return
-        }
-
-        viewModel.rideState = .rideRequested
-        onRideConfirmed(pickup, destination)
     }
 }
 

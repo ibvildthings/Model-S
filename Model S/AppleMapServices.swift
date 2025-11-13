@@ -2,6 +2,9 @@
 //  AppleMapServices.swift
 //  Model S
 //
+//  Apple Maps implementations of map service protocols.
+//  Provides location search, geocoding, and route calculation using MapKit.
+//
 //  Created by Pritesh Desai on 11/12/25.
 //
 
@@ -11,21 +14,31 @@ import Combine
 
 // MARK: - Apple Location Search Service
 
-/// Apple Maps implementation of LocationSearchService using MKLocalSearchCompleter
+/// Apple Maps implementation of location autocomplete using MKLocalSearchCompleter
+/// Provides real-time search suggestions as user types
 @MainActor
 class AppleLocationSearchService: NSObject, LocationSearchService, ObservableObject {
+    /// Current search results (updated as user types)
     @Published var searchResults: [LocationSearchResult] = []
+
+    /// Whether a search is currently in progress
     @Published var isSearching = false
 
+    /// MKLocalSearchCompleter handles the actual autocomplete
     private let searchCompleter = MKLocalSearchCompleter()
+
+    /// Current search region (limits results to nearby area)
     private var currentRegion: MKCoordinateRegion?
 
     override init() {
         super.init()
         searchCompleter.delegate = self
+        // Search for both addresses and points of interest
         searchCompleter.resultTypes = [.address, .pointOfInterest]
     }
 
+    /// Searches for locations matching the query string
+    /// - Parameter query: The search text (e.g., "123 Main St" or "Starbucks")
     func search(query: String) {
         guard !query.isEmpty else {
             searchResults = []
@@ -37,10 +50,13 @@ class AppleLocationSearchService: NSObject, LocationSearchService, ObservableObj
         searchCompleter.queryFragment = query
     }
 
+    /// Limits search results to a region around the given center point
+    /// - Parameters:
+    ///   - center: The center coordinate
+    ///   - radiusMiles: Radius in miles to search within
     func updateSearchRegion(center: CLLocationCoordinate2D, radiusMiles: Double) {
-        // Convert radius to degrees
-        // 1 degree latitude ≈ 69 miles
-        let latitudeDelta = (radiusMiles / 69.0) * 2.0
+        // Convert radius from miles to coordinate degrees
+        let latitudeDelta = (radiusMiles / MapConstants.milesPerDegree) * 2.0
         let longitudeDelta = latitudeDelta
 
         let region = MKCoordinateRegion(

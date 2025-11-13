@@ -40,9 +40,13 @@ struct RideLocationCardWithSearch: View {
         self.onDestinationTap = onDestinationTap
         self.onLocationSelected = onLocationSelected
 
-        // Create search service from factory
-        let service = MapServiceFactory.shared.createLocationSearchService() as! AppleLocationSearchService
-        self._searchService = StateObject(wrappedValue: service)
+        // Create search service from factory (properly typed)
+        // Note: Currently only Apple Maps is implemented
+        let service = MapServiceFactory.shared.createLocationSearchService()
+        guard let appleService = service as? AppleLocationSearchService else {
+            fatalError("AppleLocationSearchService is required for RideLocationCardWithSearch")
+        }
+        self._searchService = StateObject(wrappedValue: appleService)
     }
 
     var body: some View {
