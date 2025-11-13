@@ -190,13 +190,12 @@ struct RouteLineView: View {
             for i in 0..<pointCount {
                 let mapPoint = points[i]
                 let coordinate = mapPoint.coordinate
+                let screenPoint = coordinateToScreen(coordinate: coordinate)
 
-                if let screenPoint = coordinateToScreen(coordinate: coordinate) {
-                    if i == 0 {
-                        path.move(to: screenPoint)
-                    } else {
-                        path.addLine(to: screenPoint)
-                    }
+                if i == 0 {
+                    path.move(to: screenPoint)
+                } else {
+                    path.addLine(to: screenPoint)
                 }
             }
         }
@@ -211,7 +210,7 @@ struct RouteLineView: View {
         .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
     }
 
-    private func coordinateToScreen(coordinate: CLLocationCoordinate2D) -> CGPoint? {
+    private func coordinateToScreen(coordinate: CLLocationCoordinate2D) -> CGPoint {
         // Calculate the map's coordinate span
         let mapWidth = region.span.longitudeDelta
         let mapHeight = region.span.latitudeDelta
@@ -224,12 +223,7 @@ struct RouteLineView: View {
         let screenX = x * size.width
         let screenY = y * size.height
 
-        // Check if point is within visible bounds
-        guard screenX >= 0 && screenX <= size.width &&
-              screenY >= 0 && screenY <= size.height else {
-            return nil
-        }
-
+        // Return point even if off-screen - SwiftUI will handle clipping
         return CGPoint(x: screenX, y: screenY)
     }
 }
