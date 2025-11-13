@@ -10,12 +10,12 @@ import MapKit
 
 /// Displays autocomplete suggestions for address search
 struct LocationSearchSuggestionsView: View {
-    let results: [MKLocalSearchCompletion]
-    let onSelect: (MKLocalSearchCompletion) -> Void
+    let results: [LocationSearchResult]
+    let onSelect: (LocationSearchResult) -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            ForEach(results, id: \.self) { result in
+            ForEach(results) { result in
                 Button(action: {
                     onSelect(result)
                 }) {

@@ -13,13 +13,37 @@ struct RideLocationCardWithSearch: View {
     @Binding var pickupText: String
     @Binding var destinationText: String
     @FocusState.Binding var focusedField: RideLocationCard.LocationField?
-    @StateObject private var searchCompleter = LocationSearchCompleter()
+    @StateObject private var searchService: AppleLocationSearchService
 
     var configuration: RideRequestConfiguration = .default
     var userLocation: CLLocationCoordinate2D?
     var onPickupTap: () -> Void
     var onDestinationTap: () -> Void
     var onLocationSelected: (CLLocationCoordinate2D, String, Bool) -> Void
+
+    init(
+        pickupText: Binding<String>,
+        destinationText: Binding<String>,
+        focusedField: FocusState<RideLocationCard.LocationField?>.Binding,
+        configuration: RideRequestConfiguration = .default,
+        userLocation: CLLocationCoordinate2D? = nil,
+        onPickupTap: @escaping () -> Void,
+        onDestinationTap: @escaping () -> Void,
+        onLocationSelected: @escaping (CLLocationCoordinate2D, String, Bool) -> Void
+    ) {
+        self._pickupText = pickupText
+        self._destinationText = destinationText
+        self._focusedField = focusedField
+        self.configuration = configuration
+        self.userLocation = userLocation
+        self.onPickupTap = onPickupTap
+        self.onDestinationTap = onDestinationTap
+        self.onLocationSelected = onLocationSelected
+
+        // Create search service from factory
+        let service = MapServiceFactory.shared.createLocationSearchService() as! AppleLocationSearchService
+        self._searchService = StateObject(wrappedValue: service)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,13 +75,13 @@ struct RideLocationCardWithSearch: View {
                         .accessibilityHint("Enter your pickup address")
                         .onChange(of: pickupText) { newValue in
                             if focusedField == .pickup {
-                                searchCompleter.search(query: newValue)
+                                searchService.search(query: newValue)
                             }
                         }
                         .onTapGesture {
                             onPickupTap()
                             if !pickupText.isEmpty {
-                                searchCompleter.search(query: pickupText)
+                                searchService.search(query: pickupText)
                             }
                         }
                 }
@@ -97,13 +121,13 @@ struct RideLocationCardWithSearch: View {
                         .accessibilityHint("Enter your destination address")
                         .onChange(of: destinationText) { newValue in
                             if focusedField == .destination {
-                                searchCompleter.search(query: newValue)
+                                searchService.search(query: newValue)
                             }
                         }
                         .onTapGesture {
                             onDestinationTap()
                             if !destinationText.isEmpty {
-                                searchCompleter.search(query: destinationText)
+                                searchService.search(query: destinationText)
                             }
                         }
                 }
@@ -119,11 +143,11 @@ struct RideLocationCardWithSearch: View {
             .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
 
             // Search Suggestions (appears below card)
-            if focusedField != nil && !searchCompleter.searchResults.isEmpty {
+            if focusedField != nil && !searchService.searchResults.isEmpty {
                 LocationSearchSuggestionsView(
-                    results: searchCompleter.searchResults,
-                    onSelect: { completion in
-                        handleSelection(completion)
+                    results: searchService.searchResults,
+                    onSelect: { result in
+                        handleSelection(result)
                     }
                 )
                 .padding(.horizontal, 16)
@@ -134,25 +158,25 @@ struct RideLocationCardWithSearch: View {
         .padding(.horizontal, 16)
         .onChange(of: focusedField) { newValue in
             if newValue == nil {
-                searchCompleter.clearResults()
+                searchService.clearResults()
             }
         }
         .onChange(of: userLocation) { newLocation in
             if let location = newLocation {
-                searchCompleter.updateSearchRegion(center: location)
+                searchService.updateSearchRegion(center: location, radiusMiles: 50.0)
             }
         }
         .onAppear {
             if let location = userLocation {
-                searchCompleter.updateSearchRegion(center: location)
+                searchService.updateSearchRegion(center: location, radiusMiles: 50.0)
             }
         }
     }
 
-    private func handleSelection(_ completion: MKLocalSearchCompletion) {
+    private func handleSelection(_ result: LocationSearchResult) {
         Task {
             do {
-                let (coordinate, name) = try await searchCompleter.getCoordinate(for: completion)
+                let (coordinate, name) = try await searchService.getCoordinate(for: result)
 
                 await MainActor.run {
                     let isPickup = focusedField == .pickup
@@ -164,7 +188,7 @@ struct RideLocationCardWithSearch: View {
                     }
 
                     onLocationSelected(coordinate, name, isPickup)
-                    searchCompleter.clearResults()
+                    searchService.clearResults()
                     focusedField = nil
                 }
             } catch {

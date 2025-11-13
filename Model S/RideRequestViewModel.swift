@@ -23,8 +23,15 @@ class RideRequestViewModel: ObservableObject {
     @Published var estimatedTravelTime: TimeInterval?
     @Published var estimatedDistance: CLLocationDistance?
 
-    private let geocoder = CLGeocoder()
+    private let geocodingService: any GeocodingService
+    private let routeService: any RouteCalculationService
     private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        // Create services from factory
+        self.geocodingService = MapServiceFactory.shared.createGeocodingService()
+        self.routeService = MapServiceFactory.shared.createRouteCalculationService()
+    }
 
     // MARK: - Geocoding
 
@@ -36,26 +43,19 @@ class RideRequestViewModel: ObservableObject {
         error = nil
 
         do {
-            let placemarks = try await geocoder.geocodeAddressString(address)
-
-            guard let placemark = placemarks.first,
-                  let location = placemark.location else {
-                error = .geocodingFailed
-                isLoading = false
-                return
-            }
+            let (coordinate, formattedAddress) = try await geocodingService.geocode(address: address)
 
             let locationPoint = LocationPoint(
-                coordinate: location.coordinate,
-                name: formatPlacemark(placemark)
+                coordinate: coordinate,
+                name: formattedAddress
             )
 
             if isPickup {
                 pickupLocation = locationPoint
-                pickupAddress = address
+                pickupAddress = formattedAddress
             } else {
                 destinationLocation = locationPoint
-                destinationAddress = address
+                destinationAddress = formattedAddress
             }
 
             // Calculate route if both locations are set
@@ -75,18 +75,8 @@ class RideRequestViewModel: ObservableObject {
         isLoading = true
         error = nil
 
-        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-
         do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
-
-            guard let placemark = placemarks.first else {
-                error = .geocodingFailed
-                isLoading = false
-                return
-            }
-
-            let address = formatPlacemark(placemark)
+            let address = try await geocodingService.reverseGeocode(coordinate: coordinate)
 
             if isPickup {
                 pickupAddress = address
@@ -103,25 +93,9 @@ class RideRequestViewModel: ObservableObject {
         }
     }
 
-    private func formatPlacemark(_ placemark: CLPlacemark) -> String {
-        var components: [String] = []
-
-        if let subThoroughfare = placemark.subThoroughfare {
-            components.append(subThoroughfare)
-        }
-        if let thoroughfare = placemark.thoroughfare {
-            components.append(thoroughfare)
-        }
-        if let locality = placemark.locality {
-            components.append(locality)
-        }
-
-        return components.isEmpty ? "Unknown Location" : components.joined(separator: " ")
-    }
-
     // MARK: - Route Calculation
 
-    /// Calculate route using MapKit Directions API
+    /// Calculate route using route service (abstracted)
     func calculateRoute() async {
         guard let pickup = pickupLocation,
               let destination = destinationLocation else {
@@ -131,29 +105,16 @@ class RideRequestViewModel: ObservableObject {
         isLoading = true
         error = nil
 
-        let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(
-            coordinate: pickup.coordinate
-        ))
-        request.destination = MKMapItem(placemark: MKPlacemark(
-            coordinate: destination.coordinate
-        ))
-        request.transportType = .automobile
-
-        let directions = MKDirections(request: request)
-
         do {
-            let response = try await directions.calculate()
+            let routeResult = try await routeService.calculateRoute(
+                from: pickup.coordinate,
+                to: destination.coordinate
+            )
 
-            guard let route = response.routes.first else {
-                error = .routeCalculationFailed
-                isLoading = false
-                return
-            }
-
-            self.route = route
-            self.estimatedTravelTime = route.expectedTravelTime
-            self.estimatedDistance = route.distance
+            // Extract route object (MKRoute for Apple, GMSRoute for Google in future)
+            self.route = routeResult.polyline as? MKRoute
+            self.estimatedTravelTime = routeResult.expectedTravelTime
+            self.estimatedDistance = routeResult.distance
             self.rideState = .routeReady
 
             isLoading = false
