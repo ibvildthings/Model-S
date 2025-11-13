@@ -17,6 +17,13 @@ class LocationSearchCompleter: NSObject, ObservableObject {
 
     private let searchCompleter = MKLocalSearchCompleter()
 
+    /// Set the search region to limit results to nearby areas
+    var region: MKCoordinateRegion? {
+        didSet {
+            searchCompleter.region = region
+        }
+    }
+
     override init() {
         super.init()
         searchCompleter.delegate = self

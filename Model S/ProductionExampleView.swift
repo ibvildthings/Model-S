@@ -137,6 +137,7 @@ struct RideRequestViewWithViewModel: View {
                     destinationText: $destinationText,
                     focusedField: $focusedField,
                     configuration: configuration,
+                    mapRegion: mapViewModel.region,
                     onPickupTap: {
                         focusedField = .pickup
                         viewModel.rideState = .selectingPickup

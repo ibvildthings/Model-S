@@ -16,6 +16,7 @@ struct RideLocationCardWithSearch: View {
     @StateObject private var searchCompleter = LocationSearchCompleter()
 
     var configuration: RideRequestConfiguration = .default
+    var mapRegion: MKCoordinateRegion?
     var onPickupTap: () -> Void
     var onDestinationTap: () -> Void
     var onLocationSelected: (CLLocationCoordinate2D, String, Bool) -> Void
@@ -136,6 +137,12 @@ struct RideLocationCardWithSearch: View {
                 searchCompleter.clearResults()
             }
         }
+        .onChange(of: mapRegion) { newRegion in
+            searchCompleter.region = newRegion
+        }
+        .onAppear {
+            searchCompleter.region = mapRegion
+        }
     }
 
     private func handleSelection(_ completion: MKLocalSearchCompletion) {
@@ -176,6 +183,10 @@ struct RideLocationCardWithSearch: View {
                 pickupText: $pickupText,
                 destinationText: $destinationText,
                 focusedField: $focusedField,
+                mapRegion: MKCoordinateRegion(
+                    center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+                    span: MKCoordinateSpan(latitudeDelta: 0.1, longitudeDelta: 0.1)
+                ),
                 onPickupTap: {
                     focusedField = .pickup
                 },
