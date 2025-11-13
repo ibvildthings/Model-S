@@ -32,8 +32,17 @@ struct RideMapView: View {
             }
         }
         .overlay(
-            // Polyline overlay for route
-            RouteOverlay(polyline: viewModel.routePolyline)
+            // Draw route polyline
+            GeometryReader { geometry in
+                if let polyline = viewModel.routePolyline {
+                    RouteLineView(
+                        polyline: polyline,
+                        region: viewModel.region,
+                        size: geometry.size,
+                        configuration: configuration
+                    )
+                }
+            }
         )
         .onTapGesture { location in
             // Handle map taps to place pins
@@ -163,15 +172,65 @@ struct Triangle: Shape {
     }
 }
 
-// MARK: - RouteOverlay
-struct RouteOverlay: View {
-    let polyline: MKPolyline?
+// MARK: - RouteLineView
+struct RouteLineView: View {
+    let polyline: MKPolyline
+    let region: MKCoordinateRegion
+    let size: CGSize
+    var configuration: RideRequestConfiguration = .default
 
     var body: some View {
-        // Placeholder for route visualization
-        // In a real implementation, you'd render the polyline using MapKit overlays
-        // or convert polyline coordinates to SwiftUI Path
-        EmptyView()
+        Path { path in
+            let points = polyline.points()
+            let pointCount = polyline.pointCount
+
+            guard pointCount > 0 else { return }
+
+            // Convert MKMapPoints to screen coordinates
+            for i in 0..<pointCount {
+                let mapPoint = points[i]
+                let coordinate = mapPoint.coordinate
+
+                if let screenPoint = coordinateToScreen(coordinate: coordinate) {
+                    if i == 0 {
+                        path.move(to: screenPoint)
+                    } else {
+                        path.addLine(to: screenPoint)
+                    }
+                }
+            }
+        }
+        .stroke(
+            configuration.routeLineColor,
+            style: StrokeStyle(
+                lineWidth: configuration.routeLineWidth,
+                lineCap: .round,
+                lineJoin: .round
+            )
+        )
+        .shadow(color: .black.opacity(0.3), radius: 2, x: 0, y: 1)
+    }
+
+    private func coordinateToScreen(coordinate: CLLocationCoordinate2D) -> CGPoint? {
+        // Calculate the map's coordinate span
+        let mapWidth = region.span.longitudeDelta
+        let mapHeight = region.span.latitudeDelta
+
+        // Calculate the position relative to the region center
+        let x = (coordinate.longitude - region.center.longitude + mapWidth / 2) / mapWidth
+        let y = (region.center.latitude - coordinate.latitude + mapHeight / 2) / mapHeight
+
+        // Convert to screen coordinates
+        let screenX = x * size.width
+        let screenY = y * size.height
+
+        // Check if point is within visible bounds
+        guard screenX >= 0 && screenX <= size.width &&
+              screenY >= 0 && screenY <= size.height else {
+            return nil
+        }
+
+        return CGPoint(x: screenX, y: screenY)
     }
 }
 

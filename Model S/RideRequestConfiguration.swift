@@ -21,6 +21,12 @@ struct RideRequestConfiguration {
     /// Color for the destination location pin
     var destinationPinColor: Color = .blue
 
+    /// Color for the route line between pickup and destination
+    var routeLineColor: Color = .blue
+
+    /// Width of the route line
+    var routeLineWidth: CGFloat = 4
+
     /// Map style preference
     var mapStyle: MapStyle = .standard(elevation: .flat, emphasis: .muted)
 
