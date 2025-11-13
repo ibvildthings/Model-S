@@ -9,8 +9,8 @@ import SwiftUI
 
 struct ContentView: View {
     var body: some View {
-        // Production-ready implementation with full features
-        ProductionExampleView()
+        // Home screen with Drive and Order a ride buttons
+        HomeView()
     }
 }
 
