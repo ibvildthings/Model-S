@@ -129,8 +129,8 @@ struct RideRequestViewWithViewModel: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                // Location Card
-                RideLocationCard(
+                // Location Card with Autocomplete
+                RideLocationCardWithSearch(
                     pickupText: $pickupText,
                     destinationText: $destinationText,
                     focusedField: $focusedField,
@@ -142,21 +142,12 @@ struct RideRequestViewWithViewModel: View {
                     onDestinationTap: {
                         focusedField = .destination
                         viewModel.rideState = .selectingDestination
+                    },
+                    onLocationSelected: { coordinate, name, isPickup in
+                        handleLocationSelection(coordinate: coordinate, name: name, isPickup: isPickup)
                     }
                 )
                 .padding(.top, configuration.showErrorBanner && viewModel.error != nil ? 8 : 60)
-                .onChange(of: pickupText) { newValue in
-                    if configuration.enableGeocoding {
-                        debounceGeocoding(newValue, isPickup: true)
-                    }
-                    updateSliderVisibility()
-                }
-                .onChange(of: destinationText) { newValue in
-                    if configuration.enableGeocoding {
-                        debounceGeocoding(newValue, isPickup: false)
-                    }
-                    updateSliderVisibility()
-                }
 
                 // Route Info
                 if configuration.showRouteInfo,
@@ -246,6 +237,38 @@ struct RideRequestViewWithViewModel: View {
                 }
             }
         }
+    }
+
+    private func handleLocationSelection(coordinate: CLLocationCoordinate2D, name: String, isPickup: Bool) {
+        // Cancel any pending geocoding
+        debounceTask?.cancel()
+
+        // Update ViewModels directly with the selected location
+        let locationPoint = LocationPoint(coordinate: coordinate, name: name)
+
+        if isPickup {
+            viewModel.pickupLocation = locationPoint
+            viewModel.pickupAddress = name
+            mapViewModel.updatePickupLocation(coordinate, name: name)
+        } else {
+            viewModel.destinationLocation = locationPoint
+            viewModel.destinationAddress = name
+            mapViewModel.updateDestinationLocation(coordinate, name: name)
+        }
+
+        // Calculate route if both locations are set
+        if configuration.enableRouteCalculation,
+           viewModel.pickupLocation != nil,
+           viewModel.destinationLocation != nil {
+            Task {
+                await viewModel.calculateRoute()
+                if let route = viewModel.route {
+                    mapViewModel.updateRouteFromMKRoute(route)
+                }
+            }
+        }
+
+        updateSliderVisibility()
     }
 
     private func debounceGeocoding(_ text: String, isPickup: Bool) {
