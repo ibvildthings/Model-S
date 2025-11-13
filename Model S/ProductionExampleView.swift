@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import CoreLocation
+import MapKit
 
 /// Example of how to integrate RideRequestView in a production app
 /// with all production-ready features enabled
