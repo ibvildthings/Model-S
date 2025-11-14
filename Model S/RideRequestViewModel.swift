@@ -190,7 +190,7 @@ class RideRequestViewModel: ObservableObject {
             }
 
         } catch {
-            self.error = .networkError
+            self.error = .rideRequestFailed
             rideState = .routeReady // Reset to allow retry
         }
     }
@@ -203,7 +203,7 @@ class RideRequestViewModel: ObservableObject {
             try await rideRequestService.cancelRide(rideId: rideId)
             resetRideState()
         } catch {
-            self.error = .networkError
+            self.error = .rideRequestFailed
         }
     }
 

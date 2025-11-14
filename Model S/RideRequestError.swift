@@ -17,6 +17,7 @@ enum RideRequestError: LocalizedError {
     case invalidPickupLocation
     case invalidDestinationLocation
     case networkUnavailable
+    case rideRequestFailed
     case unknown(Error)
 
     var errorDescription: String? {
@@ -37,6 +38,8 @@ enum RideRequestError: LocalizedError {
             return "Please enter a valid destination."
         case .networkUnavailable:
             return "No internet connection. Please check your network."
+        case .rideRequestFailed:
+            return "Unable to request a ride. Please try again."
         case .unknown(let error):
             return "An error occurred: \(error.localizedDescription)"
         }
