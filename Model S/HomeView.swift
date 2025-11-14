@@ -59,7 +59,7 @@ struct HomeView: View {
                         showDrive = true
                     }) {
                         HStack {
-                            Image(systemName: "steering.wheel")
+                            Image(systemName: "steeringwheel")
                                 .font(.title2)
 
                             Text("Drive")
@@ -137,7 +137,7 @@ struct DriveView: View {
             VStack {
                 Spacer()
 
-                Image(systemName: "steering.wheel")
+                Image(systemName: "steeringwheel")
                     .font(.system(size: 100))
                     .foregroundColor(.white)
 

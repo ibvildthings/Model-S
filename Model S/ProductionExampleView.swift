@@ -362,10 +362,14 @@ struct RideRequestViewWithViewModel: View {
             }
         }
         .onChange(of: pickupText) { newValue in
-            coordinator.viewModel.pickupAddress = newValue
+            Task { @MainActor in
+                coordinator.viewModel.pickupAddress = newValue
+            }
         }
         .onChange(of: destinationText) { newValue in
-            coordinator.viewModel.destinationAddress = newValue
+            Task { @MainActor in
+                coordinator.viewModel.destinationAddress = newValue
+            }
         }
         .sheet(isPresented: $showRideHistory) {
             RideHistoryView()
