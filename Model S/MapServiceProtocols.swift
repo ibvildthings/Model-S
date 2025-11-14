@@ -11,11 +11,16 @@ import CoreLocation
 // MARK: - Location Search Service
 
 /// Represents an autocomplete search result
-struct LocationSearchResult: Identifiable {
+struct LocationSearchResult: Identifiable, Equatable {
     let id = UUID()
     let title: String
     let subtitle: String
     let internalResult: Any // Provider-specific result object
+
+    /// Equatable conformance - compare by ID
+    static func == (lhs: LocationSearchResult, rhs: LocationSearchResult) -> Bool {
+        lhs.id == rhs.id
+    }
 }
 
 /// Protocol for location search/autocomplete services
