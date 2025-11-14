@@ -328,7 +328,7 @@ struct RideRequestViewWithViewModel: View {
             pickupText = "Current Location"
 
             let geocodingService = MapServiceFactory.shared.createGeocodingService()
-            if let (_, address) = try? await geocodingService.reverseGeocode(coordinate: coordinate) {
+            if let address = try? await geocodingService.reverseGeocode(coordinate: coordinate) {
                 pickupText = address
             }
         }
