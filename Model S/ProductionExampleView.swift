@@ -379,6 +379,11 @@ struct RideRequestViewWithViewModel: View {
         // Coordinator handles all validation and state management
         if let result = coordinator.confirmRide() {
             onRideConfirmed(result.pickup, result.destination)
+
+            // Start the ride request flow in a detached task (outside view update cycle)
+            Task {
+                await coordinator.startRideRequest()
+            }
         }
     }
 

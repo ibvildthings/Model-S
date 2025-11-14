@@ -144,7 +144,6 @@ class RideRequestCoordinator: ObservableObject {
     // MARK: - Ride Confirmation
 
     /// Validates and confirms the ride request
-    /// Initiates the full ride request flow: searching -> driver found -> en route
     /// - Returns: Tuple of (pickup, destination) if successful, nil if validation failed
     func confirmRide() -> (pickup: LocationPoint, destination: LocationPoint)? {
         // Validate locations exist
@@ -165,15 +164,12 @@ class RideRequestCoordinator: ObservableObject {
             }
         }
 
-        // Start the ride request flow asynchronously
-        // Use DispatchQueue to ensure we're completely outside the current view update cycle
-        DispatchQueue.main.async { [weak self] in
-            Task { @MainActor in
-                await self?.viewModel.requestRide()
-            }
-        }
-
         return (pickup, destination)
+    }
+
+    /// Start the ride request flow (call this from an async context)
+    func startRideRequest() async {
+        await viewModel.requestRide()
     }
 
     /// Cancels the current active ride
