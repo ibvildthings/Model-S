@@ -218,30 +218,102 @@ struct RideRequestViewWithViewModel: View {
                 }
             }
 
-            // Status Banner
-            if coordinator.viewModel.rideState == .rideRequested {
+            // Status Banner - Shows different states of ride request
+            if shouldShowStatusBanner {
                 VStack {
                     VStack(spacing: 16) {
+                        // Status Header
                         HStack {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            if coordinator.viewModel.rideState == .searchingForDriver {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else if coordinator.viewModel.rideState == .driverFound {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .font(.system(size: 24))
+                            } else if coordinator.viewModel.rideState == .driverEnRoute {
+                                Image(systemName: "car.fill")
+                                    .foregroundColor(.white)
+                                    .font(.system(size: 24))
+                            }
 
-                            Text("Finding your driver...")
-                                .font(.headline)
-                                .foregroundColor(.white)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(statusBannerTitle)
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+
+                                if let subtitle = statusBannerSubtitle {
+                                    Text(subtitle)
+                                        .font(.subheadline)
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                            }
                         }
 
-                        Button(action: {
-                            coordinator.cancelRideRequest()
-                        }) {
-                            Text("Cancel Request")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.red)
-                                .cornerRadius(12)
+                        // Driver Info (when found)
+                        if let driver = coordinator.viewModel.currentDriver,
+                           coordinator.viewModel.rideState != .searchingForDriver {
+                            Divider()
+                                .background(Color.white.opacity(0.3))
+
+                            HStack(spacing: 12) {
+                                // Driver avatar placeholder
+                                Circle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 50, height: 50)
+                                    .overlay(
+                                        Image(systemName: "person.fill")
+                                            .foregroundColor(.white.opacity(0.7))
+                                    )
+
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(driver.name)
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+
+                                    HStack(spacing: 8) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "star.fill")
+                                                .foregroundColor(.yellow)
+                                                .font(.system(size: 12))
+                                            Text(String(format: "%.1f", driver.rating))
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.9))
+                                        }
+
+                                        Text("•")
+                                            .foregroundColor(.white.opacity(0.5))
+
+                                        Text("\(driver.vehicleColor) \(driver.vehicleMake) \(driver.vehicleModel)")
+                                            .font(.subheadline)
+                                            .foregroundColor(.white.opacity(0.9))
+                                            .lineLimit(1)
+                                    }
+
+                                    Text(driver.licensePlate)
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+
+                                Spacer()
+                            }
+                        }
+
+                        // Cancel Button
+                        if coordinator.viewModel.rideState == .searchingForDriver ||
+                           coordinator.viewModel.rideState == .rideRequested {
+                            Button(action: {
+                                coordinator.cancelRideRequest()
+                            }) {
+                                Text("Cancel Request")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color.red)
+                                    .cornerRadius(12)
+                            }
                         }
                     }
                     .padding(.horizontal, 24)
@@ -331,6 +403,47 @@ struct RideRequestViewWithViewModel: View {
             if let address = try? await geocodingService.reverseGeocode(coordinate: coordinate) {
                 pickupText = address
             }
+        }
+    }
+
+    // MARK: - Status Banner Helpers
+
+    private var shouldShowStatusBanner: Bool {
+        coordinator.viewModel.rideState == .rideRequested ||
+        coordinator.viewModel.rideState == .searchingForDriver ||
+        coordinator.viewModel.rideState == .driverFound ||
+        coordinator.viewModel.rideState == .driverEnRoute
+    }
+
+    private var statusBannerTitle: String {
+        switch coordinator.viewModel.rideState {
+        case .rideRequested, .searchingForDriver:
+            return "Finding your driver..."
+        case .driverFound:
+            return "Driver Found!"
+        case .driverEnRoute:
+            return "Driver is on the way!"
+        default:
+            return ""
+        }
+    }
+
+    private var statusBannerSubtitle: String? {
+        switch coordinator.viewModel.rideState {
+        case .driverFound:
+            if let eta = coordinator.viewModel.estimatedDriverArrival {
+                let minutes = Int(eta / 60)
+                return "Arriving in \(minutes) min"
+            }
+            return nil
+        case .driverEnRoute:
+            if let eta = coordinator.viewModel.estimatedDriverArrival {
+                let minutes = Int(eta / 60)
+                return "ETA: \(minutes) min"
+            }
+            return "Your driver is heading to your location"
+        default:
+            return nil
         }
     }
 }

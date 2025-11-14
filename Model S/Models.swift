@@ -74,4 +74,13 @@ enum RideRequestState {
 
     /// Ride has been requested and is being processed
     case rideRequested
+
+    /// Searching for an available driver
+    case searchingForDriver
+
+    /// A driver has been found and assigned
+    case driverFound
+
+    /// Driver is en route to pickup location
+    case driverEnRoute
 }

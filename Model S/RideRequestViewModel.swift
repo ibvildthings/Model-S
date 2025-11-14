@@ -23,14 +23,21 @@ class RideRequestViewModel: ObservableObject {
     @Published var estimatedTravelTime: TimeInterval?
     @Published var estimatedDistance: CLLocationDistance?
 
+    // Driver-related properties
+    @Published var currentDriver: DriverInfo?
+    @Published var currentRideId: String?
+    @Published var estimatedDriverArrival: TimeInterval?
+
     private let geocodingService: any GeocodingService
     private let routeService: any RouteCalculationService
+    private let rideRequestService: any RideRequestService
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    init(rideRequestService: (any RideRequestService)? = nil) {
         // Create services from factory
         self.geocodingService = MapServiceFactory.shared.createGeocodingService()
         self.routeService = MapServiceFactory.shared.createRouteCalculationService()
+        self.rideRequestService = rideRequestService ?? RideRequestServiceFactory.shared.createRideRequestService(useMock: true)
     }
 
     // MARK: - Geocoding
@@ -141,6 +148,73 @@ class RideRequestViewModel: ObservableObject {
         return true
     }
 
+    // MARK: - Ride Request
+
+    /// Request a ride and handle the full flow: searching -> driver found -> en route
+    func requestRide() async {
+        guard let pickup = pickupLocation,
+              let destination = destinationLocation else {
+            error = .invalidPickupLocation
+            return
+        }
+
+        do {
+            // Step 1: Initial ride request
+            rideState = .rideRequested
+            let initialResult = try await rideRequestService.requestRide(
+                pickup: pickup,
+                destination: destination
+            )
+            currentRideId = initialResult.rideId
+
+            // Step 2: Transition to searching state
+            rideState = .searchingForDriver
+
+            // Step 3: Poll for status updates (simulates waiting for driver assignment)
+            let statusResult = try await rideRequestService.getRideStatus(rideId: initialResult.rideId)
+
+            // Step 4: Driver found - update state and driver info
+            if statusResult.status == .driverFound {
+                currentDriver = statusResult.driver
+                estimatedDriverArrival = statusResult.estimatedArrival
+                rideState = .driverFound
+
+                // Step 5: Wait a moment, then transition to driver en route
+                try await Task.sleep(nanoseconds: UInt64(2.0 * 1_000_000_000))
+                rideState = .driverEnRoute
+
+                // Update ETA for en route
+                if let arrival = estimatedDriverArrival {
+                    estimatedDriverArrival = arrival - 60 // 1 minute less
+                }
+            }
+
+        } catch {
+            self.error = .networkError
+            rideState = .routeReady // Reset to allow retry
+        }
+    }
+
+    /// Cancel the current ride
+    func cancelCurrentRide() async {
+        guard let rideId = currentRideId else { return }
+
+        do {
+            try await rideRequestService.cancelRide(rideId: rideId)
+            resetRideState()
+        } catch {
+            self.error = .networkError
+        }
+    }
+
+    /// Reset ride-specific state (keeps pickup/destination)
+    func resetRideState() {
+        currentDriver = nil
+        currentRideId = nil
+        estimatedDriverArrival = nil
+        rideState = .routeReady
+    }
+
     // MARK: - State Management
 
     /// Reset to initial state
@@ -155,6 +229,9 @@ class RideRequestViewModel: ObservableObject {
         isLoading = false
         estimatedTravelTime = nil
         estimatedDistance = nil
+        currentDriver = nil
+        currentRideId = nil
+        estimatedDriverArrival = nil
     }
 
     /// Cancel current ride request

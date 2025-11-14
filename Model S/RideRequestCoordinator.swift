@@ -144,6 +144,7 @@ class RideRequestCoordinator: ObservableObject {
     // MARK: - Ride Confirmation
 
     /// Validates and confirms the ride request
+    /// Initiates the full ride request flow: searching -> driver found -> en route
     /// - Returns: Tuple of (pickup, destination) if successful, nil if validation failed
     func confirmRide() -> (pickup: LocationPoint, destination: LocationPoint)? {
         // Validate locations exist
@@ -164,10 +165,19 @@ class RideRequestCoordinator: ObservableObject {
             }
         }
 
-        // Update state to requested
-        viewModel.rideState = .rideRequested
+        // Start the ride request flow asynchronously
+        Task {
+            await viewModel.requestRide()
+        }
 
         return (pickup, destination)
+    }
+
+    /// Cancels the current active ride
+    func cancelCurrentRide() {
+        Task {
+            await viewModel.cancelCurrentRide()
+        }
     }
 
     // MARK: - State Management
