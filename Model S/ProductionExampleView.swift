@@ -218,13 +218,28 @@ struct RideRequestViewWithViewModel: View {
             // Status Banner
             if coordinator.viewModel.rideState == .rideRequested {
                 VStack {
-                    HStack {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    VStack(spacing: 16) {
+                        HStack {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
 
-                        Text("Finding your driver...")
-                            .font(.headline)
-                            .foregroundColor(.white)
+                            Text("Finding your driver...")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                        }
+
+                        Button(action: {
+                            coordinator.cancelRideRequest()
+                        }) {
+                            Text("Cancel Request")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.red)
+                                .cornerRadius(12)
+                        }
                     }
                     .padding(.horizontal, 24)
                     .padding(.vertical, 16)
