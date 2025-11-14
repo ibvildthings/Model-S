@@ -321,13 +321,8 @@ struct RideRequestViewWithViewModel: View {
         let isPickup: Bool = true
 
         // Set pickup location with temporary "Current Location" text
-        Task { @MainActor in
-            // Use coordinator to set the location
-            await coordinator.selectLocation(
-                coordinate: coordinate,
-                name: locationName,
-                isPickup: isPickup
-            )
+        Task {
+            await coordinator.selectLocation(coordinate: coordinate, name: locationName, isPickup: isPickup)
 
             // Update the text field to show "Current Location"
             pickupText = locationName
