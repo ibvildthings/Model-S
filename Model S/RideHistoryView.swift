@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 /// View displaying the list of ride history
 struct RideHistoryView: View {
