@@ -166,7 +166,7 @@ class RideRequestCoordinator: ObservableObject {
         }
 
         // Start the ride request flow asynchronously
-        Task {
+        Task { @MainActor in
             await viewModel.requestRide()
         }
 
@@ -175,7 +175,7 @@ class RideRequestCoordinator: ObservableObject {
 
     /// Cancels the current active ride
     func cancelCurrentRide() {
-        Task {
+        Task { @MainActor in
             await viewModel.cancelCurrentRide()
         }
     }

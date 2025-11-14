@@ -160,27 +160,35 @@ class RideRequestViewModel: ObservableObject {
 
         do {
             // Step 1: Initial ride request
+            print("🚗 Step 1: Requesting ride...")
             rideState = .rideRequested
             let initialResult = try await rideRequestService.requestRide(
                 pickup: pickup,
                 destination: destination
             )
             currentRideId = initialResult.rideId
+            print("🚗 Ride ID: \(initialResult.rideId)")
 
             // Step 2: Transition to searching state
+            print("🚗 Step 2: Searching for driver...")
             rideState = .searchingForDriver
 
             // Step 3: Poll for status updates (simulates waiting for driver assignment)
+            print("🚗 Step 3: Polling for driver status...")
             let statusResult = try await rideRequestService.getRideStatus(rideId: initialResult.rideId)
+            print("🚗 Status received: \(statusResult.status)")
 
             // Step 4: Driver found - update state and driver info
             if statusResult.status == .driverFound {
+                print("🚗 Step 4: Driver found - \(statusResult.driver?.name ?? "Unknown")")
                 currentDriver = statusResult.driver
                 estimatedDriverArrival = statusResult.estimatedArrival
                 rideState = .driverFound
 
                 // Step 5: Wait a moment, then transition to driver en route
+                print("🚗 Step 5: Waiting before transitioning to en route...")
                 try await Task.sleep(nanoseconds: UInt64(2.0 * 1_000_000_000))
+                print("🚗 Step 6: Driver is now en route!")
                 rideState = .driverEnRoute
 
                 // Update ETA for en route
@@ -190,6 +198,7 @@ class RideRequestViewModel: ObservableObject {
             }
 
         } catch {
+            print("❌ Error requesting ride: \(error)")
             self.error = .rideRequestFailed
             rideState = .routeReady // Reset to allow retry
         }
