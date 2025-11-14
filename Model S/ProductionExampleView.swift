@@ -62,10 +62,36 @@ struct ProductionExampleView: View {
             print("ETA: \(eta), Distance: \(distance)")
         }
 
+        // Save ride to history
+        saveRideToHistory(pickup: pickup, destination: destination)
+
         // Example: Send to backend
         // Task {
         //     await submitRideRequest(pickup: pickup, destination: destination)
         // }
+    }
+
+    private func saveRideToHistory(pickup: LocationPoint, destination: LocationPoint) {
+        // Extract ride details from viewModel
+        let distance = rideViewModel.estimatedDistance ?? 0
+        let travelTime = rideViewModel.estimatedTravelTime ?? 0
+        let pickupAddress = rideViewModel.pickupAddress.isEmpty ? (pickup.name ?? "Unknown") : rideViewModel.pickupAddress
+        let destinationAddress = rideViewModel.destinationAddress.isEmpty ? (destination.name ?? "Unknown") : rideViewModel.destinationAddress
+
+        // Create ride history entry
+        let ride = RideHistory(
+            pickupLocation: pickup,
+            destinationLocation: destination,
+            distance: distance,
+            estimatedTravelTime: travelTime,
+            pickupAddress: pickupAddress,
+            destinationAddress: destinationAddress
+        )
+
+        // Save to persistent storage
+        RideHistoryStore.shared.addRide(ride)
+
+        print("✅ Ride saved to history: \(ride.formattedDistance), \(ride.formattedTravelTime)")
     }
 }
 
@@ -94,6 +120,7 @@ struct RideRequestViewWithViewModel: View {
     @State private var pickupText: String
     @State private var destinationText = ""
     @FocusState private var focusedField: RideLocationCard.LocationField?
+    @State private var showRideHistory = false
 
     var onRideConfirmed: (LocationPoint, LocationPoint) -> Void
     var onCancel: () -> Void
@@ -220,12 +247,38 @@ struct RideRequestViewWithViewModel: View {
                     .scaleEffect(1.5)
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
             }
+
+            // Floating History Button
+            VStack {
+                HStack {
+                    Spacer()
+
+                    Button(action: {
+                        showRideHistory = true
+                    }) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .font(.system(size: 20))
+                            .foregroundColor(.white)
+                            .frame(width: 50, height: 50)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                    }
+                    .padding(.top, 60)
+                    .padding(.trailing, 16)
+                }
+
+                Spacer()
+            }
         }
         .onChange(of: pickupText) { newValue in
             coordinator.viewModel.pickupAddress = newValue
         }
         .onChange(of: destinationText) { newValue in
             coordinator.viewModel.destinationAddress = newValue
+        }
+        .sheet(isPresented: $showRideHistory) {
+            RideHistoryView()
         }
     }
 

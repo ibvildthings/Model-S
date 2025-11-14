@@ -10,6 +10,7 @@ import SwiftUI
 struct HomeView: View {
     @State private var showRideRequest = false
     @State private var showDrive = false
+    @State private var showRideHistory = false
 
     var body: some View {
         NavigationStack {
@@ -73,6 +74,26 @@ struct HomeView: View {
                     }
                     .padding(.horizontal, 32)
 
+                    // Ride History Button
+                    Button(action: {
+                        showRideHistory = true
+                    }) {
+                        HStack {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.title2)
+
+                            Text("Ride History")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                        .background(Color.gray.opacity(0.2))
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .padding(.horizontal, 32)
+
                     Spacer()
                     Spacer()
                 }
@@ -97,6 +118,9 @@ struct HomeView: View {
                 DriveView(onDismiss: {
                     showDrive = false
                 })
+            }
+            .sheet(isPresented: $showRideHistory) {
+                RideHistoryView()
             }
         }
     }
