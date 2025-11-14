@@ -148,7 +148,9 @@ struct RideRequestViewWithViewModel: View {
                 // Error Banner
                 if let error = coordinator.viewModel.error {
                     ErrorBannerView(error: error, onDismiss: {
-                        coordinator.viewModel.error = nil
+                        DispatchQueue.main.async {
+                            coordinator.viewModel.error = nil
+                        }
                     })
                     .padding(.top, 60)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -362,12 +364,12 @@ struct RideRequestViewWithViewModel: View {
             }
         }
         .onChange(of: pickupText) { newValue in
-            Task { @MainActor in
+            DispatchQueue.main.async {
                 coordinator.viewModel.pickupAddress = newValue
             }
         }
         .onChange(of: destinationText) { newValue in
-            Task { @MainActor in
+            DispatchQueue.main.async {
                 coordinator.viewModel.destinationAddress = newValue
             }
         }
@@ -393,7 +395,9 @@ struct RideRequestViewWithViewModel: View {
 
     private func handleUseCurrentLocation() {
         guard let userLocation = coordinator.mapViewModel.userLocation else {
-            coordinator.viewModel.error = .locationUnavailable
+            DispatchQueue.main.async {
+                coordinator.viewModel.error = .locationUnavailable
+            }
             return
         }
 

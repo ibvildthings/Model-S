@@ -44,7 +44,21 @@ class RideRequestCoordinator: ObservableObject {
         self.geocodingDebouncer = Debouncer(delay: TimingConstants.geocodingDebounceDelay)
 
         setupLocationUpdates()
+
+        // Forward viewModel changes to coordinator's objectWillChange
+        viewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        // Forward mapViewModel changes to coordinator's objectWillChange
+        mapViewModel.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
     }
+
+    // MARK: - Cancellables
+
+    private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Location Selection
 
