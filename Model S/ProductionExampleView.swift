@@ -133,7 +133,7 @@ struct RideRequestViewWithViewModel: View {
     ) {
         // Create coordinator with configuration
         self._coordinator = StateObject(wrappedValue: RideRequestCoordinator(configuration: configuration))
-        self._pickupText = State(initialValue: configuration.defaultPickupText)
+        self._pickupText = State(initialValue: configuration.defaultPickupText as String)
         self.onRideConfirmed = onRideConfirmed
         self.onCancel = onCancel
     }
