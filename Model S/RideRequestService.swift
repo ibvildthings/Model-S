@@ -138,7 +138,7 @@ class MockRideRequestService: RideRequestService {
             photoURL: nil,
             phoneNumber: nil,
             currentLocation: nil,
-            estimatedArrival: 5 * 60 // 5 minutes
+            estimatedArrivalTime: 5 * 60 // 5 minutes
         )
     }
 }
