@@ -174,6 +174,9 @@ struct RideRequestViewWithViewModel: View {
                         Task {
                             await coordinator.selectLocation(coordinate: coordinate, name: name, isPickup: isPickup)
                         }
+                    },
+                    onUseCurrentLocation: {
+                        handleUseCurrentLocation()
                     }
                 )
                 .padding(.top, coordinator.viewModel.error != nil ? 8 : 60)
@@ -304,6 +307,34 @@ struct RideRequestViewWithViewModel: View {
         // Coordinator handles all validation and state management
         if let result = coordinator.confirmRide() {
             onRideConfirmed(result.pickup, result.destination)
+        }
+    }
+
+    private func handleUseCurrentLocation() {
+        guard let userLocation = coordinator.mapViewModel.userLocation else {
+            coordinator.viewModel.error = .locationUnavailable
+            return
+        }
+
+        let coordinate = userLocation.coordinate
+
+        // Set pickup location with temporary "Current Location" text
+        Task {
+            // Use coordinator to set the location
+            await coordinator.selectLocation(
+                coordinate: coordinate,
+                name: "Current Location",
+                isPickup: true
+            )
+
+            // Update the text field to show "Current Location"
+            pickupText = "Current Location"
+
+            // Optionally, reverse geocode to get actual address
+            let geocodingService = MapServiceFactory.shared.createGeocodingService()
+            if let (_, address) = try? await geocodingService.reverseGeocode(coordinate: coordinate) {
+                pickupText = address
+            }
         }
     }
 }

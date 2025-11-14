@@ -20,6 +20,7 @@ struct RideLocationCardWithSearch: View {
     var onPickupTap: () -> Void
     var onDestinationTap: () -> Void
     var onLocationSelected: (CLLocationCoordinate2D, String, Bool) -> Void
+    var onUseCurrentLocation: (() -> Void)?
 
     init(
         pickupText: Binding<String>,
@@ -29,7 +30,8 @@ struct RideLocationCardWithSearch: View {
         userLocation: CLLocationCoordinate2D? = nil,
         onPickupTap: @escaping () -> Void,
         onDestinationTap: @escaping () -> Void,
-        onLocationSelected: @escaping (CLLocationCoordinate2D, String, Bool) -> Void
+        onLocationSelected: @escaping (CLLocationCoordinate2D, String, Bool) -> Void,
+        onUseCurrentLocation: (() -> Void)? = nil
     ) {
         self._pickupText = pickupText
         self._destinationText = destinationText
@@ -39,6 +41,7 @@ struct RideLocationCardWithSearch: View {
         self.onPickupTap = onPickupTap
         self.onDestinationTap = onDestinationTap
         self.onLocationSelected = onLocationSelected
+        self.onUseCurrentLocation = onUseCurrentLocation
 
         // Create search service from factory (properly typed)
         // Note: Currently only Apple Maps is implemented
@@ -88,6 +91,24 @@ struct RideLocationCardWithSearch: View {
                                 searchService.search(query: pickupText)
                             }
                         }
+
+                    // Current Location Button
+                    if let onUseCurrentLocation = onUseCurrentLocation {
+                        Button(action: {
+                            onUseCurrentLocation()
+                            focusedField = nil
+                        }) {
+                            Image(systemName: "location.fill")
+                                .font(.system(size: 16))
+                                .foregroundColor(.blue)
+                                .frame(width: 36, height: 36)
+                                .background(Color(.systemBackground))
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                        }
+                        .accessibilityLabel("Use current location")
+                        .accessibilityHint("Set pickup to your current location")
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
