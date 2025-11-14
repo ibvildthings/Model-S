@@ -166,7 +166,9 @@ class RideRequestCoordinator: ObservableObject {
         }
 
         // Start the ride request flow asynchronously
+        // Use a small delay to ensure we're outside the view update cycle
         Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 second
             await viewModel.requestRide()
         }
 

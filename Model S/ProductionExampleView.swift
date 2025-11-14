@@ -326,6 +326,8 @@ struct RideRequestViewWithViewModel: View {
                     Spacer()
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
+                .animation(.easeInOut(duration: 0.3), value: coordinator.viewModel.rideState)
+                .animation(.easeInOut(duration: 0.3), value: coordinator.viewModel.currentDriver?.id)
             }
 
             // Loading Overlay
