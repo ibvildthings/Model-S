@@ -316,18 +316,17 @@ struct RideRequestViewWithViewModel: View {
             return
         }
 
-        let coordinate: CLLocationCoordinate2D = userLocation.coordinate
-        let locationName: String = "Current Location"
-        let isPickup: Bool = true
+        let coordinate = userLocation.coordinate
 
-        // Set pickup location with temporary "Current Location" text
-        let _ = Task<Void, Never> {
-            await coordinator.selectLocation(coordinate: coordinate, name: locationName, isPickup: isPickup)
+        Task {
+            await coordinator.selectLocation(
+                coordinate: coordinate,
+                name: "Current Location",
+                isPickup: true
+            )
 
-            // Update the text field to show "Current Location"
-            pickupText = locationName
+            pickupText = "Current Location"
 
-            // Optionally, reverse geocode to get actual address
             let geocodingService = MapServiceFactory.shared.createGeocodingService()
             if let (_, address) = try? await geocodingService.reverseGeocode(coordinate: coordinate) {
                 pickupText = address
