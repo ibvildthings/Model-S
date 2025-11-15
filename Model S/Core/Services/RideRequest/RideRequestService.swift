@@ -11,7 +11,7 @@ import CoreLocation
 // MARK: - Driver Info
 
 /// Represents driver information
-struct DriverInfo: Identifiable {
+struct DriverInfo: Identifiable, Equatable {
     let id: String
     let name: String
     let rating: Double
@@ -23,6 +23,31 @@ struct DriverInfo: Identifiable {
     let phoneNumber: String?
     let currentLocation: CLLocationCoordinate2D?
     let estimatedArrivalTime: TimeInterval? // seconds until arrival
+
+    static func == (lhs: DriverInfo, rhs: DriverInfo) -> Bool {
+        lhs.id == rhs.id &&
+        lhs.name == rhs.name &&
+        lhs.rating == rhs.rating &&
+        lhs.vehicleMake == rhs.vehicleMake &&
+        lhs.vehicleModel == rhs.vehicleModel &&
+        lhs.vehicleColor == rhs.vehicleColor &&
+        lhs.licensePlate == rhs.licensePlate &&
+        lhs.photoURL == rhs.photoURL &&
+        lhs.phoneNumber == rhs.phoneNumber &&
+        coordinatesEqual(lhs.currentLocation, rhs.currentLocation) &&
+        lhs.estimatedArrivalTime == rhs.estimatedArrivalTime
+    }
+
+    private static func coordinatesEqual(_ lhs: CLLocationCoordinate2D?, _ rhs: CLLocationCoordinate2D?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case (let l?, let r?):
+            return l.latitude == r.latitude && l.longitude == r.longitude
+        default:
+            return false
+        }
+    }
 }
 
 // MARK: - Ride Request Result
