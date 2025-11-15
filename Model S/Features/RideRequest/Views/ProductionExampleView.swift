@@ -194,21 +194,6 @@ struct RideRequestViewWithViewModel: View {
                 }
 
                 Spacer()
-
-                // Cancel Button - Only show during initial selection, not during ride states
-                if !shouldShowStatusBanner && !coordinator.shouldShowConfirmSlider {
-                    Button(action: {
-                        onCancel()
-                    }) {
-                        Text("Cancel")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(width: 120, height: 44)
-                            .background(Color.red)
-                            .cornerRadius(12)
-                    }
-                    .padding(.bottom, 16)
-                }
             }
 
             // Confirm Slider (managed by coordinator)
