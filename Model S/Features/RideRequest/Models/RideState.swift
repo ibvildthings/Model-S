@@ -10,7 +10,7 @@ import Foundation
 
 /// Represents all possible states in the ride request flow
 /// Uses associated values to keep state and data together
-enum RideState: Equatable {
+indirect enum RideState: Equatable {
     /// Initial state - no locations selected
     case idle
 
