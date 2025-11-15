@@ -10,7 +10,7 @@ import Foundation
 
 /// Represents all possible states in the ride request flow
 /// Uses associated values to keep state and data together
-indirect enum RideState: Equatable {
+indirect enum RideState {
     /// Initial state - no locations selected
     case idle
 
@@ -167,5 +167,72 @@ struct RouteInfo: Equatable {
         lhs.distance == rhs.distance &&
         lhs.estimatedTravelTime == rhs.estimatedTravelTime &&
         lhs.polyline == rhs.polyline
+    }
+}
+
+// MARK: - Equatable Conformance
+
+extension RideState: Equatable {
+    static func == (lhs: RideState, rhs: RideState) -> Bool {
+        switch (lhs, rhs) {
+        case (.idle, .idle):
+            return true
+
+        case (.selectingLocations(let lhsPickup, let lhsDestination),
+              .selectingLocations(let rhsPickup, let rhsDestination)):
+            return lhsPickup == rhsPickup && lhsDestination == rhsDestination
+
+        case (.routeReady(let lhsPickup, let lhsDestination, let lhsRoute),
+              .routeReady(let rhsPickup, let rhsDestination, let rhsRoute)):
+            return lhsPickup == rhsPickup && lhsDestination == rhsDestination && lhsRoute == rhsRoute
+
+        case (.submittingRequest(let lhsPickup, let lhsDestination),
+              .submittingRequest(let rhsPickup, let rhsDestination)):
+            return lhsPickup == rhsPickup && lhsDestination == rhsDestination
+
+        case (.searchingForDriver(let lhsRideId, let lhsPickup, let lhsDestination),
+              .searchingForDriver(let rhsRideId, let rhsPickup, let rhsDestination)):
+            return lhsRideId == rhsRideId && lhsPickup == rhsPickup && lhsDestination == rhsDestination
+
+        case (.driverAssigned(let lhsRideId, let lhsDriver, let lhsPickup, let lhsDestination),
+              .driverAssigned(let rhsRideId, let rhsDriver, let rhsPickup, let rhsDestination)):
+            return lhsRideId == rhsRideId && lhsDriver == rhsDriver && lhsPickup == rhsPickup && lhsDestination == rhsDestination
+
+        case (.driverEnRoute(let lhsRideId, let lhsDriver, let lhsEta, let lhsPickup, let lhsDestination),
+              .driverEnRoute(let rhsRideId, let rhsDriver, let rhsEta, let rhsPickup, let rhsDestination)):
+            return lhsRideId == rhsRideId && lhsDriver == rhsDriver && lhsEta == rhsEta && lhsPickup == rhsPickup && lhsDestination == rhsDestination
+
+        case (.error(let lhsError, let lhsPrevious), .error(let rhsError, let rhsPrevious)):
+            // Compare error types (ignore associated values for .unknown case)
+            let errorsMatch = errorTypesMatch(lhsError, rhsError)
+            // Recursively compare previous states
+            let previousMatch = (lhsPrevious == nil && rhsPrevious == nil) ||
+                               (lhsPrevious != nil && rhsPrevious != nil && lhsPrevious! == rhsPrevious!)
+            return errorsMatch && previousMatch
+
+        default:
+            return false
+        }
+    }
+
+    /// Helper to compare error types (ignoring associated Error values)
+    private static func errorTypesMatch(_ lhs: RideRequestError, _ rhs: RideRequestError) -> Bool {
+        switch (lhs, rhs) {
+        case (.locationPermissionDenied, .locationPermissionDenied),
+             (.locationServicesDisabled, .locationServicesDisabled),
+             (.locationUnavailable, .locationUnavailable),
+             (.geocodingFailed, .geocodingFailed),
+             (.routeCalculationFailed, .routeCalculationFailed),
+             (.invalidPickupLocation, .invalidPickupLocation),
+             (.invalidDestinationLocation, .invalidDestinationLocation),
+             (.networkUnavailable, .networkUnavailable),
+             (.rideRequestFailed, .rideRequestFailed):
+            return true
+        case (.unknown, .unknown):
+            // We can't compare Error values, so consider all .unknown cases equal
+            return true
+        default:
+            return false
+        }
     }
 }
