@@ -17,6 +17,7 @@ struct RideMapView: View {
             region: $viewModel.region,
             pickupLocation: viewModel.pickupLocation?.coordinate,
             destinationLocation: viewModel.destinationLocation?.coordinate,
+            driverLocation: viewModel.driverLocation,
             route: viewModel.routePolyline as? MKPolyline,
             showsUserLocation: true,
             routeLineColor: configuration.routeLineColor,
@@ -29,6 +30,11 @@ struct RideMapView: View {
         }
         .onChange(of: viewModel.destinationLocation) { _ in
             if viewModel.destinationLocation != nil {
+                hapticFeedback()
+            }
+        }
+        .onChange(of: viewModel.driverLocation) { _ in
+            if viewModel.driverLocation != nil {
                 hapticFeedback()
             }
         }

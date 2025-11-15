@@ -12,6 +12,7 @@ struct MapViewWrapper: UIViewRepresentable {
     @Binding var region: MKCoordinateRegion
     var pickupLocation: CLLocationCoordinate2D?
     var destinationLocation: CLLocationCoordinate2D?
+    var driverLocation: CLLocationCoordinate2D?
     var route: MKPolyline?
     var showsUserLocation: Bool
     var routeLineColor: Color
@@ -43,7 +44,8 @@ struct MapViewWrapper: UIViewRepresentable {
         context.coordinator.updateAnnotations(
             mapView: mapView,
             pickup: pickupLocation,
-            destination: destinationLocation
+            destination: destinationLocation,
+            driver: driverLocation
         )
 
         // Update route overlay
@@ -71,10 +73,36 @@ struct MapViewWrapper: UIViewRepresentable {
             self.routeLineWidth = routeLineWidth
         }
 
-        func updateAnnotations(mapView: MKMapView, pickup: CLLocationCoordinate2D?, destination: CLLocationCoordinate2D?) {
-            // Remove old annotations
-            let oldAnnotations = mapView.annotations.filter { !($0 is MKUserLocation) }
+        func updateAnnotations(mapView: MKMapView, pickup: CLLocationCoordinate2D?, destination: CLLocationCoordinate2D?, driver: CLLocationCoordinate2D?) {
+            // Remove old annotations (except driver - we'll update it)
+            let oldAnnotations = mapView.annotations.filter { annotation in
+                guard !($0 is MKUserLocation) else { return false }
+                // Keep driver annotation if it exists, we'll update its position
+                return annotation.title != "Driver"
+            }
             mapView.removeAnnotations(oldAnnotations)
+
+            // Add or update driver annotation with smooth animation
+            if let driver = driver {
+                // Find existing driver annotation
+                if let existingDriver = mapView.annotations.first(where: { $0.title == "Driver" }) as? MKPointAnnotation {
+                    // Animate position change
+                    UIView.animate(withDuration: 0.3) {
+                        existingDriver.coordinate = driver
+                    }
+                } else {
+                    // Create new driver annotation
+                    let annotation = MKPointAnnotation()
+                    annotation.coordinate = driver
+                    annotation.title = "Driver"
+                    mapView.addAnnotation(annotation)
+                }
+            } else {
+                // Remove driver annotation if no driver location
+                if let existingDriver = mapView.annotations.first(where: { $0.title == "Driver" }) {
+                    mapView.removeAnnotation(existingDriver)
+                }
+            }
 
             // Add pickup annotation
             if let pickup = pickup {
@@ -142,6 +170,9 @@ struct MapViewWrapper: UIViewRepresentable {
                 annotationView?.image = createPinImage(color: .systemGreen, iconName: "location.fill")
             } else if annotation.title == "Destination" {
                 annotationView?.image = createPinImage(color: .systemBlue, iconName: "mappin")
+            } else if annotation.title == "Driver" {
+                annotationView?.image = createCarImage()
+                annotationView?.centerOffset = CGPoint(x: 0, y: 0) // Center the car icon
             }
 
             return annotationView
@@ -192,6 +223,35 @@ struct MapViewWrapper: UIViewRepresentable {
                         height: iconSize
                     )
                     icon.withTintColor(.white, renderingMode: .alwaysTemplate).draw(in: iconRect)
+                }
+            }
+        }
+
+        private func createCarImage() -> UIImage? {
+            let size = CGSize(width: 44, height: 44)
+            let renderer = UIGraphicsImageRenderer(size: size)
+
+            return renderer.image { context in
+                let ctx = context.cgContext
+
+                // Draw circular background
+                let circleRect = CGRect(x: 0, y: 0, width: 44, height: 44)
+                ctx.setFillColor(UIColor.systemBlue.cgColor)
+                ctx.fillEllipse(in: circleRect)
+
+                // Add shadow effect
+                ctx.setShadow(offset: CGSize(width: 0, height: 2), blur: 4, color: UIColor.black.withAlphaComponent(0.3).cgColor)
+
+                // Draw car icon
+                if let carIcon = UIImage(systemName: "car.fill") {
+                    let iconSize: CGFloat = 24
+                    let iconRect = CGRect(
+                        x: (44 - iconSize) / 2,
+                        y: (44 - iconSize) / 2,
+                        width: iconSize,
+                        height: iconSize
+                    )
+                    carIcon.withTintColor(.white, renderingMode: .alwaysTemplate).draw(in: iconRect)
                 }
             }
         }

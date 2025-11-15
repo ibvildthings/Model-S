@@ -41,9 +41,18 @@ class MapViewModel: NSObject, ObservableObject {
     /// User's current location
     @Published var userLocation: CLLocation?
 
+    /// Driver's current location (animated during ride)
+    @Published var driverLocation: CLLocationCoordinate2D?
+
     // MARK: - Private Dependencies
 
     private let locationManager = CLLocationManager()
+
+    /// Timer for animating driver movement
+    private var driverAnimationTimer: Timer?
+
+    /// Current progress along the route (0.0 to 1.0)
+    private var routeProgress: Double = 0.0
 
     /// Callback when user location updates (used by coordinator)
     var onLocationUpdate: ((CLLocation) -> Void)?
@@ -156,6 +165,119 @@ class MapViewModel: NSObject, ObservableObject {
     /// Stops tracking user location (call when map is no longer visible)
     func stopUpdatingLocation() {
         locationManager.stopUpdatingLocation()
+    }
+
+    // MARK: - Driver Animation
+
+    /// Starts animating the driver's movement along the route to pickup location
+    /// - Parameter startingCoordinate: Initial driver position (or nil to start from beginning of route)
+    func startDriverAnimation(from startingCoordinate: CLLocationCoordinate2D? = nil) {
+        guard let polyline = routePolyline else { return }
+
+        // Stop any existing animation
+        stopDriverAnimation()
+
+        // Set initial driver location
+        if let start = startingCoordinate {
+            driverLocation = start
+            // Calculate initial progress based on starting position
+            routeProgress = calculateProgress(for: start, on: polyline)
+        } else {
+            // Start from beginning of route
+            routeProgress = 0.0
+            if polyline.pointCount > 0 {
+                let points = polyline.points()
+                driverLocation = points[0].coordinate
+            }
+        }
+
+        // Create timer to update driver position every 0.1 seconds
+        driverAnimationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            self?.updateDriverPosition()
+        }
+    }
+
+    /// Stops the driver animation
+    func stopDriverAnimation() {
+        driverAnimationTimer?.invalidate()
+        driverAnimationTimer = nil
+    }
+
+    /// Clears the driver location from the map
+    func clearDriverLocation() {
+        stopDriverAnimation()
+        driverLocation = nil
+        routeProgress = 0.0
+    }
+
+    /// Updates the driver's position along the route
+    private func updateDriverPosition() {
+        guard let polyline = routePolyline else {
+            stopDriverAnimation()
+            return
+        }
+
+        // Increment progress (adjust speed here - 0.01 = slower, 0.05 = faster)
+        routeProgress += 0.008
+
+        // Check if we've reached the end
+        if routeProgress >= 1.0 {
+            routeProgress = 1.0
+            stopDriverAnimation()
+
+            // Set driver at pickup location
+            if let pickup = pickupLocation {
+                driverLocation = pickup.coordinate
+            }
+            return
+        }
+
+        // Calculate new position along polyline
+        let points = polyline.points()
+        let totalPoints = polyline.pointCount
+        let currentIndex = Int(Double(totalPoints - 1) * routeProgress)
+
+        if currentIndex < totalPoints {
+            driverLocation = points[currentIndex].coordinate
+        }
+    }
+
+    /// Calculates progress (0.0-1.0) for a given coordinate on the polyline
+    private func calculateProgress(for coordinate: CLLocationCoordinate2D, on polyline: MKPolyline) -> Double {
+        let points = polyline.points()
+        let totalPoints = polyline.pointCount
+
+        guard totalPoints > 0 else { return 0.0 }
+
+        // Find closest point on polyline
+        var closestIndex = 0
+        var minDistance = Double.infinity
+
+        for i in 0..<totalPoints {
+            let point = points[i].coordinate
+            let distance = self.distance(from: coordinate, to: point)
+            if distance < minDistance {
+                minDistance = distance
+                closestIndex = i
+            }
+        }
+
+        return Double(closestIndex) / Double(totalPoints - 1)
+    }
+
+    /// Calculate distance between two coordinates in meters
+    private func distance(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) -> Double {
+        let fromLocation = CLLocation(latitude: from.latitude, longitude: from.longitude)
+        let toLocation = CLLocation(latitude: to.latitude, longitude: to.longitude)
+        return fromLocation.distance(from: toLocation)
+    }
+
+    /// Check if driver is close to pickup (within 100 meters)
+    func isDriverNearPickup() -> Bool {
+        guard let driver = driverLocation,
+              let pickup = pickupLocation else { return false }
+
+        return distance(from: driver, to: pickup.coordinate) < 100
     }
 }
 

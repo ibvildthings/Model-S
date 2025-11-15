@@ -49,6 +49,7 @@ class RideRequestCoordinator: ObservableObject {
         // Forward flowController changes to coordinator's objectWillChange
         flowController.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
+            self?.handleStateChange()
         }.store(in: &cancellables)
 
         // Forward mapViewModel changes to coordinator's objectWillChange
@@ -225,5 +226,32 @@ class RideRequestCoordinator: ObservableObject {
     /// Call when destination field is focused
     func didFocusDestination() {
         // State management handled by flowController
+    }
+
+    // MARK: - State Change Handling
+
+    /// Handles state transitions and triggers appropriate actions (like driver animation)
+    private func handleStateChange() {
+        let currentState = flowController.currentState
+
+        switch currentState {
+        case .driverEnRoute, .driverArriving:
+            // Start animating driver if not already animating
+            if mapViewModel.driverLocation == nil {
+                // Start driver from beginning of route
+                mapViewModel.startDriverAnimation()
+            }
+
+        case .rideInProgress, .approachingDestination:
+            // Driver has reached pickup, clear driver animation
+            mapViewModel.clearDriverLocation()
+
+        case .idle, .selectingLocations, .routeReady:
+            // Clear driver location when going back to initial states
+            mapViewModel.clearDriverLocation()
+
+        default:
+            break
+        }
     }
 }
