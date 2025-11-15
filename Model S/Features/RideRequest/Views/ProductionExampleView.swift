@@ -141,7 +141,7 @@ struct RideRequestViewWithViewModel: View {
             RideMapView(viewModel: coordinator.mapViewModel, configuration: RideRequestConfiguration.default)
                 .ignoresSafeArea()
 
-            VStack {
+            VStack(spacing: 0) {
                 // Error Banner
                 if let error = coordinator.flowController.currentError {
                     ErrorBannerView(error: error, onDismiss: {
@@ -149,7 +149,7 @@ struct RideRequestViewWithViewModel: View {
                             coordinator.flowController.clearError()
                         }
                     })
-                    .padding(.top, 60)
+                    .padding(.top, 56)
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
@@ -178,7 +178,7 @@ struct RideRequestViewWithViewModel: View {
                         handleUseCurrentLocation()
                     }
                 )
-                .padding(.top, coordinator.flowController.currentError != nil ? 8 : 60)
+                .padding(.top, coordinator.flowController.currentError != nil ? 12 : 56)
 
                 // Route Info
                 if let routeInfo = coordinator.flowController.routeInfo {
@@ -186,7 +186,7 @@ struct RideRequestViewWithViewModel: View {
                         travelTime: formatTravelTime(routeInfo.estimatedTravelTime),
                         distance: formatDistance(routeInfo.distance)
                     )
-                    .padding(.top, 8)
+                    .padding(.top, 12)
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
@@ -194,11 +194,17 @@ struct RideRequestViewWithViewModel: View {
 
                 // Cancel Button
                 if coordinator.flowController.legacyState != .rideRequested {
-                    Button("Cancel") {
+                    Button(action: {
                         onCancel()
+                    }) {
+                        Text("Cancel")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .frame(width: 120, height: 44)
+                            .background(Color.red)
+                            .cornerRadius(12)
                     }
-                    .foregroundColor(.red)
-                    .padding(.bottom, 8)
+                    .padding(.bottom, 16)
                 }
             }
 
@@ -211,25 +217,26 @@ struct RideRequestViewWithViewModel: View {
                         configuration: RideRequestConfiguration.default,
                         onConfirmRide: handleConfirmRide
                     )
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 40)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 32)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
 
             // Status Banner - Shows different states of ride request
             if shouldShowStatusBanner {
-                VStack {
+                VStack(spacing: 0) {
                     VStack(spacing: 16) {
                         // Status Header
-                        HStack {
+                        HStack(spacing: 12) {
                             if coordinator.flowController.legacyState == .searchingForDriver {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                    .scaleEffect(1.1)
                             } else if coordinator.flowController.legacyState == .driverFound {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
-                                    .font(.system(size: 24))
+                                    .font(.system(size: 28))
                             } else if coordinator.flowController.legacyState == .driverEnRoute {
                                 Image(systemName: "car.fill")
                                     .foregroundColor(.white)
@@ -247,6 +254,8 @@ struct RideRequestViewWithViewModel: View {
                                         .foregroundColor(.white.opacity(0.9))
                                 }
                             }
+
+                            Spacer()
                         }
 
                         // Driver Info (when found)
@@ -259,13 +268,14 @@ struct RideRequestViewWithViewModel: View {
                                 // Driver avatar placeholder
                                 Circle()
                                     .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 50, height: 50)
+                                    .frame(width: 56, height: 56)
                                     .overlay(
                                         Image(systemName: "person.fill")
                                             .foregroundColor(.white.opacity(0.7))
+                                            .font(.system(size: 24))
                                     )
 
-                                VStack(alignment: .leading, spacing: 4) {
+                                VStack(alignment: .leading, spacing: 6) {
                                     Text(driver.name)
                                         .font(.headline)
                                         .foregroundColor(.white)
@@ -291,6 +301,7 @@ struct RideRequestViewWithViewModel: View {
 
                                     Text(driver.licensePlate)
                                         .font(.caption)
+                                        .fontWeight(.medium)
                                         .foregroundColor(.white.opacity(0.7))
                                 }
 
@@ -305,22 +316,23 @@ struct RideRequestViewWithViewModel: View {
                                 coordinator.cancelRideRequest()
                             }) {
                                 Text("Cancel Request")
-                                    .font(.subheadline)
+                                    .font(.headline)
                                     .fontWeight(.semibold)
                                     .foregroundColor(.white)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
+                                    .frame(height: 48)
                                     .background(Color.red)
                                     .cornerRadius(12)
                             }
                         }
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.vertical, 16)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 20)
                     .background(.ultraThinMaterial)
                     .cornerRadius(20)
-                    .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
-                    .padding(.top, 60)
+                    .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 4)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 56)
 
                     Spacer()
                 }
@@ -329,7 +341,7 @@ struct RideRequestViewWithViewModel: View {
 
             // Loading Overlay
             if coordinator.flowController.isLoading {
-                Color.black.opacity(0.2)
+                Color.black.opacity(0.3)
                     .ignoresSafeArea()
 
                 ProgressView()
@@ -348,12 +360,12 @@ struct RideRequestViewWithViewModel: View {
                         Image(systemName: "clock.arrow.circlepath")
                             .font(.system(size: 20))
                             .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
+                            .frame(width: 56, height: 56)
                             .background(Color.blue)
                             .clipShape(Circle())
-                            .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
+                            .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 4)
                     }
-                    .padding(.top, 60)
+                    .padding(.top, 56)
                     .padding(.trailing, 16)
                 }
 

@@ -20,10 +20,11 @@ struct ErrorBannerView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundColor(.red)
+                    .font(.system(size: 20))
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(error.errorDescription ?? "An error occurred")
@@ -41,9 +42,9 @@ struct ErrorBannerView: View {
                 Spacer()
 
                 Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundColor(.secondary.opacity(0.6))
                 }
             }
 
@@ -55,17 +56,18 @@ struct ErrorBannerView: View {
                     onDismiss()
                 }) {
                     Text("Open Settings")
-                        .font(.caption)
-                        .fontWeight(.medium)
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
                         .foregroundColor(.blue)
                 }
             }
         }
-        .padding()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
         .background(.ultraThinMaterial)
-        .cornerRadius(12)
-        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 5)
-        .padding(.horizontal)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 4)
+        .padding(.horizontal, 16)
     }
 
     private var needsAction: Bool {

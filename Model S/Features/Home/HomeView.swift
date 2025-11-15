@@ -19,82 +19,82 @@ struct HomeView: View {
                 Color.black
                     .ignoresSafeArea()
 
-                VStack(spacing: 24) {
+                VStack(spacing: 0) {
                     Spacer()
 
                     // App Title
-                    VStack(spacing: 8) {
+                    VStack(spacing: 12) {
                         Image(systemName: "bolt.car.fill")
-                            .font(.system(size: 80))
+                            .font(.system(size: 64))
                             .foregroundColor(.white)
 
                         Text("Model S")
-                            .font(.system(size: 48, weight: .bold))
+                            .font(.system(size: 40, weight: .bold))
                             .foregroundColor(.white)
                     }
-                    .padding(.bottom, 60)
+                    .padding(.bottom, 64)
 
-                    // Order a Ride Button
-                    Button(action: {
-                        showRideRequest = true
-                    }) {
-                        HStack {
-                            Image(systemName: "location.fill")
-                                .font(.title2)
+                    // Buttons Container
+                    VStack(spacing: 16) {
+                        // Order a Ride Button
+                        Button(action: {
+                            showRideRequest = true
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "location.fill")
+                                    .font(.title3)
 
-                            Text("Order a ride")
-                                .font(.title3)
-                                .fontWeight(.semibold)
+                                Text("Order a ride")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(Color.white)
+                            .foregroundColor(.black)
+                            .cornerRadius(16)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                        .background(Color.white)
-                        .foregroundColor(.black)
-                        .cornerRadius(12)
-                    }
-                    .padding(.horizontal, 32)
 
-                    // Drive Button
-                    Button(action: {
-                        showDrive = true
-                    }) {
-                        HStack {
-                            Image(systemName: "steeringwheel")
-                                .font(.title2)
+                        // Drive Button
+                        Button(action: {
+                            showDrive = true
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "steeringwheel")
+                                    .font(.title3)
 
-                            Text("Drive")
-                                .font(.title3)
-                                .fontWeight(.semibold)
+                                Text("Drive")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(Color.gray.opacity(0.2))
+                            .foregroundColor(.white)
+                            .cornerRadius(16)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                        .background(Color.gray.opacity(0.2))
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
-                    }
-                    .padding(.horizontal, 32)
 
-                    // Ride History Button
-                    Button(action: {
-                        showRideHistory = true
-                    }) {
-                        HStack {
-                            Image(systemName: "clock.arrow.circlepath")
-                                .font(.title2)
+                        // Ride History Button
+                        Button(action: {
+                            showRideHistory = true
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "clock.arrow.circlepath")
+                                    .font(.title3)
 
-                            Text("Ride History")
-                                .font(.title3)
-                                .fontWeight(.semibold)
+                                Text("Ride History")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(Color.gray.opacity(0.2))
+                            .foregroundColor(.white)
+                            .cornerRadius(16)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                        .background(Color.gray.opacity(0.2))
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
                     }
-                    .padding(.horizontal, 32)
+                    .padding(.horizontal, 24)
 
-                    Spacer()
                     Spacer()
                 }
             }
@@ -134,18 +134,17 @@ struct DriveView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack {
+            VStack(spacing: 16) {
                 Spacer()
 
                 Image(systemName: "steeringwheel")
-                    .font(.system(size: 100))
+                    .font(.system(size: 72))
                     .foregroundColor(.white)
 
                 Text("Drive Mode")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
+                    .font(.system(size: 32, weight: .bold))
                     .foregroundColor(.white)
-                    .padding(.top, 20)
+                    .padding(.top, 8)
 
                 Text("Coming Soon")
                     .font(.title3)

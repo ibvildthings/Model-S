@@ -59,20 +59,20 @@ struct RideLocationCardWithSearch: View {
                 // Card Header
                 HStack {
                     Text(configuration.cardTitle)
-                        .font(.title3)
+                        .font(.headline)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)
                     Spacer()
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 16)
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 14)
 
                 // Pickup Location Input
                 HStack(spacing: 12) {
                     Circle()
                         .fill(configuration.pickupPinColor)
-                        .frame(width: 12, height: 12)
+                        .frame(width: 10, height: 10)
 
                     TextField("Pickup Location", text: $pickupText)
                         .focused($focusedField, equals: .pickup)
@@ -101,20 +101,20 @@ struct RideLocationCardWithSearch: View {
                             Image(systemName: "location.fill")
                                 .font(.system(size: 16))
                                 .foregroundColor(.blue)
-                                .frame(width: 36, height: 36)
+                                .frame(width: 40, height: 40)
                                 .background(Color(.systemBackground))
                                 .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.1), radius: 2, x: 0, y: 1)
+                                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
                         }
                         .accessibilityLabel("Use current location")
                         .accessibilityHint("Set pickup to your current location")
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 18)
 
                 // Divider with connecting line
                 HStack(spacing: 12) {
@@ -125,18 +125,18 @@ struct RideLocationCardWithSearch: View {
                                 .frame(width: 3, height: 3)
                         }
                     }
-                    .padding(.leading, 4)
+                    .padding(.leading, 3)
 
                     Spacer()
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 18)
                 .padding(.vertical, 8)
 
                 // Destination Location Input
                 HStack(spacing: 12) {
                     Circle()
                         .fill(configuration.destinationPinColor)
-                        .frame(width: 12, height: 12)
+                        .frame(width: 10, height: 10)
 
                     TextField(configuration.destinationPlaceholder, text: $destinationText)
                         .focused($focusedField, equals: .destination)
@@ -156,16 +156,16 @@ struct RideLocationCardWithSearch: View {
                             }
                         }
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
                 .background(Color(.systemGray6))
                 .cornerRadius(12)
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 18)
             }
             .background(.ultraThinMaterial)
-            .cornerRadius(28)
-            .shadow(color: .black.opacity(0.1), radius: 20, x: 0, y: 8)
+            .cornerRadius(20)
+            .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 4)
 
             // Search Suggestions (appears below card)
             if focusedField != nil && !searchService.searchResults.isEmpty {

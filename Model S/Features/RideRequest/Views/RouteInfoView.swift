@@ -16,22 +16,23 @@ struct RouteInfoView: View {
         HStack(spacing: 16) {
             if let time = travelTime {
                 Label(time, systemImage: "clock.fill")
-                    .font(.caption)
+                    .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.secondary)
             }
 
             if let dist = distance {
                 Label(dist, systemImage: "arrow.triangle.turn.up.right.diamond.fill")
-                    .font(.caption)
+                    .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.secondary)
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.vertical, 10)
         .background(.ultraThinMaterial)
-        .cornerRadius(20)
+        .cornerRadius(16)
+        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
     }
 }
 

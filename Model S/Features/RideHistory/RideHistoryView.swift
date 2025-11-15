@@ -66,15 +66,15 @@ struct RideHistoryView: View {
     private var emptyStateView: some View {
         VStack(spacing: 16) {
             Image(systemName: "car.circle")
-                .font(.system(size: 80))
+                .font(.system(size: 64))
                 .foregroundColor(.gray)
 
             Text("No Rides Yet")
-                .font(.title2)
+                .font(.title3)
                 .fontWeight(.semibold)
 
             Text("Your ride history will appear here")
-                .font(.body)
+                .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
         }
@@ -110,7 +110,7 @@ struct RideHistoryView: View {
     }
 
     private var statsHeader: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 0) {
             HStack(spacing: 20) {
                 StatItem(
                     title: "Total Rides",
@@ -119,7 +119,7 @@ struct RideHistoryView: View {
                 )
 
                 Divider()
-                    .frame(height: 40)
+                    .frame(height: 44)
 
                 StatItem(
                     title: "Total Distance",
@@ -127,11 +127,12 @@ struct RideHistoryView: View {
                     icon: "map.fill"
                 )
             }
-            .padding()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
             .background(Color(.systemGray6))
             .cornerRadius(12)
-            .padding(.horizontal)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
     }
 
@@ -154,7 +155,7 @@ struct StatItem: View {
     var body: some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(.title2)
+                .font(.title3)
                 .foregroundColor(.blue)
 
             VStack(alignment: .leading, spacing: 4) {
@@ -167,7 +168,7 @@ struct StatItem: View {
                     .foregroundColor(.secondary)
             }
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -359,9 +360,9 @@ struct StatBox: View {
     let value: String
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 10) {
             Image(systemName: icon)
-                .font(.title2)
+                .font(.title3)
                 .foregroundColor(.blue)
 
             Text(value)
@@ -373,7 +374,8 @@ struct StatBox: View {
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity)
-        .padding()
+        .padding(.vertical, 20)
+        .padding(.horizontal, 16)
         .background(Color(.systemGray6))
         .cornerRadius(12)
     }

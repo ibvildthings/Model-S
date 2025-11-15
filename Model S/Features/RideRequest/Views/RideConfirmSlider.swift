@@ -14,8 +14,8 @@ struct RideConfirmSlider: View {
     @State private var isConfirmed = false
     @State private var isRequesting = false
 
-    private let sliderHeight: CGFloat = 64
-    private let thumbSize: CGFloat = 56
+    private let sliderHeight: CGFloat = 60
+    private let thumbSize: CGFloat = 52
 
     var body: some View {
         GeometryReader { geometry in
@@ -51,9 +51,9 @@ struct RideConfirmSlider: View {
                 HStack {
                     Spacer()
                     Text(isRequesting ? configuration.requestingText : configuration.sliderText)
-                        .font(.headline)
+                        .font(.subheadline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.white.opacity(0.9))
+                        .foregroundColor(.white.opacity(0.95))
                         .offset(x: isRequesting ? 0 : -thumbSize / 2)
                     Spacer()
                 }
@@ -64,10 +64,10 @@ struct RideConfirmSlider: View {
                     Circle()
                         .fill(.white)
                         .frame(width: thumbSize, height: thumbSize)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                        .shadow(color: .black.opacity(0.25), radius: 10, x: 0, y: 4)
                         .overlay(
                             Image(systemName: "arrow.right")
-                                .font(.system(size: 24, weight: .semibold))
+                                .font(.system(size: 22, weight: .semibold))
                                 .foregroundColor(configuration.accentColor)
                         )
                         .offset(x: 4 + offset)
