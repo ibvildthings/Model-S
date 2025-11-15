@@ -138,32 +138,31 @@ class RideFlowController: ObservableObject {
                     destination: destination
                 ))
 
-                // Simulate driver arriving
-                try await Task.sleep(nanoseconds: UInt64(3.0 * 1_000_000_000))
+                // NOTE: Transitions to driverArriving and rideInProgress are now
+                // handled by the coordinator based on the animation reaching pickup.
+                // The coordinator will trigger these when:
+                // - driverArriving: when car is < 100m from pickup
+                // - rideInProgress: when car reaches pickup location
 
-                transition(to: .driverArriving(
-                    rideId: result.rideId,
-                    driver: driver,
-                    pickup: pickup,
-                    destination: destination
-                ))
+                // Wait for ride to be in progress (will be set by animation callback)
+                // Poll until we're in rideInProgress state
+                while case .driverEnRoute = currentState {
+                    try await Task.sleep(nanoseconds: UInt64(0.5 * 1_000_000_000))
+                }
+                while case .driverArriving = currentState {
+                    try await Task.sleep(nanoseconds: UInt64(0.5 * 1_000_000_000))
+                }
 
-                // Simulate ride starting
-                try await Task.sleep(nanoseconds: UInt64(2.0 * 1_000_000_000))
-
-                transition(to: .rideInProgress(
-                    rideId: result.rideId,
-                    driver: driver,
-                    eta: eta,
-                    pickup: pickup,
-                    destination: destination
-                ))
+                // Now we're in rideInProgress, continue with the rest of the flow
+                guard case .rideInProgress(let rideId, let driver, _, let pickup, let destination) = currentState else {
+                    return
+                }
 
                 // Simulate approaching destination
                 try await Task.sleep(nanoseconds: UInt64(3.0 * 1_000_000_000))
 
                 transition(to: .approachingDestination(
-                    rideId: result.rideId,
+                    rideId: rideId,
                     driver: driver,
                     pickup: pickup,
                     destination: destination
@@ -173,7 +172,7 @@ class RideFlowController: ObservableObject {
                 try await Task.sleep(nanoseconds: UInt64(2.0 * 1_000_000_000))
 
                 transition(to: .rideCompleted(
-                    rideId: result.rideId,
+                    rideId: rideId,
                     driver: driver,
                     pickup: pickup,
                     destination: destination

@@ -54,8 +54,17 @@ class MapViewModel: NSObject, ObservableObject {
     /// Current progress along the route (0.0 to 1.0)
     private var routeProgress: Double = 0.0
 
+    /// Track if we've already notified about approaching
+    private var hasNotifiedApproaching = false
+
     /// Callback when user location updates (used by coordinator)
     var onLocationUpdate: ((CLLocation) -> Void)?
+
+    /// Callback when driver reaches pickup location
+    var onDriverReachedPickup: (() -> Void)?
+
+    /// Callback when driver is approaching pickup (< 100m)
+    var onDriverApproaching: (() -> Void)?
 
     // MARK: - Initialization
 
@@ -177,6 +186,9 @@ class MapViewModel: NSObject, ObservableObject {
         // Stop any existing animation
         stopDriverAnimation()
 
+        // Reset approaching notification flag
+        hasNotifiedApproaching = false
+
         // Set initial driver location
         if let start = startingCoordinate {
             driverLocation = start
@@ -208,6 +220,7 @@ class MapViewModel: NSObject, ObservableObject {
         stopDriverAnimation()
         driverLocation = nil
         routeProgress = 0.0
+        hasNotifiedApproaching = false
     }
 
     /// Updates the driver's position along the route
@@ -229,6 +242,9 @@ class MapViewModel: NSObject, ObservableObject {
             if let pickup = pickupLocation {
                 driverLocation = pickup.coordinate
             }
+
+            // Notify that driver reached pickup
+            onDriverReachedPickup?()
             return
         }
 
@@ -239,6 +255,12 @@ class MapViewModel: NSObject, ObservableObject {
 
         if currentIndex < totalPoints {
             driverLocation = points[currentIndex].coordinate
+
+            // Check if driver is approaching (< 100m from pickup)
+            if !hasNotifiedApproaching && isDriverNearPickup() {
+                hasNotifiedApproaching = true
+                onDriverApproaching?()
+            }
         }
     }
 

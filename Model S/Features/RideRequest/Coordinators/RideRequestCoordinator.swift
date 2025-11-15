@@ -235,12 +235,33 @@ class RideRequestCoordinator: ObservableObject {
         let currentState = flowController.currentState
 
         switch currentState {
-        case .driverEnRoute, .driverArriving:
+        case .driverEnRoute:
             // Start animating driver if not already animating
             if mapViewModel.driverLocation == nil {
+                // Set up callbacks for animation milestones
+                mapViewModel.onDriverApproaching = { [weak self] in
+                    guard let self = self else { return }
+                    // Transition to driverArriving when car gets close
+                    Task { @MainActor in
+                        self.transitionToDriverArriving()
+                    }
+                }
+
+                mapViewModel.onDriverReachedPickup = { [weak self] in
+                    guard let self = self else { return }
+                    // Transition to rideInProgress when car reaches pickup
+                    Task { @MainActor in
+                        self.transitionToRideInProgress()
+                    }
+                }
+
                 // Start driver from beginning of route
                 mapViewModel.startDriverAnimation()
             }
+
+        case .driverArriving:
+            // Animation continues, waiting for driver to reach pickup
+            break
 
         case .rideInProgress, .approachingDestination:
             // Driver has reached pickup, clear driver animation
@@ -253,5 +274,42 @@ class RideRequestCoordinator: ObservableObject {
         default:
             break
         }
+    }
+
+    /// Transition to driver arriving state (triggered by animation)
+    private func transitionToDriverArriving() {
+        guard case .driverEnRoute(let rideId, let driver, _, let pickup, let destination) = flowController.currentState else {
+            return
+        }
+
+        // Manually transition to driverArriving state
+        flowController.currentState = .driverArriving(
+            rideId: rideId,
+            driver: driver,
+            pickup: pickup,
+            destination: destination
+        )
+    }
+
+    /// Transition to ride in progress state (triggered by animation)
+    private func transitionToRideInProgress() {
+        guard let driver = flowController.driver,
+              let rideId = flowController.rideId,
+              let pickup = flowController.pickupLocation,
+              let destination = flowController.destinationLocation else {
+            return
+        }
+
+        // Get ETA to destination (reuse the original ETA)
+        let eta = flowController.estimatedArrival ?? 300 // Default 5 minutes
+
+        // Manually transition to rideInProgress state
+        flowController.currentState = .rideInProgress(
+            rideId: rideId,
+            driver: driver,
+            eta: eta,
+            pickup: pickup,
+            destination: destination
+        )
     }
 }
