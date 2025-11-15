@@ -71,7 +71,7 @@ struct RideRequestConfiguration {
     var autoCenterOnUserLocation: Bool = true
 
     /// Auto-set pickup to user's current location
-    var autoSetPickupLocation: Bool = true
+    var autoSetPickupLocation: Bool = false
 
     /// Debounce delay for geocoding in seconds (prevents too many API calls)
     var geocodingDebounceDelay: TimeInterval = 1.0
