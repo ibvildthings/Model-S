@@ -50,6 +50,13 @@ class RideFlowController: ObservableObject {
     func updatePickup(_ location: LocationPoint?) {
         let destination = currentState.destinationLocation
         transition(to: .selectingLocations(pickup: location, destination: destination))
+
+        // Auto-calculate route if both locations are set
+        if let pickup = location, let destination = destination {
+            Task {
+                await calculateRoute(from: pickup, to: destination)
+            }
+        }
     }
 
     /// Update destination location
