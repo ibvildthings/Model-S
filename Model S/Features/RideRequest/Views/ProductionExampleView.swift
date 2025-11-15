@@ -12,7 +12,6 @@ import MapKit
 /// Example of how to integrate RideRequestView in a production app
 /// with all production-ready features enabled
 struct ProductionExampleView: View {
-    @StateObject private var rideViewModel = RideRequestViewModel()
     @State private var showRideRequest = true
 
     var body: some View {
@@ -20,7 +19,6 @@ struct ProductionExampleView: View {
             if showRideRequest {
                 // Production-ready RideRequestView with full integration
                 RideRequestViewWithViewModel(
-                    viewModel: rideViewModel,
                     configuration: productionConfig,
                     onRideConfirmed: handleRideConfirmed,
                     onCancel: {
@@ -30,7 +28,6 @@ struct ProductionExampleView: View {
             } else {
                 // Your main app UI
                 MainAppPlaceholder(onRequestRide: {
-                    rideViewModel.reset()
                     showRideRequest = true
                 })
             }
@@ -47,7 +44,7 @@ struct ProductionExampleView: View {
         return config
     }
 
-    private func handleRideConfirmed(pickup: LocationPoint, destination: LocationPoint) {
+    private func handleRideConfirmed(pickup: LocationPoint, destination: LocationPoint, route: RouteInfo?) {
         // In production, you would:
         // 1. Submit ride request to your backend
         // 2. Start driver search
@@ -57,13 +54,14 @@ struct ProductionExampleView: View {
         print("Pickup: \(pickup.name ?? "Unknown"), \(pickup.coordinate)")
         print("Destination: \(destination.name ?? "Unknown"), \(destination.coordinate)")
 
-        if let eta = rideViewModel.formattedTravelTime(),
-           let distance = rideViewModel.formattedDistance() {
-            print("ETA: \(eta), Distance: \(distance)")
+        if let route = route {
+            let minutes = Int(route.estimatedTravelTime / 60)
+            let miles = route.distance / 1609.34
+            print("ETA: \(minutes) min, Distance: \(String(format: "%.1f mi", miles))")
         }
 
         // Save ride to history
-        saveRideToHistory(pickup: pickup, destination: destination)
+        saveRideToHistory(pickup: pickup, destination: destination, route: route)
 
         // Example: Send to backend
         // Task {
@@ -71,12 +69,12 @@ struct ProductionExampleView: View {
         // }
     }
 
-    private func saveRideToHistory(pickup: LocationPoint, destination: LocationPoint) {
-        // Extract ride details from viewModel
-        let distance = rideViewModel.estimatedDistance ?? 0
-        let travelTime = rideViewModel.estimatedTravelTime ?? 0
-        let pickupAddress = rideViewModel.pickupAddress.isEmpty ? (pickup.name ?? "Unknown") : rideViewModel.pickupAddress
-        let destinationAddress = rideViewModel.destinationAddress.isEmpty ? (destination.name ?? "Unknown") : rideViewModel.destinationAddress
+    private func saveRideToHistory(pickup: LocationPoint, destination: LocationPoint, route: RouteInfo?) {
+        // Extract ride details from route
+        let distance = route?.distance ?? 0
+        let travelTime = route?.estimatedTravelTime ?? 0
+        let pickupAddress = pickup.name ?? "Unknown"
+        let destinationAddress = destination.name ?? "Unknown"
 
         // Create ride history entry
         let ride = RideHistory(
@@ -122,13 +120,12 @@ struct RideRequestViewWithViewModel: View {
     @FocusState private var focusedField: RideLocationCard.LocationField?
     @State private var showRideHistory = false
 
-    var onRideConfirmed: (LocationPoint, LocationPoint) -> Void
+    var onRideConfirmed: (LocationPoint, LocationPoint, RouteInfo?) -> Void
     var onCancel: () -> Void
 
     init(
-        viewModel: RideRequestViewModel,
         configuration: RideRequestConfiguration = .default,
-        onRideConfirmed: @escaping (LocationPoint, LocationPoint) -> Void,
+        onRideConfirmed: @escaping (LocationPoint, LocationPoint, RouteInfo?) -> Void,
         onCancel: @escaping () -> Void
     ) {
         // Create coordinator with configuration
@@ -146,10 +143,10 @@ struct RideRequestViewWithViewModel: View {
 
             VStack {
                 // Error Banner
-                if let error = coordinator.viewModel.error {
+                if let error = coordinator.flowController.currentError {
                     ErrorBannerView(error: error, onDismiss: {
                         DispatchQueue.main.async {
-                            coordinator.viewModel.error = nil
+                            coordinator.flowController.clearError()
                         }
                     })
                     .padding(.top, 60)
@@ -181,13 +178,13 @@ struct RideRequestViewWithViewModel: View {
                         handleUseCurrentLocation()
                     }
                 )
-                .padding(.top, coordinator.viewModel.error != nil ? 8 : 60)
+                .padding(.top, coordinator.flowController.currentError != nil ? 8 : 60)
 
                 // Route Info
-                if coordinator.viewModel.route != nil {
+                if let routeInfo = coordinator.flowController.routeInfo {
                     RouteInfoView(
-                        travelTime: coordinator.viewModel.formattedTravelTime(),
-                        distance: coordinator.viewModel.formattedDistance()
+                        travelTime: formatTravelTime(routeInfo.estimatedTravelTime),
+                        distance: formatDistance(routeInfo.distance)
                     )
                     .padding(.top, 8)
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -196,7 +193,7 @@ struct RideRequestViewWithViewModel: View {
                 Spacer()
 
                 // Cancel Button
-                if coordinator.viewModel.rideState != .rideRequested {
+                if coordinator.flowController.legacyState != .rideRequested {
                     Button("Cancel") {
                         onCancel()
                     }
@@ -206,7 +203,7 @@ struct RideRequestViewWithViewModel: View {
             }
 
             // Confirm Slider (managed by coordinator)
-            if coordinator.showConfirmSlider {
+            if coordinator.shouldShowConfirmSlider {
                 VStack {
                     Spacer()
 
@@ -226,14 +223,14 @@ struct RideRequestViewWithViewModel: View {
                     VStack(spacing: 16) {
                         // Status Header
                         HStack {
-                            if coordinator.viewModel.rideState == .searchingForDriver {
+                            if coordinator.flowController.legacyState == .searchingForDriver {
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            } else if coordinator.viewModel.rideState == .driverFound {
+                            } else if coordinator.flowController.legacyState == .driverFound {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
                                     .font(.system(size: 24))
-                            } else if coordinator.viewModel.rideState == .driverEnRoute {
+                            } else if coordinator.flowController.legacyState == .driverEnRoute {
                                 Image(systemName: "car.fill")
                                     .foregroundColor(.white)
                                     .font(.system(size: 24))
@@ -253,8 +250,8 @@ struct RideRequestViewWithViewModel: View {
                         }
 
                         // Driver Info (when found)
-                        if let driver = coordinator.viewModel.currentDriver,
-                           coordinator.viewModel.rideState != .searchingForDriver {
+                        if let driver = coordinator.flowController.driver,
+                           coordinator.flowController.legacyState != .searchingForDriver {
                             Divider()
                                 .background(Color.white.opacity(0.3))
 
@@ -302,8 +299,8 @@ struct RideRequestViewWithViewModel: View {
                         }
 
                         // Cancel Button
-                        if coordinator.viewModel.rideState == .searchingForDriver ||
-                           coordinator.viewModel.rideState == .rideRequested {
+                        if coordinator.flowController.legacyState == .searchingForDriver ||
+                           coordinator.flowController.legacyState == .rideRequested {
                             Button(action: {
                                 coordinator.cancelRideRequest()
                             }) {
@@ -331,7 +328,7 @@ struct RideRequestViewWithViewModel: View {
             }
 
             // Loading Overlay
-            if coordinator.viewModel.isLoading {
+            if coordinator.flowController.isLoading {
                 Color.black.opacity(0.2)
                     .ignoresSafeArea()
 
@@ -363,16 +360,6 @@ struct RideRequestViewWithViewModel: View {
                 Spacer()
             }
         }
-        .onChange(of: pickupText) { newValue in
-            DispatchQueue.main.async {
-                coordinator.viewModel.pickupAddress = newValue
-            }
-        }
-        .onChange(of: destinationText) { newValue in
-            DispatchQueue.main.async {
-                coordinator.viewModel.destinationAddress = newValue
-            }
-        }
         .sheet(isPresented: $showRideHistory) {
             RideHistoryView()
         }
@@ -384,7 +371,10 @@ struct RideRequestViewWithViewModel: View {
     private func handleConfirmRide() {
         // Coordinator handles all validation and state management
         if let result = coordinator.confirmRide() {
-            onRideConfirmed(result.pickup, result.destination)
+            // Get route info from flow controller
+            let routeInfo = coordinator.flowController.routeInfo
+
+            onRideConfirmed(result.pickup, result.destination, routeInfo)
 
             // Start the ride request flow in a detached task (outside view update cycle)
             Task {
@@ -395,9 +385,7 @@ struct RideRequestViewWithViewModel: View {
 
     private func handleUseCurrentLocation() {
         guard let userLocation = coordinator.mapViewModel.userLocation else {
-            DispatchQueue.main.async {
-                coordinator.viewModel.error = .locationUnavailable
-            }
+            // Location unavailable - user will see it in the UI state
             return
         }
 
@@ -422,14 +410,14 @@ struct RideRequestViewWithViewModel: View {
     // MARK: - Status Banner Helpers
 
     private var shouldShowStatusBanner: Bool {
-        coordinator.viewModel.rideState == .rideRequested ||
-        coordinator.viewModel.rideState == .searchingForDriver ||
-        coordinator.viewModel.rideState == .driverFound ||
-        coordinator.viewModel.rideState == .driverEnRoute
+        coordinator.flowController.legacyState == .rideRequested ||
+        coordinator.flowController.legacyState == .searchingForDriver ||
+        coordinator.flowController.legacyState == .driverFound ||
+        coordinator.flowController.legacyState == .driverEnRoute
     }
 
     private var statusBannerTitle: String {
-        switch coordinator.viewModel.rideState {
+        switch coordinator.flowController.legacyState {
         case .rideRequested, .searchingForDriver:
             return "Finding your driver..."
         case .driverFound:
@@ -442,15 +430,15 @@ struct RideRequestViewWithViewModel: View {
     }
 
     private var statusBannerSubtitle: String? {
-        switch coordinator.viewModel.rideState {
+        switch coordinator.flowController.legacyState {
         case .driverFound:
-            if let eta = coordinator.viewModel.estimatedDriverArrival {
+            if let eta = coordinator.flowController.estimatedArrival {
                 let minutes = Int(eta / 60)
                 return "Arriving in \(minutes) min"
             }
             return nil
         case .driverEnRoute:
-            if let eta = coordinator.viewModel.estimatedDriverArrival {
+            if let eta = coordinator.flowController.estimatedArrival {
                 let minutes = Int(eta / 60)
                 return "ETA: \(minutes) min"
             }
@@ -458,6 +446,18 @@ struct RideRequestViewWithViewModel: View {
         default:
             return nil
         }
+    }
+
+    // MARK: - Format Helpers
+
+    private func formatTravelTime(_ seconds: TimeInterval) -> String {
+        let minutes = Int(seconds / 60)
+        return "\(minutes) min"
+    }
+
+    private func formatDistance(_ meters: Double) -> String {
+        let miles = meters / 1609.34
+        return String(format: "%.1f mi", miles)
     }
 }
 

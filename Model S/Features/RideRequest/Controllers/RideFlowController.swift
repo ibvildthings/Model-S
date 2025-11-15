@@ -201,8 +201,35 @@ class RideFlowController: ObservableObject {
         currentState.routeInfo
     }
 
+    /// Current error if in error state
+    var currentError: RideRequestError? {
+        if case .error(let error, _) = currentState {
+            return error
+        }
+        return nil
+    }
+
     /// Legacy state for backward compatibility
     var legacyState: RideRequestState {
         currentState.legacyState
+    }
+
+    /// Whether we're currently loading (submitting request or calculating route)
+    var isLoading: Bool {
+        if case .submittingRequest = currentState {
+            return true
+        }
+        return false
+    }
+
+    /// Clear current error and return to previous state or idle
+    func clearError() {
+        if case .error(_, let previousState) = currentState {
+            if let previous = previousState {
+                transition(to: previous)
+            } else {
+                transition(to: .idle)
+            }
+        }
     }
 }
