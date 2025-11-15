@@ -70,10 +70,41 @@ class RideStateMachine {
             ]
 
         case .driverEnRoute:
-            // Can complete ride or cancel
+            // Can transition to arriving
             return [
-                .idle, // Ride completed or cancelled
+                .driverArriving(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Placeholder
+                .idle, // Cancel ride
                 .error(.rideRequestFailed, previousState: state)
+            ]
+
+        case .driverArriving:
+            // Can transition to ride in progress
+            return [
+                .rideInProgress(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), eta: 0, pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Placeholder
+                .idle, // Cancel ride
+                .error(.rideRequestFailed, previousState: state)
+            ]
+
+        case .rideInProgress:
+            // Can transition to approaching destination
+            return [
+                .approachingDestination(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Placeholder
+                .idle, // Cancel ride
+                .error(.rideRequestFailed, previousState: state)
+            ]
+
+        case .approachingDestination:
+            // Can transition to completed
+            return [
+                .rideCompleted(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Placeholder
+                .idle, // Cancel ride
+                .error(.rideRequestFailed, previousState: state)
+            ]
+
+        case .rideCompleted:
+            // Can only reset
+            return [
+                .idle
             ]
 
         case .error:
@@ -114,6 +145,10 @@ class RideStateMachine {
              (.searchingForDriver, .searchingForDriver),
              (.driverAssigned, .driverAssigned),
              (.driverEnRoute, .driverEnRoute),
+             (.driverArriving, .driverArriving),
+             (.rideInProgress, .rideInProgress),
+             (.approachingDestination, .approachingDestination),
+             (.rideCompleted, .rideCompleted),
              (.error, .error):
             return true
         default:
@@ -138,6 +173,14 @@ class RideStateMachine {
             return "Driver Assigned"
         case .driverEnRoute:
             return "Driver En Route"
+        case .driverArriving:
+            return "Driver Arriving"
+        case .rideInProgress:
+            return "Ride In Progress"
+        case .approachingDestination:
+            return "Approaching Destination"
+        case .rideCompleted:
+            return "Ride Completed"
         case .error(let error, _):
             return "Error: \(error.localizedDescription)"
         }
