@@ -32,6 +32,18 @@ indirect enum RideState {
     /// Driver is en route to pickup location
     case driverEnRoute(rideId: String, driver: DriverInfo, eta: TimeInterval, pickup: LocationPoint, destination: LocationPoint)
 
+    /// Driver is arriving at pickup location (< 1 min away)
+    case driverArriving(rideId: String, driver: DriverInfo, pickup: LocationPoint, destination: LocationPoint)
+
+    /// Ride in progress - passenger picked up, heading to destination
+    case rideInProgress(rideId: String, driver: DriverInfo, eta: TimeInterval, pickup: LocationPoint, destination: LocationPoint)
+
+    /// Approaching destination (< 1 min away)
+    case approachingDestination(rideId: String, driver: DriverInfo, pickup: LocationPoint, destination: LocationPoint)
+
+    /// Ride completed successfully
+    case rideCompleted(rideId: String, driver: DriverInfo, pickup: LocationPoint, destination: LocationPoint)
+
     /// An error occurred
     case error(RideRequestError, previousState: RideState?)
 
@@ -48,7 +60,8 @@ indirect enum RideState {
     /// Whether we're in an active ride flow
     var isActiveRide: Bool {
         switch self {
-        case .submittingRequest, .searchingForDriver, .driverAssigned, .driverEnRoute:
+        case .submittingRequest, .searchingForDriver, .driverAssigned, .driverEnRoute,
+             .driverArriving, .rideInProgress, .approachingDestination, .rideCompleted:
             return true
         default:
             return false
@@ -60,7 +73,11 @@ indirect enum RideState {
         switch self {
         case .searchingForDriver(let rideId, _, _),
              .driverAssigned(let rideId, _, _, _),
-             .driverEnRoute(let rideId, _, _, _, _):
+             .driverEnRoute(let rideId, _, _, _, _),
+             .driverArriving(let rideId, _, _, _),
+             .rideInProgress(let rideId, _, _, _, _),
+             .approachingDestination(let rideId, _, _, _),
+             .rideCompleted(let rideId, _, _, _):
             return rideId
         default:
             return nil
@@ -71,19 +88,26 @@ indirect enum RideState {
     var driver: DriverInfo? {
         switch self {
         case .driverAssigned(_, let driver, _, _),
-             .driverEnRoute(_, let driver, _, _, _):
+             .driverEnRoute(_, let driver, _, _, _),
+             .driverArriving(_, let driver, _, _),
+             .rideInProgress(_, let driver, _, _, _),
+             .approachingDestination(_, let driver, _, _),
+             .rideCompleted(_, let driver, _, _):
             return driver
         default:
             return nil
         }
     }
 
-    /// Estimated arrival time if driver is en route
+    /// Estimated arrival time if driver is en route or ride in progress
     var estimatedArrival: TimeInterval? {
-        if case .driverEnRoute(_, _, let eta, _, _) = self {
+        switch self {
+        case .driverEnRoute(_, _, let eta, _, _),
+             .rideInProgress(_, _, let eta, _, _):
             return eta
+        default:
+            return nil
         }
-        return nil
     }
 
     /// Current pickup location
@@ -95,7 +119,11 @@ indirect enum RideState {
              .submittingRequest(let pickup, _),
              .searchingForDriver(_, let pickup, _),
              .driverAssigned(_, _, let pickup, _),
-             .driverEnRoute(_, _, _, let pickup, _):
+             .driverEnRoute(_, _, _, let pickup, _),
+             .driverArriving(_, _, let pickup, _),
+             .rideInProgress(_, _, _, let pickup, _),
+             .approachingDestination(_, _, let pickup, _),
+             .rideCompleted(_, _, let pickup, _):
             return pickup
         default:
             return nil
@@ -111,7 +139,11 @@ indirect enum RideState {
              .submittingRequest(_, let destination),
              .searchingForDriver(_, _, let destination),
              .driverAssigned(_, _, _, let destination),
-             .driverEnRoute(_, _, _, _, let destination):
+             .driverEnRoute(_, _, _, _, let destination),
+             .driverArriving(_, _, _, let destination),
+             .rideInProgress(_, _, _, _, let destination),
+             .approachingDestination(_, _, _, let destination),
+             .rideCompleted(_, _, _, let destination):
             return destination
         default:
             return nil
@@ -151,6 +183,14 @@ indirect enum RideState {
             return .driverFound
         case .driverEnRoute:
             return .driverEnRoute
+        case .driverArriving:
+            return .driverArriving
+        case .rideInProgress:
+            return .rideInProgress
+        case .approachingDestination:
+            return .approachingDestination
+        case .rideCompleted:
+            return .rideCompleted
         case .error:
             return .selectingPickup
         }
@@ -201,6 +241,22 @@ extension RideState: Equatable {
         case (.driverEnRoute(let lhsRideId, let lhsDriver, let lhsEta, let lhsPickup, let lhsDestination),
               .driverEnRoute(let rhsRideId, let rhsDriver, let rhsEta, let rhsPickup, let rhsDestination)):
             return lhsRideId == rhsRideId && lhsDriver == rhsDriver && lhsEta == rhsEta && lhsPickup == rhsPickup && lhsDestination == rhsDestination
+
+        case (.driverArriving(let lhsRideId, let lhsDriver, let lhsPickup, let lhsDestination),
+              .driverArriving(let rhsRideId, let rhsDriver, let rhsPickup, let rhsDestination)):
+            return lhsRideId == rhsRideId && lhsDriver == rhsDriver && lhsPickup == rhsPickup && lhsDestination == rhsDestination
+
+        case (.rideInProgress(let lhsRideId, let lhsDriver, let lhsEta, let lhsPickup, let lhsDestination),
+              .rideInProgress(let rhsRideId, let rhsDriver, let rhsEta, let rhsPickup, let rhsDestination)):
+            return lhsRideId == rhsRideId && lhsDriver == rhsDriver && lhsEta == rhsEta && lhsPickup == rhsPickup && lhsDestination == rhsDestination
+
+        case (.approachingDestination(let lhsRideId, let lhsDriver, let lhsPickup, let lhsDestination),
+              .approachingDestination(let rhsRideId, let rhsDriver, let rhsPickup, let rhsDestination)):
+            return lhsRideId == rhsRideId && lhsDriver == rhsDriver && lhsPickup == rhsPickup && lhsDestination == rhsDestination
+
+        case (.rideCompleted(let lhsRideId, let lhsDriver, let lhsPickup, let lhsDestination),
+              .rideCompleted(let rhsRideId, let rhsDriver, let rhsPickup, let rhsDestination)):
+            return lhsRideId == rhsRideId && lhsDriver == rhsDriver && lhsPickup == rhsPickup && lhsDestination == rhsDestination
 
         case (.error(let lhsError, let lhsPrevious), .error(let rhsError, let rhsPrevious)):
             // Compare error types (ignore associated values for .unknown case)

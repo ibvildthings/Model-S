@@ -217,18 +217,37 @@ struct RideRequestViewWithViewModel: View {
                     VStack(spacing: 16) {
                         // Status Header
                         HStack(spacing: 12) {
-                            if coordinator.flowController.legacyState == .searchingForDriver {
+                            switch coordinator.flowController.legacyState {
+                            case .searchingForDriver, .rideRequested:
                                 ProgressView()
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                     .scaleEffect(1.1)
-                            } else if coordinator.flowController.legacyState == .driverFound {
+                            case .driverFound:
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundColor(.green)
                                     .font(.system(size: 28))
-                            } else if coordinator.flowController.legacyState == .driverEnRoute {
+                            case .driverEnRoute:
                                 Image(systemName: "car.fill")
                                     .foregroundColor(.white)
                                     .font(.system(size: 24))
+                            case .driverArriving:
+                                Image(systemName: "hand.wave.fill")
+                                    .foregroundColor(.yellow)
+                                    .font(.system(size: 24))
+                            case .rideInProgress:
+                                Image(systemName: "figure.seated.side.automatic")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 24))
+                            case .approachingDestination:
+                                Image(systemName: "location.fill")
+                                    .foregroundColor(.green)
+                                    .font(.system(size: 24))
+                            case .rideCompleted:
+                                Image(systemName: "checkmark.seal.fill")
+                                    .foregroundColor(.green)
+                                    .font(.system(size: 28))
+                            default:
+                                EmptyView()
                             }
 
                             VStack(alignment: .leading, spacing: 4) {
@@ -401,7 +420,11 @@ struct RideRequestViewWithViewModel: View {
         coordinator.flowController.legacyState == .rideRequested ||
         coordinator.flowController.legacyState == .searchingForDriver ||
         coordinator.flowController.legacyState == .driverFound ||
-        coordinator.flowController.legacyState == .driverEnRoute
+        coordinator.flowController.legacyState == .driverEnRoute ||
+        coordinator.flowController.legacyState == .driverArriving ||
+        coordinator.flowController.legacyState == .rideInProgress ||
+        coordinator.flowController.legacyState == .approachingDestination ||
+        coordinator.flowController.legacyState == .rideCompleted
     }
 
     private var statusBannerTitle: String {
@@ -412,6 +435,14 @@ struct RideRequestViewWithViewModel: View {
             return "Driver Found!"
         case .driverEnRoute:
             return "Driver is on the way!"
+        case .driverArriving:
+            return "Driver is arriving!"
+        case .rideInProgress:
+            return "Ride in progress"
+        case .approachingDestination:
+            return "Approaching destination"
+        case .rideCompleted:
+            return "Ride completed!"
         default:
             return ""
         }
@@ -431,6 +462,18 @@ struct RideRequestViewWithViewModel: View {
                 return "ETA: \(minutes) min"
             }
             return "Your driver is heading to your location"
+        case .driverArriving:
+            return "Your driver will arrive in less than a minute"
+        case .rideInProgress:
+            if let eta = coordinator.flowController.estimatedArrival {
+                let minutes = Int(eta / 60)
+                return "ETA to destination: \(minutes) min"
+            }
+            return "En route to destination"
+        case .approachingDestination:
+            return "You'll arrive in less than a minute"
+        case .rideCompleted:
+            return "Thank you for riding with us!"
         default:
             return nil
         }

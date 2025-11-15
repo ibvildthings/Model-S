@@ -83,4 +83,16 @@ enum RideRequestState {
 
     /// Driver is en route to pickup location
     case driverEnRoute
+
+    /// Driver is arriving at pickup location (< 1 min away)
+    case driverArriving
+
+    /// Ride in progress - passenger picked up
+    case rideInProgress
+
+    /// Approaching destination (< 1 min away)
+    case approachingDestination
+
+    /// Ride completed successfully
+    case rideCompleted
 }

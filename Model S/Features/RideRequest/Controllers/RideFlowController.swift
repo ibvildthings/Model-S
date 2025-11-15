@@ -137,6 +137,47 @@ class RideFlowController: ObservableObject {
                     pickup: pickup,
                     destination: destination
                 ))
+
+                // Simulate driver arriving
+                try await Task.sleep(nanoseconds: UInt64(3.0 * 1_000_000_000))
+
+                transition(to: .driverArriving(
+                    rideId: result.rideId,
+                    driver: driver,
+                    pickup: pickup,
+                    destination: destination
+                ))
+
+                // Simulate ride starting
+                try await Task.sleep(nanoseconds: UInt64(2.0 * 1_000_000_000))
+
+                transition(to: .rideInProgress(
+                    rideId: result.rideId,
+                    driver: driver,
+                    eta: eta,
+                    pickup: pickup,
+                    destination: destination
+                ))
+
+                // Simulate approaching destination
+                try await Task.sleep(nanoseconds: UInt64(3.0 * 1_000_000_000))
+
+                transition(to: .approachingDestination(
+                    rideId: result.rideId,
+                    driver: driver,
+                    pickup: pickup,
+                    destination: destination
+                ))
+
+                // Simulate ride completion
+                try await Task.sleep(nanoseconds: UInt64(2.0 * 1_000_000_000))
+
+                transition(to: .rideCompleted(
+                    rideId: result.rideId,
+                    driver: driver,
+                    pickup: pickup,
+                    destination: destination
+                ))
             }
 
         } catch {
