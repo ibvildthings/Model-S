@@ -153,47 +153,50 @@ struct RideRequestViewWithViewModel: View {
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                // Location Card with Autocomplete
-                RideLocationCardWithSearch(
-                    pickupText: $pickupText,
-                    destinationText: $destinationText,
-                    focusedField: $focusedField,
-                    configuration: RideRequestConfiguration.default,
-                    userLocation: coordinator.mapViewModel.userLocation?.coordinate,
-                    onPickupTap: {
-                        focusedField = .pickup
-                        coordinator.didFocusPickup()
-                    },
-                    onDestinationTap: {
-                        focusedField = .destination
-                        coordinator.didFocusDestination()
-                    },
-                    onLocationSelected: { coordinate, name, isPickup in
-                        // Simplified - just call coordinator
-                        Task {
-                            await coordinator.selectLocation(coordinate: coordinate, name: name, isPickup: isPickup)
+                // Location Card with Autocomplete - Hide when status banner is showing
+                if !shouldShowStatusBanner {
+                    RideLocationCardWithSearch(
+                        pickupText: $pickupText,
+                        destinationText: $destinationText,
+                        focusedField: $focusedField,
+                        configuration: RideRequestConfiguration.default,
+                        userLocation: coordinator.mapViewModel.userLocation?.coordinate,
+                        onPickupTap: {
+                            focusedField = .pickup
+                            coordinator.didFocusPickup()
+                        },
+                        onDestinationTap: {
+                            focusedField = .destination
+                            coordinator.didFocusDestination()
+                        },
+                        onLocationSelected: { coordinate, name, isPickup in
+                            // Simplified - just call coordinator
+                            Task {
+                                await coordinator.selectLocation(coordinate: coordinate, name: name, isPickup: isPickup)
+                            }
+                        },
+                        onUseCurrentLocation: {
+                            handleUseCurrentLocation()
                         }
-                    },
-                    onUseCurrentLocation: {
-                        handleUseCurrentLocation()
-                    }
-                )
-                .padding(.top, coordinator.flowController.currentError != nil ? 12 : 56)
-
-                // Route Info
-                if let routeInfo = coordinator.flowController.routeInfo {
-                    RouteInfoView(
-                        travelTime: formatTravelTime(routeInfo.estimatedTravelTime),
-                        distance: formatDistance(routeInfo.distance)
                     )
-                    .padding(.top, 12)
+                    .padding(.top, coordinator.flowController.currentError != nil ? 12 : 56)
                     .transition(.move(edge: .top).combined(with: .opacity))
+
+                    // Route Info
+                    if let routeInfo = coordinator.flowController.routeInfo {
+                        RouteInfoView(
+                            travelTime: formatTravelTime(routeInfo.estimatedTravelTime),
+                            distance: formatDistance(routeInfo.distance)
+                        )
+                        .padding(.top, 12)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
 
                 Spacer()
 
-                // Cancel Button
-                if coordinator.flowController.legacyState != .rideRequested {
+                // Cancel Button - Only show during initial selection, not during ride states
+                if !shouldShowStatusBanner && !coordinator.shouldShowConfirmSlider {
                     Button(action: {
                         onCancel()
                     }) {
