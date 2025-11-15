@@ -336,28 +336,16 @@ struct RideRequestViewWithViewModel: View {
                     .scaleEffect(1.5)
                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
             }
-
-            // Floating History Button
-            VStack {
-                HStack {
-                    Spacer()
-
-                    Button(action: {
-                        showRideHistory = true
-                    }) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.system(size: 20))
-                            .foregroundColor(.white)
-                            .frame(width: 56, height: 56)
-                            .background(Color.blue)
-                            .clipShape(Circle())
-                            .shadow(color: .black.opacity(0.25), radius: 12, x: 0, y: 4)
-                    }
-                    .padding(.top, 56)
-                    .padding(.trailing, 16)
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button(action: {
+                    showRideHistory = true
+                }) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.system(size: 18))
+                        .foregroundColor(.primary)
                 }
-
-                Spacer()
             }
         }
         .sheet(isPresented: $showRideHistory) {
