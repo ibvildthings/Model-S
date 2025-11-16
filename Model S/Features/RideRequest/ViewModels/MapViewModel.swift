@@ -69,9 +69,13 @@ class MapViewModel: NSObject, ObservableObject {
     // MARK: - Initialization
 
     override init() {
-        // Start with default map region (configured in Constants)
+        // Try to use last known location, otherwise use default
+        let lastLocation = CLLocationManager().location
+        let initialCenter = lastLocation?.coordinate ?? MapConstants.defaultCenter
+
+        // Start with user's location or default region
         self.region = MKCoordinateRegion(
-            center: MapConstants.defaultCenter,
+            center: initialCenter,
             span: MapConstants.defaultSpan
         )
 
@@ -142,10 +146,13 @@ class MapViewModel: NSObject, ObservableObject {
     func updateRouteFromMKRoute(_ route: MKRoute) {
         self.routePolyline = route.polyline
 
-        // Center map on route with padding
-        let padding: Double = 50
+        // Center map on route with generous padding to show both pickup and destination clearly
+        let padding: Double = 5000 // Increased padding for better visibility
         let rect = route.polyline.boundingMapRect
-        let newRegion = MKCoordinateRegion(rect.insetBy(dx: -padding, dy: -padding))
+        let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
+        let newRegion = MKCoordinateRegion(paddedRect)
+
+        print("📍 Zooming to show route: center=\(newRegion.center), span=\(newRegion.span)")
 
         // Animate the region change for smooth transition
         Task { @MainActor in
@@ -210,12 +217,64 @@ class MapViewModel: NSObject, ObservableObject {
             }
         }
 
+        // Adjust viewport to include driver, pickup, and destination
+        adjustViewportForDriver()
+
         // Create timer to update driver position every 0.1 seconds
         driverAnimationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.updateDriverPosition()
         }
 
         print("🚗 Driver location set to: \(driverLocation?.latitude ?? 0), \(driverLocation?.longitude ?? 0)")
+    }
+
+    /// Adjusts the map viewport to include driver, pickup, and destination
+    private func adjustViewportForDriver() {
+        guard let driver = driverLocation else { return }
+
+        var coordinates: [CLLocationCoordinate2D] = [driver]
+
+        if let pickup = pickupLocation {
+            coordinates.append(pickup.coordinate)
+        }
+        if let destination = destinationLocation {
+            coordinates.append(destination.coordinate)
+        }
+
+        // Calculate bounding box for all coordinates
+        guard !coordinates.isEmpty else { return }
+
+        var minLat = coordinates[0].latitude
+        var maxLat = coordinates[0].latitude
+        var minLon = coordinates[0].longitude
+        var maxLon = coordinates[0].longitude
+
+        for coord in coordinates {
+            minLat = min(minLat, coord.latitude)
+            maxLat = max(maxLat, coord.latitude)
+            minLon = min(minLon, coord.longitude)
+            maxLon = max(maxLon, coord.longitude)
+        }
+
+        let center = CLLocationCoordinate2D(
+            latitude: (minLat + maxLat) / 2,
+            longitude: (minLon + maxLon) / 2
+        )
+
+        // Add 30% padding to ensure all points are visible
+        let latDelta = (maxLat - minLat) * 1.3
+        let lonDelta = (maxLon - minLon) * 1.3
+
+        let span = MKCoordinateSpan(
+            latitudeDelta: max(latDelta, 0.01), // Minimum span
+            longitudeDelta: max(lonDelta, 0.01)
+        )
+
+        print("📍 Adjusting viewport to include driver: center=\(center), span=\(span)")
+
+        withAnimation(.easeInOut(duration: 0.8)) {
+            region = MKCoordinateRegion(center: center, span: span)
+        }
     }
 
     /// Stops the driver animation
@@ -329,17 +388,19 @@ extension MapViewModel: CLLocationManagerDelegate {
 
         print("📍 User location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
 
+        let isFirstLocation = userLocation == nil
         userLocation = location
         locationError = nil
 
-        // Update region to user's location on first update (if still at default)
-        if region.center.latitude == MapConstants.defaultCenter.latitude &&
-           region.center.longitude == MapConstants.defaultCenter.longitude {
+        // Update region to user's location on first update only if we don't have pins yet
+        if isFirstLocation && pickupLocation == nil && destinationLocation == nil {
             print("📍 Centering map on user's location for the first time")
-            region = MKCoordinateRegion(
-                center: location.coordinate,
-                span: MapConstants.defaultSpan
-            )
+            withAnimation(.easeInOut(duration: 0.5)) {
+                region = MKCoordinateRegion(
+                    center: location.coordinate,
+                    span: MapConstants.defaultSpan
+                )
+            }
         }
 
         // Notify coordinator about location update
