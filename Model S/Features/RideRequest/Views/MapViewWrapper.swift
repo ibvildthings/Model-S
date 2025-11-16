@@ -74,9 +74,9 @@ struct MapViewWrapper: UIViewRepresentable {
         }
 
         func updateAnnotations(mapView: MKMapView, pickup: CLLocationCoordinate2D?, destination: CLLocationCoordinate2D?, driver: CLLocationCoordinate2D?) {
-            // Remove old annotations (except driver - we'll update it)
+            // Remove old annotations (except user location and driver - we'll update driver)
             let oldAnnotations = mapView.annotations.filter { annotation in
-                guard !($0 is MKUserLocation) else { return false }
+                guard !(annotation is MKUserLocation) else { return false }
                 // Keep driver annotation if it exists, we'll update its position
                 return annotation.title != "Driver"
             }
