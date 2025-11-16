@@ -41,13 +41,13 @@ class DriverSimulator {
     const routeToPickup = generateRoutePolyline(driverStartLocation, ride.pickup, 30);
 
     // Calculate duration based on distance to pickup
-    // Speed: ~10-15 seconds for driver-to-pickup phase
-    const durationToPickupSeconds = 10 + Math.random() * 5;
+    // REALISTIC TIMING: 2-3 minutes for driver to arrive (like real Uber/Lyft)
+    const durationToPickupSeconds = 120 + Math.random() * 60; // 2-3 minutes
     const updateIntervalMs = 500; // Update every 500ms
     const totalUpdatesToPickup = (durationToPickupSeconds * 1000) / updateIntervalMs;
     const initialProgressIncrement = 1 / totalUpdatesToPickup;
 
-    console.log(`   Duration to pickup: ${durationToPickupSeconds.toFixed(1)}s`);
+    console.log(`   Duration to pickup: ${(durationToPickupSeconds / 60).toFixed(1)} minutes`);
 
     const simulation = {
       rideId: ride.id,
@@ -125,12 +125,12 @@ class DriverSimulator {
             console.log(`   Distance to destination: ${Math.round(distanceToDestination)}m`);
 
             // IMPORTANT: Recalculate duration for pickup-to-destination phase
-            // Minimum 30 seconds for ride-in-progress to give user time to experience it
-            const durationToDestinationSeconds = Math.max(30, 30 + Math.random() * 15);
+            // REALISTIC TIMING: 5 minutes for the actual ride (like real Uber/Lyft)
+            const durationToDestinationSeconds = 300; // Exactly 5 minutes
             const totalUpdatesToDestination = (durationToDestinationSeconds * 1000) / simulation.updateIntervalMs;
             simulation.progressIncrement = 1 / totalUpdatesToDestination;
 
-            console.log(`   Duration to destination: ${durationToDestinationSeconds.toFixed(1)}s (min 30s for better UX)`);
+            console.log(`   Duration to destination: ${(durationToDestinationSeconds / 60).toFixed(1)} minutes (realistic ride duration)`);
 
             // Generate route from pickup to destination
             const routeToDestination = generateRoutePolyline(ride.pickup, ride.destination, 30);
@@ -193,6 +193,13 @@ class DriverSimulator {
           simulation.end.lat,
           simulation.end.lng
         );
+
+        // Log progress every 10% for long rides (helps debug 5-minute rides)
+        const progressPercent = Math.floor(simulation.progress * 100);
+        if (progressPercent % 10 === 0 && progressPercent > 0) {
+          const phase = simulation.currentPhase === 'toPickup' ? 'to pickup' : 'to destination';
+          console.log(`🚗 ${driver.name} ${progressPercent}% ${phase} (${Math.round(distanceRemaining)}m remaining)`);
+        }
 
         // Notify state changes based on distance
         if (simulation.currentPhase === 'toPickup') {
