@@ -177,14 +177,13 @@ class RideRequestServiceFactory {
     private init() {}
 
     /// Create a ride request service instance
-    /// - Parameter useMock: If true, returns mock service. If false, returns real API service (when implemented)
-    func createRideRequestService(useMock: Bool = true) -> RideRequestService {
+    /// - Parameter useMock: If true, returns mock service. If false, returns real API service
+    /// - Parameter baseURL: The backend server URL (default: http://localhost:3000)
+    func createRideRequestService(useMock: Bool = true, baseURL: String = "http://localhost:3000") -> RideRequestService {
         if useMock {
             return MockRideRequestService()
         } else {
-            // TODO: Replace with real API service when backend is ready
-            // return RealRideRequestService(apiClient: apiClient)
-            fatalError("Real API service not yet implemented. Use mock service for now.")
+            return RideAPIClient(baseURL: baseURL)
         }
     }
 }

@@ -40,7 +40,8 @@ class RideFlowController: ObservableObject {
         geocodingService: GeocodingService? = nil
     ) {
         self.stateMachine = RideStateMachine()
-        self.rideService = rideService ?? RideRequestServiceFactory.shared.createRideRequestService(useMock: true)
+        // 🌐 Using REAL backend server (change useMock to true for mock mode)
+        self.rideService = rideService ?? RideRequestServiceFactory.shared.createRideRequestService(useMock: false)
         self.routeService = routeService ?? MapServiceFactory.shared.createRouteCalculationService()
         self.geocodingService = geocodingService ?? MapServiceFactory.shared.createGeocodingService()
     }
