@@ -60,15 +60,22 @@ router.post('/request', async (req, res) => {
       if (match) {
         const { driver, distance, eta } = match;
 
+        console.log(`✅ Driver ${driver.name} matched!`);
+        console.log(`   Driver location: ${driver.location.lat.toFixed(4)}, ${driver.location.lng.toFixed(4)}`);
+        console.log(`   Distance to pickup: ${Math.round(distance)}m`);
+        console.log(`   ETA: ${Math.round(eta)}s`);
+
+        // IMPORTANT: Store driver's location BEFORE assignment
+        const driverOriginalLocation = { ...driver.location };
+
         // Assign driver to ride
         ride.assignDriver(driver, eta);
 
-        console.log(`✅ Driver ${driver.name} assigned to ride ${ride.id}`);
-
-        // Broadcast update via WebSocket
+        // Broadcast initial assignment with driver's ACTUAL location
         broadcastRideUpdate(ride);
 
         // Start driver movement simulation
+        // The simulator will send the initial position immediately
         driverSimulator.startSimulation(
           ride,
           driver,
@@ -84,6 +91,7 @@ router.post('/request', async (req, res) => {
         );
       } else {
         // No drivers available
+        console.log(`❌ No drivers available for ride ${ride.id}`);
         ride.updateStatus('noDriversAvailable');
         broadcastRideUpdate(ride);
       }

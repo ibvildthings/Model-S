@@ -76,9 +76,53 @@ function randomLocationInRadius(lat, lng, radiusMeters) {
   return { lat: newLat, lng: newLng };
 }
 
+/**
+ * Generate a simple route polyline between two points
+ * Creates intermediate waypoints for smooth route visualization
+ * @param {object} start - Start point {lat, lng}
+ * @param {object} end - End point {lat, lng}
+ * @param {number} numPoints - Number of points in the route (default: 20)
+ * @returns {array} Array of {lat, lng} points forming the route
+ */
+function generateRoutePolyline(start, end, numPoints = 20) {
+  const points = [];
+
+  for (let i = 0; i <= numPoints; i++) {
+    const progress = i / numPoints;
+    points.push(interpolate(start, end, progress));
+  }
+
+  return points;
+}
+
+/**
+ * Calculate bearing between two points
+ * @param {number} lat1 - Start latitude
+ * @param {number} lng1 - Start longitude
+ * @param {number} lat2 - End latitude
+ * @param {number} lng2 - End longitude
+ * @returns {number} Bearing in degrees (0-360)
+ */
+function calculateBearing(lat1, lng1, lat2, lng2) {
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δλ = (lng2 - lng1) * Math.PI / 180;
+
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) -
+    Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+
+  const θ = Math.atan2(y, x);
+  const bearing = (θ * 180 / Math.PI + 360) % 360;
+
+  return bearing;
+}
+
 module.exports = {
   calculateDistance,
   interpolate,
   calculateETA,
-  randomLocationInRadius
+  randomLocationInRadius,
+  generateRoutePolyline,
+  calculateBearing
 };
