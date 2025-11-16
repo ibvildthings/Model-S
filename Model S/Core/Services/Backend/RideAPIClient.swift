@@ -239,7 +239,7 @@ class RideAPIClient: RideRequestService {
             return .driverArriving
         case "inprogress", "in_progress":
             return .rideInProgress
-        case "approaching":
+        case "approaching", "approachingdestination":
             return .approachingDestination
         case "completed":
             return .rideCompleted

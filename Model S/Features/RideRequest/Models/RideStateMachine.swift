@@ -86,9 +86,10 @@ class RideStateMachine {
             ]
 
         case .rideInProgress:
-            // Can transition to approaching destination
+            // Can transition to approaching destination OR directly to completed
             return [
                 .approachingDestination(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Placeholder
+                .rideCompleted(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Allow skipping approaching if backend goes directly to completed
                 .idle, // Cancel ride
                 .error(.rideRequestFailed, previousState: state)
             ]
