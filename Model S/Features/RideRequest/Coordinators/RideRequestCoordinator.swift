@@ -234,6 +234,14 @@ class RideRequestCoordinator: ObservableObject {
     private func handleStateChange() {
         let currentState = flowController.currentState
 
+        // Ensure map always has pickup/destination from current state
+        if let pickup = flowController.pickupLocation {
+            mapViewModel.updatePickupLocation(pickup.coordinate, name: pickup.name)
+        }
+        if let destination = flowController.destinationLocation {
+            mapViewModel.updateDestinationLocation(destination.coordinate, name: destination.name)
+        }
+
         switch currentState {
         case .driverEnRoute:
             // Start animating driver if not already animating
@@ -243,6 +251,7 @@ class RideRequestCoordinator: ObservableObject {
                     guard let self = self else { return }
                     // Transition to driverArriving when car gets close
                     Task { @MainActor in
+                        print("🚗 Driver approaching pickup (< 100m)")
                         self.transitionToDriverArriving()
                     }
                 }
@@ -251,20 +260,24 @@ class RideRequestCoordinator: ObservableObject {
                     guard let self = self else { return }
                     // Transition to rideInProgress when car reaches pickup
                     Task { @MainActor in
+                        print("✅ Driver reached pickup")
                         self.transitionToRideInProgress()
                     }
                 }
 
                 // Start driver from beginning of route
+                print("🚗 Starting driver animation")
                 mapViewModel.startDriverAnimation()
             }
 
         case .driverArriving:
             // Animation continues, waiting for driver to reach pickup
+            print("🚗 Driver arriving soon...")
             break
 
         case .rideInProgress, .approachingDestination:
             // Driver has reached pickup, clear driver animation
+            print("🚙 Ride in progress, clearing driver marker")
             mapViewModel.clearDriverLocation()
 
         case .idle, .selectingLocations, .routeReady:
