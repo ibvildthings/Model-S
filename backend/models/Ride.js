@@ -29,7 +29,7 @@ class Ride {
 
   toJSON() {
     return {
-      id: this.id,
+      rideId: this.id,  // Changed from "id" to "rideId" for iOS compatibility
       pickup: this.pickup,
       destination: this.destination,
       status: this.status,
