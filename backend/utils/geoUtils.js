@@ -77,6 +77,33 @@ function randomLocationInRadius(lat, lng, radiusMeters) {
 }
 
 /**
+ * Generate random location in a donut-shaped area (between minRadius and maxRadius)
+ * This ensures drivers spawn at a realistic distance, not too close or too far
+ * @param {number} lat - Center latitude
+ * @param {number} lng - Center longitude
+ * @param {number} minRadiusMeters - Minimum distance from center in meters
+ * @param {number} maxRadiusMeters - Maximum distance from center in meters
+ * @returns {object} Random point {lat, lng}
+ */
+function randomLocationInDonut(lat, lng, minRadiusMeters, maxRadiusMeters) {
+  // Convert radius from meters to degrees
+  const minRadiusDegrees = minRadiusMeters / 111320;
+  const maxRadiusDegrees = maxRadiusMeters / 111320;
+
+  // Random angle (0 to 360 degrees)
+  const angle = Math.random() * 2 * Math.PI;
+
+  // Random distance between min and max radius
+  const distance = minRadiusDegrees + Math.random() * (maxRadiusDegrees - minRadiusDegrees);
+
+  // Calculate new position
+  const newLat = lat + distance * Math.cos(angle);
+  const newLng = lng + distance * Math.sin(angle);
+
+  return { lat: newLat, lng: newLng };
+}
+
+/**
  * Generate a simple route polyline between two points
  * Creates intermediate waypoints for smooth route visualization
  * @param {object} start - Start point {lat, lng}
@@ -123,6 +150,7 @@ module.exports = {
   interpolate,
   calculateETA,
   randomLocationInRadius,
+  randomLocationInDonut,
   generateRoutePolyline,
   calculateBearing
 };

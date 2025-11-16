@@ -4,7 +4,7 @@
  */
 
 const Driver = require('../models/Driver');
-const { randomLocationInRadius } = require('../utils/geoUtils');
+const { randomLocationInDonut } = require('../utils/geoUtils');
 
 class DriverPool {
   constructor() {
@@ -15,11 +15,18 @@ class DriverPool {
   /**
    * Initialize a pool of simulated drivers
    * Creates drivers at random locations around San Francisco
+   * Drivers spawn in a donut shape (3-8km from center) to ensure
+   * they're always a realistic distance away from typical pickup locations
    */
   initializeDrivers() {
     // San Francisco center coordinates
     const sfCenter = { lat: 37.7749, lng: -122.4194 };
-    const radiusMeters = 10000; // 10 km radius
+
+    // Spawn drivers in a donut shape: 3-8 km from center
+    // This ensures they're not too close (unrealistic instant arrival)
+    // but not too far (too long to test)
+    const minRadiusMeters = 3000;  // 3 km minimum
+    const maxRadiusMeters = 8000;  // 8 km maximum
 
     const driverNames = [
       'Michael Chen',
@@ -37,7 +44,14 @@ class DriverPool {
     const vehicleTypes = ['Standard', 'Standard', 'Standard', 'Premium', 'XL'];
 
     for (let i = 0; i < driverNames.length; i++) {
-      const location = randomLocationInRadius(sfCenter.lat, sfCenter.lng, radiusMeters);
+      // Spawn driver in donut-shaped area
+      const location = randomLocationInDonut(
+        sfCenter.lat,
+        sfCenter.lng,
+        minRadiusMeters,
+        maxRadiusMeters
+      );
+
       const rating = 4.5 + Math.random() * 0.5; // Rating between 4.5 and 5.0
       const vehicleType = vehicleTypes[i % vehicleTypes.length];
 
@@ -51,9 +65,11 @@ class DriverPool {
       );
 
       this.drivers.push(driver);
+
+      console.log(`   ${driver.name}: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`);
     }
 
-    console.log(`✅ Initialized ${this.drivers.length} simulated drivers`);
+    console.log(`✅ Initialized ${this.drivers.length} simulated drivers (3-8km radius)`);
   }
 
   /**
