@@ -49,7 +49,7 @@ class RideRequestCoordinator: ObservableObject {
         // Observe state changes (use $currentState to get value AFTER it changes)
         flowController.$currentState.sink { [weak self] newState in
             self?.objectWillChange.send()
-            self?.handleStateChange()
+            self?.handleStateChange(newState)
         }.store(in: &cancellables)
 
         // Forward mapViewModel changes to coordinator's objectWillChange
@@ -231,8 +231,7 @@ class RideRequestCoordinator: ObservableObject {
     // MARK: - State Change Handling
 
     /// Handles state transitions and triggers appropriate actions (like driver animation)
-    private func handleStateChange() {
-        let currentState = flowController.currentState
+    private func handleStateChange(_ currentState: RideState) {
         print("🔄 handleStateChange called with state: \(currentState)")
 
         // Ensure map always has pickup/destination from current state
