@@ -58,6 +58,9 @@ class RideRequestCoordinator: ObservableObject {
             guard let self = self, let location = driverLocation else { return }
             // Update map with backend's real-time driver position
             self.mapViewModel.driverLocation = location
+
+            // Adjust viewport to keep driver in frame (every position update)
+            self.adjustViewportForDriver()
         }.store(in: &cancellables)
 
         // Forward mapViewModel changes to coordinator's objectWillChange
@@ -245,6 +248,66 @@ class RideRequestCoordinator: ObservableObject {
         // State management handled by flowController
     }
 
+    // MARK: - Viewport Management
+
+    /// Adjusts viewport to keep driver and target (pickup or destination) in frame
+    private func adjustViewportForDriver() {
+        guard let driver = mapViewModel.driverLocation else { return }
+
+        // Determine target based on current state
+        let targetCoordinate: CLLocationCoordinate2D?
+
+        switch flowController.currentState {
+        case .driverEnRoute(_, _, _, let pickup, _), .driverArriving(_, _, let pickup, _):
+            targetCoordinate = pickup.coordinate
+        case .rideInProgress(_, _, _, _, let destination), .approachingDestination(_, _, _, let destination):
+            targetCoordinate = destination.coordinate
+        default:
+            targetCoordinate = nil
+        }
+
+        guard let target = targetCoordinate else { return }
+
+        // Calculate center point between driver and target
+        let center = CLLocationCoordinate2D(
+            latitude: (driver.latitude + target.latitude) / 2,
+            longitude: (driver.longitude + target.longitude) / 2
+        )
+
+        // Calculate distance between driver and target
+        let driverCL = CLLocation(latitude: driver.latitude, longitude: driver.longitude)
+        let targetCL = CLLocation(latitude: target.latitude, longitude: target.longitude)
+        let distance = driverCL.distance(from: targetCL)
+
+        // Dynamic padding based on distance - zooms in as driver gets closer
+        let paddingMultiplier: Double
+        if distance > 5000 { // > 5km
+            paddingMultiplier = 1.5
+        } else if distance > 2000 { // 2-5km
+            paddingMultiplier = 1.3
+        } else if distance > 500 { // 500m-2km
+            paddingMultiplier = 1.2
+        } else if distance > 50 { // 50m-500m
+            paddingMultiplier = 1.15
+        } else { // < 50m - VERY CLOSE, minimal padding
+            paddingMultiplier = 1.05 // Very tight zoom when at destination
+        }
+
+        // Calculate span
+        let latDelta = abs(driver.latitude - target.latitude) * paddingMultiplier
+        let lonDelta = abs(driver.longitude - target.longitude) * paddingMultiplier
+
+        let span = MKCoordinateSpan(
+            latitudeDelta: max(latDelta, 0.002), // Minimum span for very close proximity
+            longitudeDelta: max(lonDelta, 0.002)
+        )
+
+        // Update viewport smoothly
+        withAnimation(.easeInOut(duration: 0.5)) {
+            mapViewModel.region = MKCoordinateRegion(center: center, span: span)
+        }
+    }
+
     // MARK: - State Change Handling
 
     /// Handles state transitions and triggers appropriate actions (like driver animation)
@@ -317,9 +380,11 @@ class RideRequestCoordinator: ObservableObject {
             break
 
         case .rideCompleted:
-            // Ride finished, clean up and schedule auto-reset
-            print("✅ Ride completed, clearing driver animation")
-            mapViewModel.clearDriverLocation()
+            // Ride finished - keep driver visible at destination for completion UI
+            print("✅ Ride completed - driver stays at destination")
+
+            // DON'T clear driver immediately - they should stay at destination
+            // Driver will be cleared when auto-reset happens (after 2.5 seconds)
 
             // Auto-reset after 2.5 seconds to allow user to see completion
             print("⏱️ Scheduling auto-reset in 2.5 seconds...")
