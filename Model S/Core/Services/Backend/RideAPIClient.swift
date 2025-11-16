@@ -108,9 +108,8 @@ class RideAPIClient: RideRequestService {
         print("✅ Ride created: \(rideResponse.rideId)")
         print("   Status: \(rideResponse.status)")
 
-        // Start polling for driver assignment
-        let rideId = rideResponse.rideId
-        startPollingForDriverAssignment(rideId: rideId)
+        // Note: Polling for driver assignment is now handled by RideFlowController
+        // to properly communicate state changes to the UI
 
         return RideRequestResult(
             rideId: rideResponse.rideId,

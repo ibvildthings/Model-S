@@ -126,8 +126,26 @@ class RideFlowController: ObservableObject {
                 destination: destination
             ))
 
-            // Wait for driver assignment
-            let statusResult = try await rideService.getRideStatus(rideId: result.rideId)
+            // Poll for driver assignment (backend takes a few seconds to match)
+            var statusResult: RideRequestResult
+            var attempts = 0
+            let maxAttempts = 30 // Max 30 seconds
+
+            repeat {
+                attempts += 1
+                print("🔄 Polling for driver assignment (attempt \(attempts))...")
+
+                // Wait 1 second between polls
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+
+                statusResult = try await rideService.getRideStatus(rideId: result.rideId)
+
+                // Break if driver found
+                if statusResult.driver != nil {
+                    print("✅ Driver found after \(attempts) attempts!")
+                    break
+                }
+            } while attempts < maxAttempts
 
             // Transition to driver assigned
             if let driver = statusResult.driver,
