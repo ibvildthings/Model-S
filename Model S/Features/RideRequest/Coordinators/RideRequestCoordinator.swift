@@ -32,6 +32,7 @@ class RideRequestCoordinator: ObservableObject {
     private let geocodingService: GeocodingService
     private let geocodingDebouncer: Debouncer
     private var cancellables = Set<AnyCancellable>()
+    private var autoResetTimer: Timer?
 
     // MARK: - Initialization
 
@@ -180,9 +181,18 @@ class RideRequestCoordinator: ObservableObject {
 
     /// Cancels the current ride request
     func cancelRideRequest() {
+        // Cancel auto-reset timer if it's running
+        autoResetTimer?.invalidate()
+        autoResetTimer = nil
+
         Task { @MainActor in
             await flowController.cancelRide()
         }
+    }
+
+    deinit {
+        // Clean up timer on deallocation
+        autoResetTimer?.invalidate()
     }
 
     // MARK: - Computed Properties
@@ -321,13 +331,28 @@ class RideRequestCoordinator: ObservableObject {
             break
 
         case .rideCompleted:
-            // Ride finished, clean up
+            // Ride finished, clean up and schedule auto-reset
             print("✅ Ride completed, clearing driver animation")
             mapViewModel.clearDriverLocation()
+
+            // Auto-reset after 2.5 seconds to allow user to see completion
+            print("⏱️ Scheduling auto-reset in 2.5 seconds...")
+            autoResetTimer?.invalidate()
+            autoResetTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                print("🔄 Auto-resetting to idle state")
+                Task { @MainActor in
+                    self.flowController.reset()
+                }
+            }
             break
 
         case .idle, .selectingLocations:
             print("🔄 Handling .idle or .selectingLocations")
+            // Cancel auto-reset timer if it's running
+            autoResetTimer?.invalidate()
+            autoResetTimer = nil
+
             // Clear driver location and route when going back to initial states
             mapViewModel.clearDriverLocation()
             mapViewModel.routePolyline = nil
