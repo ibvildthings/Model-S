@@ -8,6 +8,7 @@ const cors = require('cors');
 const http = require('http');
 const WebSocket = require('ws');
 const { router: ridesRouter, setBroadcastFunctions } = require('./routes/rides');
+const { router: driversRouter } = require('./routes/drivers');
 const driverPool = require('./services/driverPool');
 
 const app = express();
@@ -156,6 +157,9 @@ app.get('/api/drivers', (req, res) => {
 // Rides routes
 app.use('/api/rides', ridesRouter);
 
+// Driver routes
+app.use('/api/drivers', driversRouter);
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({
@@ -186,12 +190,26 @@ server.listen(PORT, () => {
   console.log(`📡 WebSocket available at ws://localhost:${PORT}`);
   console.log('');
   console.log('📋 Available Endpoints:');
-  console.log(`   GET  /                      - Server info`);
-  console.log(`   GET  /health                - Health check`);
-  console.log(`   POST /api/rides/request     - Request a ride`);
-  console.log(`   GET  /api/rides/:rideId     - Get ride status`);
-  console.log(`   POST /api/rides/:rideId/cancel - Cancel ride`);
-  console.log(`   GET  /api/drivers           - View all drivers`);
+  console.log('');
+  console.log('   Rider APIs:');
+  console.log(`   POST /api/rides/request         - Request a ride`);
+  console.log(`   GET  /api/rides/:rideId         - Get ride status`);
+  console.log(`   POST /api/rides/:rideId/cancel  - Cancel ride`);
+  console.log('');
+  console.log('   Driver APIs:');
+  console.log(`   POST /api/drivers/login                      - Driver login`);
+  console.log(`   POST /api/drivers/:id/logout                 - Driver logout`);
+  console.log(`   PUT  /api/drivers/:id/availability           - Toggle availability`);
+  console.log(`   PUT  /api/drivers/:id/location               - Update location`);
+  console.log(`   POST /api/drivers/:id/rides/:rideId/accept   - Accept ride`);
+  console.log(`   POST /api/drivers/:id/rides/:rideId/reject   - Reject ride`);
+  console.log(`   PUT  /api/drivers/:id/rides/:rideId/status   - Update ride status`);
+  console.log(`   GET  /api/drivers/:id/stats                  - Get driver stats`);
+  console.log('');
+  console.log('   System:');
+  console.log(`   GET  /                          - Server info`);
+  console.log(`   GET  /health                    - Health check`);
+  console.log(`   GET  /api/drivers               - View all drivers (debug)`);
   console.log('');
   console.log('💡 Ready to receive ride requests from iOS app!');
   console.log('');

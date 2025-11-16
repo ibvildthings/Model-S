@@ -115,53 +115,23 @@ struct HomeView: View {
                     }
             }
             .navigationDestination(isPresented: $showDrive) {
-                DriveView(onDismiss: {
-                    showDrive = false
-                })
+                DriverAppView()
+                    .navigationBarBackButtonHidden(true)
+                    .toolbar {
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button(action: {
+                                showDrive = false
+                            }) {
+                                Image(systemName: "chevron.left")
+                                    .foregroundColor(.primary)
+                                Text("Back")
+                                    .foregroundColor(.primary)
+                            }
+                        }
+                    }
             }
             .sheet(isPresented: $showRideHistory) {
                 RideHistoryView()
-            }
-        }
-    }
-}
-
-// Placeholder for Drive feature
-struct DriveView: View {
-    let onDismiss: () -> Void
-
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            VStack(spacing: 16) {
-                Spacer()
-
-                Image(systemName: "steeringwheel")
-                    .font(.system(size: 72))
-                    .foregroundColor(.white)
-
-                Text("Drive Mode")
-                    .font(.system(size: 32, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.top, 8)
-
-                Text("Coming Soon")
-                    .font(.title3)
-                    .foregroundColor(.gray)
-
-                Spacer()
-            }
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: onDismiss) {
-                    Image(systemName: "chevron.left")
-                        .foregroundColor(.white)
-                    Text("Back")
-                        .foregroundColor(.white)
-                }
             }
         }
     }
