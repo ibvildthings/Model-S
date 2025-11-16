@@ -121,7 +121,17 @@ router.get('/:rideId', (req, res) => {
     });
   }
 
-  res.json(ride.toJSON());
+  const rideData = ride.toJSON();
+
+  // Debug: Log what we're sending to iOS
+  if (rideData.driver) {
+    console.log(`📤 Sending ride status with driver: ${rideData.driver.name}`);
+    console.log(`   Driver location: ${rideData.driver.location.lat}, ${rideData.driver.location.lng}`);
+  } else {
+    console.log(`📤 Sending ride status: ${rideData.status} (no driver yet)`);
+  }
+
+  res.json(rideData);
 });
 
 /**
