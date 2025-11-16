@@ -60,6 +60,12 @@ class MapViewModel: NSObject, ObservableObject {
     /// Track if we've already notified about approaching
     private var hasNotifiedApproaching = false
 
+    /// Counter for viewport updates (update every N frames to avoid excessive zooming)
+    private var viewportUpdateCounter = 0
+
+    /// Enable dynamic viewport adjustment during driver animation
+    private var shouldDynamicallyAdjustViewport = false
+
     /// Callback when user location updates (used by coordinator)
     var onLocationUpdate: ((CLLocation) -> Void)?
 
@@ -228,6 +234,10 @@ class MapViewModel: NSObject, ObservableObject {
             }
         }
 
+        // Enable dynamic viewport adjustment
+        shouldDynamicallyAdjustViewport = true
+        viewportUpdateCounter = 0
+
         // Adjust viewport to include driver, pickup, and destination
         adjustViewportForDriver()
 
@@ -239,7 +249,7 @@ class MapViewModel: NSObject, ObservableObject {
         print("🚗 Driver location set to: \(driverLocation?.latitude ?? 0), \(driverLocation?.longitude ?? 0)")
     }
 
-    /// Adjusts the map viewport to include driver, pickup, and destination
+    /// Adjusts the map viewport to include driver, pickup, and destination (initial setup)
     private func adjustViewportForDriver() {
         guard let driver = driverLocation else { return }
 
@@ -288,6 +298,49 @@ class MapViewModel: NSObject, ObservableObject {
         }
     }
 
+    /// Dynamically adjusts viewport to keep driver and pickup in frame (zooms in as they get closer)
+    private func adjustViewportForDriverAndPickup() {
+        guard let driver = driverLocation, let pickup = pickupLocation else { return }
+
+        // Calculate distance between driver and pickup
+        let driverCL = CLLocation(latitude: driver.latitude, longitude: driver.longitude)
+        let pickupCL = CLLocation(latitude: pickup.coordinate.latitude, longitude: pickup.coordinate.longitude)
+        let distance = driverCL.distance(from: pickupCL) // in meters
+
+        // Calculate center point between driver and pickup
+        let center = CLLocationCoordinate2D(
+            latitude: (driver.latitude + pickup.coordinate.latitude) / 2,
+            longitude: (driver.longitude + pickup.coordinate.longitude) / 2
+        )
+
+        // Dynamic padding based on distance - zooms in as driver gets closer
+        // When far: more padding, When close: less padding for tighter view
+        let paddingMultiplier: Double
+        if distance > 5000 { // > 5km
+            paddingMultiplier = 1.5
+        } else if distance > 2000 { // 2-5km
+            paddingMultiplier = 1.3
+        } else if distance > 500 { // 500m-2km
+            paddingMultiplier = 1.2
+        } else { // < 500m
+            paddingMultiplier = 1.1 // Tighter zoom when very close
+        }
+
+        // Calculate span based on distance
+        let latDelta = abs(driver.latitude - pickup.coordinate.latitude) * paddingMultiplier
+        let lonDelta = abs(driver.longitude - pickup.coordinate.longitude) * paddingMultiplier
+
+        let span = MKCoordinateSpan(
+            latitudeDelta: max(latDelta, 0.005), // Minimum span for close proximity
+            longitudeDelta: max(lonDelta, 0.005)
+        )
+
+        // Smooth animation for viewport changes
+        withAnimation(.easeInOut(duration: 1.0)) {
+            region = MKCoordinateRegion(center: center, span: span)
+        }
+    }
+
     /// Stops the driver animation
     func stopDriverAnimation() {
         driverAnimationTimer?.invalidate()
@@ -301,6 +354,8 @@ class MapViewModel: NSObject, ObservableObject {
         driverRoutePolyline = nil
         routeProgress = 0.0
         hasNotifiedApproaching = false
+        shouldDynamicallyAdjustViewport = false
+        viewportUpdateCounter = 0
     }
 
     /// Updates the driver's position along the route
@@ -342,6 +397,15 @@ class MapViewModel: NSObject, ObservableObject {
             // Log every 50 updates to avoid spam
             if currentIndex % 50 == 0 {
                 print("🚗 Driver position updated: progress=\(String(format: "%.1f", routeProgress * 100))%, location=\(newLocation.latitude),\(newLocation.longitude)")
+            }
+
+            // Dynamically adjust viewport every 20 frames (every 2 seconds) to keep driver and pickup in view
+            if shouldDynamicallyAdjustViewport {
+                viewportUpdateCounter += 1
+                if viewportUpdateCounter >= 20 {
+                    viewportUpdateCounter = 0
+                    adjustViewportForDriverAndPickup()
+                }
             }
 
             // Check if driver is approaching (< 100m from pickup)

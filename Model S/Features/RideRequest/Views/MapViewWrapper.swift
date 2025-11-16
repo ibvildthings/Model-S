@@ -67,6 +67,10 @@ struct MapViewWrapper: UIViewRepresentable {
         let routeLineColor: UIColor
         let routeLineWidth: CGFloat
 
+        // Track last known positions to avoid unnecessary updates
+        private var lastPickup: CLLocationCoordinate2D?
+        private var lastDestination: CLLocationCoordinate2D?
+
         init(_ parent: MapViewWrapper, routeLineColor: UIColor, routeLineWidth: CGFloat) {
             self.parent = parent
             self.routeLineColor = routeLineColor
@@ -74,15 +78,43 @@ struct MapViewWrapper: UIViewRepresentable {
         }
 
         func updateAnnotations(mapView: MKMapView, pickup: CLLocationCoordinate2D?, destination: CLLocationCoordinate2D?, driver: CLLocationCoordinate2D?) {
-            // Remove old annotations (except user location and driver - we'll update driver)
-            let oldAnnotations = mapView.annotations.filter { annotation in
-                guard !(annotation is MKUserLocation) else { return false }
-                // Keep driver annotation if it exists, we'll update its position
-                return annotation.title != "Driver"
-            }
-            mapView.removeAnnotations(oldAnnotations)
+            // Update pickup annotation only if it changed
+            if pickup != lastPickup {
+                // Remove old pickup
+                if let oldPickup = mapView.annotations.first(where: { $0.title == "Pickup" }) {
+                    mapView.removeAnnotation(oldPickup)
+                }
 
-            // Add or update driver annotation with smooth animation
+                // Add new pickup if it exists
+                if let pickup = pickup {
+                    let annotation = MKPointAnnotation()
+                    annotation.coordinate = pickup
+                    annotation.title = "Pickup"
+                    mapView.addAnnotation(annotation)
+                }
+
+                lastPickup = pickup
+            }
+
+            // Update destination annotation only if it changed
+            if destination != lastDestination {
+                // Remove old destination
+                if let oldDestination = mapView.annotations.first(where: { $0.title == "Destination" }) {
+                    mapView.removeAnnotation(oldDestination)
+                }
+
+                // Add new destination if it exists
+                if let destination = destination {
+                    let annotation = MKPointAnnotation()
+                    annotation.coordinate = destination
+                    annotation.title = "Destination"
+                    mapView.addAnnotation(annotation)
+                }
+
+                lastDestination = destination
+            }
+
+            // Update driver annotation with smooth animation
             if let driver = driver {
                 // Find existing driver annotation
                 if let existingDriver = mapView.annotations.first(where: { $0.title == "Driver" }) as? MKPointAnnotation {
@@ -104,22 +136,6 @@ struct MapViewWrapper: UIViewRepresentable {
                     mapView.removeAnnotation(existingDriver)
                     print("🚗 Removed driver annotation")
                 }
-            }
-
-            // Add pickup annotation
-            if let pickup = pickup {
-                let annotation = MKPointAnnotation()
-                annotation.coordinate = pickup
-                annotation.title = "Pickup"
-                mapView.addAnnotation(annotation)
-            }
-
-            // Add destination annotation
-            if let destination = destination {
-                let annotation = MKPointAnnotation()
-                annotation.coordinate = destination
-                annotation.title = "Destination"
-                mapView.addAnnotation(annotation)
             }
         }
 
