@@ -46,8 +46,8 @@ class RideRequestCoordinator: ObservableObject {
 
         setupLocationUpdates()
 
-        // Forward flowController changes to coordinator's objectWillChange
-        flowController.objectWillChange.sink { [weak self] _ in
+        // Observe state changes (use $currentState to get value AFTER it changes)
+        flowController.$currentState.sink { [weak self] newState in
             self?.objectWillChange.send()
             self?.handleStateChange()
         }.store(in: &cancellables)
