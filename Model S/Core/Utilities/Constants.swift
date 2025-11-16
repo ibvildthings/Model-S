@@ -47,6 +47,10 @@ enum MapConstants {
 
     /// Route line width
     static let routeLineWidth: CGFloat = 4.0
+
+    /// Minimum distance (meters) driver must move before recalculating route
+    /// This prevents excessive route recalculations while maintaining smooth updates (Uber/Lyft style)
+    static let dynamicRouteUpdateThreshold: CLLocationDistance = 100.0
 }
 
 // MARK: - Timing Configuration

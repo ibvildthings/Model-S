@@ -34,6 +34,9 @@ class RideRequestCoordinator: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var autoResetTimer: Timer?
 
+    /// Last driver position where we calculated a route (to avoid excessive recalculations)
+    private var lastRouteCalculationPosition: CLLocationCoordinate2D?
+
     // MARK: - Initialization
 
     /// Creates a coordinator with the given configuration
@@ -61,6 +64,11 @@ class RideRequestCoordinator: ObservableObject {
 
             // Adjust viewport to keep driver in frame (every position update)
             self.adjustViewportForDriver()
+
+            // Dynamically update route from current position (Uber/Lyft style)
+            Task {
+                await self.updateDynamicRoute(from: location)
+            }
         }.store(in: &cancellables)
 
         // Forward mapViewModel changes to coordinator's objectWillChange
@@ -341,16 +349,20 @@ class RideRequestCoordinator: ObservableObject {
             // Switch to approach route mode (driver → pickup, blue color)
             mapViewModel.switchToApproachRoute()
 
-            // Still calculate and show the driver's route for visualization
+            // Reset route calculation tracking for new approach phase
+            lastRouteCalculationPosition = nil
+
+            // Initial route calculation from driver's starting position
             if let driverLocation = driver.currentLocation {
                 Task {
-                    print("🚗 Calculating driver route from \(driverLocation) to \(pickup.coordinate)")
+                    print("🚗 Calculating initial driver route from \(driverLocation) to \(pickup.coordinate)")
                     if let driverRoute = await flowController.calculateDriverRoute(
                         from: driverLocation,
                         to: pickup.coordinate
                     ) {
                         mapViewModel.updateDriverRoute(driverRoute)
-                        print("✅ Driver route displayed (backend controls position updates)")
+                        lastRouteCalculationPosition = driverLocation
+                        print("✅ Driver route displayed (will update dynamically as driver moves)")
                     }
                 }
             }
@@ -373,10 +385,22 @@ class RideRequestCoordinator: ObservableObject {
             // Switch to active ride route (pickup → destination, purple color)
             mapViewModel.switchToActiveRideRoute()
 
-            // Update the route visualization to pickup-to-destination
-            if let mkRoute = flowController.currentMKRoute {
-                mapViewModel.updateDriverRoute(mkRoute)
-                print("✅ Destination route displayed (backend controls position updates)")
+            // Reset route calculation tracking for new active ride phase
+            lastRouteCalculationPosition = nil
+
+            // Calculate initial route from current position to destination
+            if let driverLocation = driver.currentLocation {
+                Task {
+                    print("🚗 Calculating initial route from current position to \(destination.coordinate)")
+                    if let destRoute = await flowController.calculateDriverRoute(
+                        from: driverLocation,
+                        to: destination.coordinate
+                    ) {
+                        mapViewModel.routePolyline = destRoute.polyline
+                        lastRouteCalculationPosition = driverLocation
+                        print("✅ Destination route displayed (will update dynamically as driver moves)")
+                    }
+                }
             }
             break
 
@@ -423,4 +447,64 @@ class RideRequestCoordinator: ObservableObject {
     // REMOVED: Manual transition methods no longer needed
     // Backend polling now controls all state transitions
     // Animation is purely visual and doesn't trigger state changes
+
+    // MARK: - Dynamic Route Updates
+
+    /// Updates the route dynamically from current driver position (Uber/Lyft style)
+    /// Only shows route from current position forward, not the already-traveled path
+    /// - Parameter driverLocation: Current driver position
+    private func updateDynamicRoute(from driverLocation: CLLocationCoordinate2D) async {
+        // Check if we need to recalculate based on distance moved
+        if let lastPosition = lastRouteCalculationPosition {
+            let lastCL = CLLocation(latitude: lastPosition.latitude, longitude: lastPosition.longitude)
+            let currentCL = CLLocation(latitude: driverLocation.latitude, longitude: driverLocation.longitude)
+            let distanceMoved = lastCL.distance(from: currentCL)
+
+            // Only recalculate if driver has moved more than threshold
+            if distanceMoved < MapConstants.dynamicRouteUpdateThreshold {
+                return
+            }
+        }
+
+        // Determine target based on current state
+        let targetCoordinate: CLLocationCoordinate2D?
+        let isApproachPhase: Bool
+
+        switch flowController.currentState {
+        case .driverEnRoute(_, _, _, let pickup, _),
+             .driverArriving(_, _, let pickup, _):
+            // Approach phase: calculate route from current position → pickup
+            targetCoordinate = pickup.coordinate
+            isApproachPhase = true
+
+        case .rideInProgress(_, _, _, _, let destination),
+             .approachingDestination(_, _, _, let destination):
+            // Active ride phase: calculate route from current position → destination
+            targetCoordinate = destination.coordinate
+            isApproachPhase = false
+
+        default:
+            // Not in a phase where we need dynamic route updates
+            return
+        }
+
+        guard let target = targetCoordinate else { return }
+
+        // Recalculate route from current driver position to target
+        print("🛣️ Recalculating route from current position to \(isApproachPhase ? "pickup" : "destination")")
+
+        if let newRoute = await flowController.calculateDriverRoute(from: driverLocation, to: target) {
+            // Update the appropriate route polyline
+            if isApproachPhase {
+                mapViewModel.updateDriverRoute(newRoute)
+            } else {
+                // For active ride, update the main route polyline
+                mapViewModel.routePolyline = newRoute.polyline
+            }
+
+            // Update last calculation position
+            lastRouteCalculationPosition = driverLocation
+            print("✅ Route updated from current position")
+        }
+    }
 }
