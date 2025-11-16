@@ -181,7 +181,12 @@ class MapViewModel: NSObject, ObservableObject {
     /// Starts animating the driver's movement along the route to pickup location
     /// - Parameter startingCoordinate: Initial driver position (or nil to start from beginning of route)
     func startDriverAnimation(from startingCoordinate: CLLocationCoordinate2D? = nil) {
-        guard let polyline = routePolyline else { return }
+        guard let polyline = routePolyline else {
+            print("❌ Cannot start driver animation: routePolyline is nil")
+            return
+        }
+
+        print("🚗 Starting driver animation with \(polyline.pointCount) points")
 
         // Stop any existing animation
         stopDriverAnimation()
@@ -194,12 +199,14 @@ class MapViewModel: NSObject, ObservableObject {
             driverLocation = start
             // Calculate initial progress based on starting position
             routeProgress = calculateProgress(for: start, on: polyline)
+            print("🚗 Driver starting at custom position: \(start)")
         } else {
             // Start from beginning of route
             routeProgress = 0.0
             if polyline.pointCount > 0 {
                 let points = polyline.points()
                 driverLocation = points[0].coordinate
+                print("🚗 Driver starting at beginning of route: \(points[0].coordinate)")
             }
         }
 
@@ -207,6 +214,8 @@ class MapViewModel: NSObject, ObservableObject {
         driverAnimationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.updateDriverPosition()
         }
+
+        print("🚗 Driver location set to: \(driverLocation?.latitude ?? 0), \(driverLocation?.longitude ?? 0)")
     }
 
     /// Stops the driver animation
@@ -243,6 +252,7 @@ class MapViewModel: NSObject, ObservableObject {
                 driverLocation = pickup.coordinate
             }
 
+            print("✅ Driver reached pickup")
             // Notify that driver reached pickup
             onDriverReachedPickup?()
             return
@@ -254,11 +264,18 @@ class MapViewModel: NSObject, ObservableObject {
         let currentIndex = Int(Double(totalPoints - 1) * routeProgress)
 
         if currentIndex < totalPoints {
-            driverLocation = points[currentIndex].coordinate
+            let newLocation = points[currentIndex].coordinate
+            driverLocation = newLocation
+
+            // Log every 50 updates to avoid spam
+            if currentIndex % 50 == 0 {
+                print("🚗 Driver position updated: progress=\(String(format: "%.1f", routeProgress * 100))%, location=\(newLocation.latitude),\(newLocation.longitude)")
+            }
 
             // Check if driver is approaching (< 100m from pickup)
             if !hasNotifiedApproaching && isDriverNearPickup() {
                 hasNotifiedApproaching = true
+                print("🚗 Driver approaching pickup (< 100m)")
                 onDriverApproaching?()
             }
         }
@@ -310,12 +327,15 @@ extension MapViewModel: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
 
+        print("📍 User location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+
         userLocation = location
         locationError = nil
 
         // Update region to user's location on first update (if still at default)
         if region.center.latitude == MapConstants.defaultCenter.latitude &&
            region.center.longitude == MapConstants.defaultCenter.longitude {
+            print("📍 Centering map on user's location for the first time")
             region = MKCoordinateRegion(
                 center: location.coordinate,
                 span: MapConstants.defaultSpan
@@ -328,19 +348,24 @@ extension MapViewModel: CLLocationManagerDelegate {
 
     /// Called when location authorization status changes
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        print("📍 Location authorization changed to: \(status.rawValue)")
         locationAuthorizationStatus = status
 
         switch status {
         case .authorizedWhenInUse, .authorizedAlways:
+            print("📍 Location authorized, starting location updates")
             if CLLocationManager.locationServicesEnabled() {
                 locationManager.startUpdatingLocation()
                 locationError = nil
             } else {
+                print("❌ Location services disabled")
                 locationError = .locationServicesDisabled
             }
         case .denied, .restricted:
+            print("❌ Location permission denied or restricted")
             locationError = .locationPermissionDenied
         case .notDetermined:
+            print("⚠️ Location permission not determined")
             break
         @unknown default:
             break
