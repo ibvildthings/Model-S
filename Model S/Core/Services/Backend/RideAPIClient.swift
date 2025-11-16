@@ -54,8 +54,10 @@ class RideAPIClient: RideRequestService {
 
         request.httpBody = try JSONEncoder().encode(payload)
 
-        // Send request
-        let (data, response) = try await session.data(for: request)
+        // Send request with automatic retry on network failures
+        let (data, response) = try await performRequestWithRetry {
+            try await self.session.data(for: request)
+        }
 
         // Check HTTP status
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -124,7 +126,10 @@ class RideAPIClient: RideRequestService {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
 
-        let (data, response) = try await session.data(for: request)
+        // Use retry logic for status polling (more lenient - status checks are frequent)
+        let (data, response) = try await performRequestWithRetry(maxRetries: 2) {
+            try await self.session.data(for: request)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -160,7 +165,10 @@ class RideAPIClient: RideRequestService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
-        let (_, response) = try await session.data(for: request)
+        // Use retry logic for cancellation (important to succeed)
+        let (_, response) = try await performRequestWithRetry {
+            try await self.session.data(for: request)
+        }
 
         guard let httpResponse = response as? HTTPURLResponse,
               httpResponse.statusCode == 200 else {
@@ -226,6 +234,87 @@ class RideAPIClient: RideRequestService {
     }
 
     // MARK: - Helper Methods
+
+    /// Performs a network request with automatic retry on transient failures
+    /// - Parameters:
+    ///   - maxRetries: Maximum number of retry attempts (default: 3)
+    ///   - operation: The async operation to perform
+    /// - Returns: The result of the operation
+    /// - Throws: The last error encountered if all retries fail
+    private func performRequestWithRetry<T>(
+        maxRetries: Int = 3,
+        operation: @escaping () async throws -> T
+    ) async throws -> T {
+        var lastError: Error?
+
+        for attempt in 0...maxRetries {
+            do {
+                // Attempt the operation
+                let result = try await operation()
+
+                // Success! Log if this was a retry
+                if attempt > 0 {
+                    print("✅ Request succeeded after \(attempt) retries")
+                }
+
+                return result
+
+            } catch {
+                lastError = error
+
+                // Check if error is retryable
+                let shouldRetry = isRetryableError(error)
+
+                // Don't retry on last attempt or non-retryable errors
+                if attempt >= maxRetries || !shouldRetry {
+                    if !shouldRetry {
+                        print("❌ Non-retryable error encountered: \(error)")
+                    } else {
+                        print("❌ Max retries (\(maxRetries)) exceeded")
+                    }
+                    throw error
+                }
+
+                // Calculate exponential backoff delay: 0.5s, 1s, 2s, 4s
+                let baseDelay: TimeInterval = 0.5
+                let delay = baseDelay * pow(2.0, Double(attempt))
+
+                print("⚠️ Request failed (attempt \(attempt + 1)/\(maxRetries + 1)): \(error)")
+                print("🔄 Retrying in \(delay)s...")
+
+                // Wait before retrying
+                try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            }
+        }
+
+        // This should never be reached, but Swift requires it
+        throw lastError ?? RideRequestError.networkUnavailable
+    }
+
+    /// Determines if an error is retryable (network issues) vs non-retryable (client errors)
+    private func isRetryableError(_ error: Error) -> Bool {
+        // Network errors are retryable
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut,
+                 .cannotFindHost,
+                 .cannotConnectToHost,
+                 .networkConnectionLost,
+                 .dnsLookupFailed,
+                 .notConnectedToInternet,
+                 .badServerResponse:
+                return true
+            default:
+                return false
+            }
+        }
+
+        // HTTP 5xx errors are retryable (server issues)
+        // HTTP 4xx errors are NOT retryable (client errors)
+        // For now, we'll handle this at the URLSession level above
+
+        return false
+    }
 
     private func convertStatus(_ status: String) -> RideRequestState {
         switch status.lowercased() {

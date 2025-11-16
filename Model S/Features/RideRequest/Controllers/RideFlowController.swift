@@ -49,6 +49,13 @@ class RideFlowController: ObservableObject {
         self.geocodingService = geocodingService ?? MapServiceFactory.shared.createGeocodingService()
     }
 
+    deinit {
+        // Clean up timer to prevent memory leaks
+        statusPollingTimer?.invalidate()
+        statusPollingTimer = nil
+        print("🧹 RideFlowController deallocated, cleaned up resources")
+    }
+
     // MARK: - State Transitions
 
     /// Start fresh ride request flow

@@ -108,6 +108,14 @@ class MapViewModel: NSObject, ObservableObject {
         checkLocationAuthorization()
     }
 
+    deinit {
+        // Clean up timer to prevent memory leaks
+        driverAnimationTimer?.invalidate()
+        driverAnimationTimer = nil
+        locationManager.stopUpdatingLocation()
+        print("🧹 MapViewModel deallocated, cleaned up resources")
+    }
+
     // MARK: - Location Permissions
 
     /// Requests location permission from the user
