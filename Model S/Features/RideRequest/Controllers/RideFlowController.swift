@@ -204,6 +204,40 @@ class RideFlowController: ObservableObject {
         transition(to: .idle)
     }
 
+    /// Manually transition to driver arriving (called by animation callback)
+    func transitionToDriverArriving() {
+        guard case .driverEnRoute(let rideId, let driver, _, let pickup, let destination) = currentState else {
+            print("❌ Cannot transition to driverArriving from current state: \(currentState)")
+            return
+        }
+
+        transition(to: .driverArriving(
+            rideId: rideId,
+            driver: driver,
+            pickup: pickup,
+            destination: destination
+        ))
+    }
+
+    /// Manually transition to ride in progress (called by animation callback)
+    func transitionToRideInProgress() {
+        guard case .driverArriving(let rideId, let driver, let pickup, let destination) = currentState else {
+            print("❌ Cannot transition to rideInProgress from current state: \(currentState)")
+            return
+        }
+
+        // Get ETA to destination (reuse from previous state or default)
+        let eta = estimatedArrival ?? 300 // Default 5 minutes
+
+        transition(to: .rideInProgress(
+            rideId: rideId,
+            driver: driver,
+            eta: eta,
+            pickup: pickup,
+            destination: destination
+        ))
+    }
+
     // MARK: - Private Helpers
 
     /// Perform a validated state transition

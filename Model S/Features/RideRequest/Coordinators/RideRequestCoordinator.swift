@@ -278,38 +278,11 @@ class RideRequestCoordinator: ObservableObject {
 
     /// Transition to driver arriving state (triggered by animation)
     private func transitionToDriverArriving() {
-        guard case .driverEnRoute(let rideId, let driver, _, let pickup, let destination) = flowController.currentState else {
-            return
-        }
-
-        // Manually transition to driverArriving state
-        flowController.currentState = .driverArriving(
-            rideId: rideId,
-            driver: driver,
-            pickup: pickup,
-            destination: destination
-        )
+        flowController.transitionToDriverArriving()
     }
 
     /// Transition to ride in progress state (triggered by animation)
     private func transitionToRideInProgress() {
-        guard let driver = flowController.driver,
-              let rideId = flowController.rideId,
-              let pickup = flowController.pickupLocation,
-              let destination = flowController.destinationLocation else {
-            return
-        }
-
-        // Get ETA to destination (reuse the original ETA)
-        let eta = flowController.estimatedArrival ?? 300 // Default 5 minutes
-
-        // Manually transition to rideInProgress state
-        flowController.currentState = .rideInProgress(
-            rideId: rideId,
-            driver: driver,
-            eta: eta,
-            pickup: pickup,
-            destination: destination
-        )
+        flowController.transitionToRideInProgress()
     }
 }
