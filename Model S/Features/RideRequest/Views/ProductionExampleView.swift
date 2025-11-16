@@ -401,29 +401,83 @@ struct RideRequestViewWithViewModel: View {
 
     // TEMPORARY: Quick test locations - Remove before production
     private func fillTestLocations() {
-        // Test locations in Cupertino/San Jose area
-        let testPickup = CLLocationCoordinate2D(latitude: 37.3323, longitude: -122.0312) // Cupertino
-        let testDestination = CLLocationCoordinate2D(latitude: 37.3218, longitude: -122.0182) // Nearby restaurant
+        // Define 10 different test location pairs in Cupertino/San Jose area
+        let testLocationPairs: [(pickup: (coord: CLLocationCoordinate2D, name: String), destination: (coord: CLLocationCoordinate2D, name: String))] = [
+            // Pair 1: Apple Park to Izumi Matcha
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.3323, longitude: -122.0312), "Apple Park Visitor Center"),
+                destination: (CLLocationCoordinate2D(latitude: 37.3218, longitude: -122.0182), "Izumi Matcha")
+            ),
+            // Pair 2: De Anza College to Valley Fair Mall
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.3197, longitude: -122.0450), "De Anza College"),
+                destination: (CLLocationCoordinate2D(latitude: 37.3238, longitude: -121.9950), "Westfield Valley Fair")
+            ),
+            // Pair 3: Cupertino Library to Main Street Cupertino
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.3230, longitude: -122.0416), "Cupertino Library"),
+                destination: (CLLocationCoordinate2D(latitude: 37.3226, longitude: -122.0310), "Main Street Cupertino")
+            ),
+            // Pair 4: Santana Row to San Jose Airport
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.3213, longitude: -121.9488), "Santana Row"),
+                destination: (CLLocationCoordinate2D(latitude: 37.3639, longitude: -121.9289), "San Jose Airport")
+            ),
+            // Pair 5: Stevens Creek Trail to Whole Foods
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.3234, longitude: -122.0086), "Stevens Creek Trail"),
+                destination: (CLLocationCoordinate2D(latitude: 37.3315, longitude: -122.0297), "Whole Foods Cupertino")
+            ),
+            // Pair 6: Sunnyvale Caltrain to Murphy Avenue
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.3782, longitude: -122.0306), "Sunnyvale Caltrain Station"),
+                destination: (CLLocationCoordinate2D(latitude: 37.3876, longitude: -122.0309), "Murphy Avenue")
+            ),
+            // Pair 7: San Jose State to SAP Center
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.3352, longitude: -121.8811), "San Jose State University"),
+                destination: (CLLocationCoordinate2D(latitude: 37.3329, longitude: -121.9010), "SAP Center")
+            ),
+            // Pair 8: Los Gatos Creek Trail to Downtown Los Gatos
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.2358, longitude: -121.9623), "Los Gatos Creek Trail"),
+                destination: (CLLocationCoordinate2D(latitude: 37.2271, longitude: -121.9752), "Downtown Los Gatos")
+            ),
+            // Pair 9: Rancho San Antonio to Foothill College
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.3237, longitude: -122.0799), "Rancho San Antonio Preserve"),
+                destination: (CLLocationCoordinate2D(latitude: 37.3606, longitude: -122.1262), "Foothill College")
+            ),
+            // Pair 10: Campbell Park to The Pruneyard
+            (
+                pickup: (CLLocationCoordinate2D(latitude: 37.2871, longitude: -121.9500), "Campbell Park"),
+                destination: (CLLocationCoordinate2D(latitude: 37.2931, longitude: -121.9751), "The Pruneyard Shopping Center")
+            )
+        ]
+
+        // Randomly select one pair
+        let selectedPair = testLocationPairs.randomElement()!
+        print("🎲 Randomly selected test locations: \(selectedPair.pickup.name) → \(selectedPair.destination.name)")
 
         Task {
             // Fill pickup
             await coordinator.selectLocation(
-                coordinate: testPickup,
-                name: "Apple Park Visitor Center",
+                coordinate: selectedPair.pickup.coord,
+                name: selectedPair.pickup.name,
                 isPickup: true
             )
-            pickupText = "Apple Park Visitor Center"
+            pickupText = selectedPair.pickup.name
 
             // Small delay so user can see it happening
             try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
 
             // Fill destination
             await coordinator.selectLocation(
-                coordinate: testDestination,
-                name: "Izumi Matcha",
+                coordinate: selectedPair.destination.coord,
+                name: selectedPair.destination.name,
                 isPickup: false
             )
-            destinationText = "Izumi Matcha"
+            destinationText = selectedPair.destination.name
         }
     }
 
