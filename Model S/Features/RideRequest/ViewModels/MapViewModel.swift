@@ -69,11 +69,9 @@ class MapViewModel: NSObject, ObservableObject {
     /// Callback when user location updates (used by coordinator)
     var onLocationUpdate: ((CLLocation) -> Void)?
 
-    /// Callback when driver reaches pickup location
-    var onDriverReachedPickup: (() -> Void)?
-
-    /// Callback when driver is approaching pickup (< 100m)
-    var onDriverApproaching: (() -> Void)?
+    // REMOVED: Animation callbacks no longer trigger state changes
+    // Backend polling is now the single source of truth for ride state
+    // Animation is purely visual and doesn't control state transitions
 
     // MARK: - Initialization
 
@@ -379,9 +377,8 @@ class MapViewModel: NSObject, ObservableObject {
                 driverLocation = pickup.coordinate
             }
 
-            print("✅ Driver reached pickup")
-            // Notify that driver reached pickup
-            onDriverReachedPickup?()
+            print("✅ Driver animation reached pickup (visual only)")
+            // Animation complete - backend polling will handle state transition
             return
         }
 
@@ -408,11 +405,11 @@ class MapViewModel: NSObject, ObservableObject {
                 }
             }
 
-            // Check if driver is approaching (< 100m from pickup)
+            // Check if driver is approaching (< 100m from pickup) - for logging only
             if !hasNotifiedApproaching && isDriverNearPickup() {
                 hasNotifiedApproaching = true
-                print("🚗 Driver approaching pickup (< 100m)")
-                onDriverApproaching?()
+                print("🚗 Driver animation approaching pickup (< 100m, visual only)")
+                // Backend polling will handle state transition
             }
         }
     }

@@ -256,24 +256,10 @@ class RideRequestCoordinator: ObservableObject {
             // Start animating driver if not already animating
             if mapViewModel.driverLocation == nil {
                 print("🔄 Driver location is nil, setting up animation")
-                // Set up callbacks for animation milestones
-                mapViewModel.onDriverApproaching = { [weak self] in
-                    guard let self = self else { return }
-                    // Transition to driverArriving when car gets close
-                    Task { @MainActor in
-                        print("🚗 Driver approaching pickup (< 100m)")
-                        self.transitionToDriverArriving()
-                    }
-                }
 
-                mapViewModel.onDriverReachedPickup = { [weak self] in
-                    guard let self = self else { return }
-                    // Transition to rideInProgress when car reaches pickup
-                    Task { @MainActor in
-                        print("✅ Driver reached pickup")
-                        self.transitionToRideInProgress()
-                    }
-                }
+                // REMOVED: Animation callbacks no longer trigger state changes
+                // Backend polling now controls all state transitions
+                // Animation is purely visual
 
                 // Calculate and set driver's route from their location to pickup
                 if let driverLocation = driver.currentLocation {
@@ -322,13 +308,7 @@ class RideRequestCoordinator: ObservableObject {
         }
     }
 
-    /// Transition to driver arriving state (triggered by animation)
-    private func transitionToDriverArriving() {
-        flowController.transitionToDriverArriving()
-    }
-
-    /// Transition to ride in progress state (triggered by animation)
-    private func transitionToRideInProgress() {
-        flowController.transitionToRideInProgress()
-    }
+    // REMOVED: Manual transition methods no longer needed
+    // Backend polling now controls all state transitions
+    // Animation is purely visual and doesn't trigger state changes
 }
