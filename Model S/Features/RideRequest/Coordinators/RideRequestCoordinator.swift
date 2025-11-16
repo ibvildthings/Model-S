@@ -233,6 +233,7 @@ class RideRequestCoordinator: ObservableObject {
     /// Handles state transitions and triggers appropriate actions (like driver animation)
     private func handleStateChange() {
         let currentState = flowController.currentState
+        print("🔄 handleStateChange called with state: \(currentState)")
 
         // Ensure map always has pickup/destination from current state
         if let pickup = flowController.pickupLocation {
@@ -244,15 +245,18 @@ class RideRequestCoordinator: ObservableObject {
 
         switch currentState {
         case .routeReady:
+            print("🔄 Handling .routeReady")
             // Update map with the calculated route
             if let mkRoute = flowController.currentMKRoute {
                 print("📍 Updating map with calculated route")
                 mapViewModel.updateRouteFromMKRoute(mkRoute)
             }
 
-        case .driverEnRoute:
+        case .driverEnRoute(_, _, _, _, _):
+            print("🔄 Handling .driverEnRoute")
             // Start animating driver if not already animating
             if mapViewModel.driverLocation == nil {
+                print("🔄 Driver location is nil, setting up animation")
                 // Set up callbacks for animation milestones
                 mapViewModel.onDriverApproaching = { [weak self] in
                     guard let self = self else { return }
@@ -275,24 +279,29 @@ class RideRequestCoordinator: ObservableObject {
                 // Start driver from beginning of route
                 print("🚗 Starting driver animation")
                 mapViewModel.startDriverAnimation()
+            } else {
+                print("🔄 Driver location already set: \(mapViewModel.driverLocation!)")
             }
 
-        case .driverArriving:
+        case .driverArriving(_, _, _, _):
             // Animation continues, waiting for driver to reach pickup
             print("🚗 Driver arriving soon...")
             break
 
-        case .rideInProgress, .approachingDestination:
+        case .rideInProgress(_, _, _, _, _), .approachingDestination(_, _, _, _):
             // Driver has reached pickup, clear driver animation
+            print("🔄 Handling .rideInProgress or .approachingDestination")
             print("🚙 Ride in progress, clearing driver marker")
             mapViewModel.clearDriverLocation()
 
         case .idle, .selectingLocations:
+            print("🔄 Handling .idle or .selectingLocations")
             // Clear driver location and route when going back to initial states
             mapViewModel.clearDriverLocation()
             mapViewModel.routePolyline = nil
 
         default:
+            print("🔄 Handling default case (submittingRequest, searchingForDriver, driverAssigned, etc.)")
             break
         }
     }
