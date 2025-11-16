@@ -8,7 +8,6 @@
 import Foundation
 import CoreLocation
 
-@MainActor
 class RideAPIClient: RideRequestService {
 
     // MARK: - Configuration
@@ -153,7 +152,7 @@ class RideAPIClient: RideRequestService {
 
         print("🔄 Starting to poll for driver assignment...")
 
-        pollingTask = Task { [weak self] in
+        pollingTask = Task { @MainActor [weak self] in
             guard let self = self else { return }
 
             // Poll every 1 second for driver assignment
