@@ -32,6 +32,9 @@ class RideFlowController: ObservableObject {
     /// Stores the actual MKRoute for map display
     private(set) var currentMKRoute: MKRoute?
 
+    /// Timer for polling backend ride status
+    private var statusPollingTimer: Timer?
+
     // MARK: - Initialization
 
     init(
@@ -185,45 +188,12 @@ class RideFlowController: ObservableObject {
                     destination: destination
                 ))
 
-                // NOTE: Transitions to driverArriving and rideInProgress are now
-                // handled by the coordinator based on the animation reaching pickup.
-                // The coordinator will trigger these when:
-                // - driverArriving: when car is < 100m from pickup
-                // - rideInProgress: when car reaches pickup location
+                // Start polling backend for ride status updates
+                startPollingRideStatus(rideId: result.rideId, pickup: pickup, destination: destination)
 
-                // Wait for ride to be in progress (will be set by animation callback)
-                // Poll until we're in rideInProgress state
-                while case .driverEnRoute = currentState {
-                    try await Task.sleep(nanoseconds: UInt64(0.5 * 1_000_000_000))
-                }
-                while case .driverArriving = currentState {
-                    try await Task.sleep(nanoseconds: UInt64(0.5 * 1_000_000_000))
-                }
-
-                // Now we're in rideInProgress, continue with the rest of the flow
-                guard case .rideInProgress(let rideId, let driver, _, let pickup, let destination) = currentState else {
-                    return
-                }
-
-                // Simulate approaching destination
-                try await Task.sleep(nanoseconds: UInt64(3.0 * 1_000_000_000))
-
-                transition(to: .approachingDestination(
-                    rideId: rideId,
-                    driver: driver,
-                    pickup: pickup,
-                    destination: destination
-                ))
-
-                // Simulate ride completion
-                try await Task.sleep(nanoseconds: UInt64(2.0 * 1_000_000_000))
-
-                transition(to: .rideCompleted(
-                    rideId: rideId,
-                    driver: driver,
-                    pickup: pickup,
-                    destination: destination
-                ))
+                // NOTE: Transitions to driverArriving, rideInProgress, approachingDestination,
+                // and rideCompleted are now handled by polling the backend ride status.
+                // The backend simulator will update the ride status as the driver progresses.
             }
 
         } catch {
@@ -239,6 +209,7 @@ class RideFlowController: ObservableObject {
         }
 
         do {
+            stopPollingRideStatus()
             try await rideService.cancelRide(rideId: rideId)
             reset()
         } catch {
@@ -248,8 +219,140 @@ class RideFlowController: ObservableObject {
 
     /// Reset to initial state
     func reset() {
+        stopPollingRideStatus()
         currentMKRoute = nil
         transition(to: .idle)
+    }
+
+    /// Start polling backend for ride status updates
+    private func startPollingRideStatus(rideId: String, pickup: LocationPoint, destination: LocationPoint) {
+        print("🔄 Starting ride status polling for ride \(rideId)")
+
+        // Stop any existing polling
+        stopPollingRideStatus()
+
+        // Poll every 2 seconds
+        statusPollingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+
+            Task { @MainActor in
+                await self.checkRideStatus(rideId: rideId, pickup: pickup, destination: destination)
+            }
+        }
+
+        // Fire immediately
+        Task { @MainActor in
+            await checkRideStatus(rideId: rideId, pickup: pickup, destination: destination)
+        }
+    }
+
+    /// Stop polling for ride status
+    private func stopPollingRideStatus() {
+        statusPollingTimer?.invalidate()
+        statusPollingTimer = nil
+        print("🔄 Stopped ride status polling")
+    }
+
+    /// Check ride status from backend and update state accordingly
+    private func checkRideStatus(rideId: String, pickup: LocationPoint, destination: LocationPoint) async {
+        do {
+            let statusResult = try await rideService.getRideStatus(rideId: rideId)
+
+            guard let driver = statusResult.driver else {
+                return
+            }
+
+            // Map backend status to frontend state
+            switch statusResult.status {
+            case "assigned":
+                // Driver assigned but not yet en route
+                if case .searchingForDriver = currentState {
+                    transition(to: .driverAssigned(
+                        rideId: rideId,
+                        driver: driver,
+                        pickup: pickup,
+                        destination: destination
+                    ))
+                }
+
+            case "enRoute":
+                // Driver is on the way to pickup
+                if case .driverAssigned = currentState {
+                    transition(to: .driverEnRoute(
+                        rideId: rideId,
+                        driver: driver,
+                        eta: statusResult.estimatedArrival ?? 0,
+                        pickup: pickup,
+                        destination: destination
+                    ))
+                }
+
+            case "arriving":
+                // Driver is arriving at pickup (< 1 min away)
+                if case .driverEnRoute = currentState {
+                    print("🚗 Backend says driver is arriving")
+                    transition(to: .driverArriving(
+                        rideId: rideId,
+                        driver: driver,
+                        pickup: pickup,
+                        destination: destination
+                    ))
+                }
+
+            case "inProgress":
+                // Driver picked up passenger, heading to destination
+                if case .driverArriving = currentState {
+                    print("🚗 Backend says ride is in progress")
+                    transition(to: .rideInProgress(
+                        rideId: rideId,
+                        driver: driver,
+                        eta: statusResult.estimatedArrival ?? 0,
+                        pickup: pickup,
+                        destination: destination
+                    ))
+                } else if case .driverEnRoute = currentState {
+                    // Sometimes we might skip arriving state if it's too fast
+                    print("🚗 Backend says ride is in progress (skipped arriving)")
+                    transition(to: .rideInProgress(
+                        rideId: rideId,
+                        driver: driver,
+                        eta: statusResult.estimatedArrival ?? 0,
+                        pickup: pickup,
+                        destination: destination
+                    ))
+                }
+
+            case "approaching":
+                // Approaching destination
+                if case .rideInProgress = currentState {
+                    print("🏁 Backend says approaching destination")
+                    transition(to: .approachingDestination(
+                        rideId: rideId,
+                        driver: driver,
+                        pickup: pickup,
+                        destination: destination
+                    ))
+                }
+
+            case "completed":
+                // Ride completed
+                print("✅ Backend says ride is completed")
+                stopPollingRideStatus()
+                transition(to: .rideCompleted(
+                    rideId: rideId,
+                    driver: driver,
+                    pickup: pickup,
+                    destination: destination
+                ))
+
+            default:
+                break
+            }
+
+        } catch {
+            print("⚠️ Error polling ride status: \(error)")
+            // Don't transition to error state, just keep polling
+        }
     }
 
     /// Manually transition to driver arriving (called by animation callback)
