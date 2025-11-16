@@ -29,8 +29,11 @@ class MapViewModel: NSObject, ObservableObject {
     /// Current map region (center and zoom level)
     @Published var region: MKCoordinateRegion
 
-    /// Route polyline to display on map
+    /// Route polyline to display on map (pickup to destination)
     @Published var routePolyline: MKPolyline?
+
+    /// Driver's route polyline (driver location to pickup) - used for driver animation
+    @Published var driverRoutePolyline: MKPolyline?
 
     /// Current location permission status
     @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -162,6 +165,13 @@ class MapViewModel: NSObject, ObservableObject {
         }
     }
 
+    /// Updates the driver's route polyline (from driver location to pickup)
+    /// - Parameter route: The MKRoute for the driver's path to pickup
+    func updateDriverRoute(_ route: MKRoute) {
+        self.driverRoutePolyline = route.polyline
+        print("🚗 Driver route updated with \(route.polyline.pointCount) points")
+    }
+
     /// Centers the map on the user's current location
     func centerOnUserLocation() {
         if let location = userLocation {
@@ -188,12 +198,13 @@ class MapViewModel: NSObject, ObservableObject {
     /// Starts animating the driver's movement along the route to pickup location
     /// - Parameter startingCoordinate: Initial driver position (or nil to start from beginning of route)
     func startDriverAnimation(from startingCoordinate: CLLocationCoordinate2D? = nil) {
-        guard let polyline = routePolyline else {
-            print("❌ Cannot start driver animation: routePolyline is nil")
+        // Use driver's route (driver to pickup) if available, otherwise fall back to main route
+        guard let polyline = driverRoutePolyline ?? routePolyline else {
+            print("❌ Cannot start driver animation: no route available")
             return
         }
 
-        print("🚗 Starting driver animation with \(polyline.pointCount) points")
+        print("🚗 Starting driver animation with \(polyline.pointCount) points (using \(driverRoutePolyline != nil ? "driver route" : "main route"))")
 
         // Stop any existing animation
         stopDriverAnimation()
@@ -287,13 +298,15 @@ class MapViewModel: NSObject, ObservableObject {
     func clearDriverLocation() {
         stopDriverAnimation()
         driverLocation = nil
+        driverRoutePolyline = nil
         routeProgress = 0.0
         hasNotifiedApproaching = false
     }
 
     /// Updates the driver's position along the route
     private func updateDriverPosition() {
-        guard let polyline = routePolyline else {
+        // Use driver's route if available, otherwise fall back to main route
+        guard let polyline = driverRoutePolyline ?? routePolyline else {
             stopDriverAnimation()
             return
         }

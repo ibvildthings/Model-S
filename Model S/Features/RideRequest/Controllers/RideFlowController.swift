@@ -105,6 +105,23 @@ class RideFlowController: ObservableObject {
         }
     }
 
+    /// Calculate driver route from driver's location to pickup
+    /// Returns the MKRoute if successful, nil otherwise
+    func calculateDriverRoute(from driverLocation: CLLocationCoordinate2D, to pickup: CLLocationCoordinate2D) async -> MKRoute? {
+        do {
+            let result = try await routeService.calculateRoute(
+                from: driverLocation,
+                to: pickup
+            )
+
+            // Return the MKRoute for driver animation
+            return result.polyline as? MKRoute
+        } catch {
+            print("❌ Failed to calculate driver route: \(error)")
+            return nil
+        }
+    }
+
     /// Start the ride request (called when user confirms)
     func requestRide() async {
         guard case .routeReady(let pickup, let destination, _) = currentState else {

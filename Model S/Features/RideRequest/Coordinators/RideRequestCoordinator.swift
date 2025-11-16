@@ -251,7 +251,7 @@ class RideRequestCoordinator: ObservableObject {
                 mapViewModel.updateRouteFromMKRoute(mkRoute)
             }
 
-        case .driverEnRoute(_, let driver, _, _, _):
+        case .driverEnRoute(_, let driver, _, let pickup, _):
             print("🔄 Handling .driverEnRoute")
             // Start animating driver if not already animating
             if mapViewModel.driverLocation == nil {
@@ -275,9 +275,26 @@ class RideRequestCoordinator: ObservableObject {
                     }
                 }
 
-                // Start driver from their actual location (from backend)
-                print("🚗 Starting driver animation from driver's actual location: \(driver.currentLocation)")
-                mapViewModel.startDriverAnimation(from: driver.currentLocation)
+                // Calculate and set driver's route from their location to pickup
+                if let driverLocation = driver.currentLocation {
+                    Task {
+                        print("🚗 Calculating driver route from \(driverLocation) to \(pickup.coordinate)")
+                        if let driverRoute = await flowController.calculateDriverRoute(
+                            from: driverLocation,
+                            to: pickup.coordinate
+                        ) {
+                            mapViewModel.updateDriverRoute(driverRoute)
+                            print("🚗 Starting driver animation from driver's actual location: \(driverLocation)")
+                            mapViewModel.startDriverAnimation(from: driverLocation)
+                        } else {
+                            print("❌ Failed to calculate driver route, falling back to default animation")
+                            mapViewModel.startDriverAnimation(from: driverLocation)
+                        }
+                    }
+                } else {
+                    print("⚠️ Driver has no location, starting animation from route beginning")
+                    mapViewModel.startDriverAnimation()
+                }
             } else {
                 print("🔄 Driver location already set: \(mapViewModel.driverLocation!)")
             }
