@@ -19,6 +19,8 @@ struct RideMapView: View {
             destinationLocation: viewModel.destinationLocation?.coordinate,
             driverLocation: viewModel.driverLocation,
             route: viewModel.routePolyline as? MKPolyline,
+            driverRoute: viewModel.driverRoutePolyline as? MKPolyline,
+            routeDisplayMode: viewModel.routeDisplayMode,
             showsUserLocation: true,
             routeLineColor: configuration.routeLineColor,
             routeLineWidth: configuration.routeLineWidth

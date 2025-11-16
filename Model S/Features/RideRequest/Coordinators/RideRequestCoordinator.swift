@@ -338,6 +338,9 @@ class RideRequestCoordinator: ObservableObject {
             // The flowController's $realTimeDriverLocation publisher will update the map
             // Every poll (2s) with real GPS data from backend simulation
 
+            // Switch to approach route mode (driver → pickup, blue color)
+            mapViewModel.switchToApproachRoute()
+
             // Still calculate and show the driver's route for visualization
             if let driverLocation = driver.currentLocation {
                 Task {
@@ -366,6 +369,9 @@ class RideRequestCoordinator: ObservableObject {
 
             // Switch viewport to track driver + destination
             mapViewModel.switchToDestinationTracking()
+
+            // Switch to active ride route (pickup → destination, purple color)
+            mapViewModel.switchToActiveRideRoute()
 
             // Update the route visualization to pickup-to-destination
             if let mkRoute = flowController.currentMKRoute {

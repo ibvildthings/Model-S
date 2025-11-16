@@ -14,6 +14,8 @@ struct MapViewWrapper: UIViewRepresentable {
     var destinationLocation: CLLocationCoordinate2D?
     var driverLocation: CLLocationCoordinate2D?
     var route: MKPolyline?
+    var driverRoute: MKPolyline?
+    var routeDisplayMode: RouteDisplayMode
     var showsUserLocation: Bool
     var routeLineColor: Color
     var routeLineWidth: CGFloat
@@ -48,8 +50,13 @@ struct MapViewWrapper: UIViewRepresentable {
             driver: driverLocation
         )
 
-        // Update route overlay
-        context.coordinator.updateRoute(mapView: mapView, route: route)
+        // Update route overlay based on display mode
+        context.coordinator.updateRoute(
+            mapView: mapView,
+            mainRoute: route,
+            driverRoute: driverRoute,
+            displayMode: routeDisplayMode
+        )
     }
 
     func makeCoordinator() -> Coordinator {
@@ -64,6 +71,7 @@ struct MapViewWrapper: UIViewRepresentable {
         var parent: MapViewWrapper
         var isUserInteracting = false
         var currentRoute: MKPolyline?
+        var currentDisplayMode: RouteDisplayMode?
         let routeLineColor: UIColor
         let routeLineWidth: CGFloat
 
@@ -139,17 +147,37 @@ struct MapViewWrapper: UIViewRepresentable {
             }
         }
 
-        func updateRoute(mapView: MKMapView, route: MKPolyline?) {
-            // Remove old route overlay
-            if let currentRoute = currentRoute {
-                mapView.removeOverlay(currentRoute)
-                self.currentRoute = nil
+        func updateRoute(mapView: MKMapView, mainRoute: MKPolyline?, driverRoute: MKPolyline?, displayMode: RouteDisplayMode) {
+            // Determine which route to display based on mode
+            let routeToDisplay: MKPolyline?
+            switch displayMode {
+            case .approach:
+                // Show driver route (driver → pickup) if available, otherwise show main route
+                routeToDisplay = driverRoute ?? mainRoute
+            case .activeRide:
+                // Show main route (pickup → destination)
+                routeToDisplay = mainRoute
             }
 
-            // Add new route overlay
-            if let route = route {
-                mapView.addOverlay(route)
-                self.currentRoute = route
+            // Check if we need to update the route
+            let needsUpdate = currentRoute !== routeToDisplay || currentDisplayMode != displayMode
+
+            if needsUpdate {
+                // Remove old route overlay
+                if let currentRoute = currentRoute {
+                    mapView.removeOverlay(currentRoute)
+                    self.currentRoute = nil
+                }
+
+                // Add new route overlay
+                if let newRoute = routeToDisplay {
+                    mapView.addOverlay(newRoute)
+                    self.currentRoute = newRoute
+                    currentDisplayMode = displayMode
+
+                    let routeType = displayMode == .approach ? "approach (driver → pickup)" : "active ride (pickup → destination)"
+                    print("🛣️ Displaying \(routeType) route")
+                }
             }
         }
 
@@ -158,8 +186,21 @@ struct MapViewWrapper: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let polyline = overlay as? MKPolyline {
                 let renderer = MKPolylineRenderer(polyline: polyline)
-                renderer.strokeColor = routeLineColor
-                renderer.lineWidth = routeLineWidth
+
+                // Use different colors based on display mode
+                if let displayMode = currentDisplayMode {
+                    switch displayMode {
+                    case .approach:
+                        renderer.strokeColor = MapConstants.approachRouteColor
+                    case .activeRide:
+                        renderer.strokeColor = MapConstants.activeRideRouteColor
+                    }
+                } else {
+                    // Fallback to configured color if no display mode set
+                    renderer.strokeColor = routeLineColor
+                }
+
+                renderer.lineWidth = MapConstants.routeLineWidth
                 renderer.lineCap = .round
                 renderer.lineJoin = .round
                 return renderer

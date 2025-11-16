@@ -10,6 +10,7 @@
 
 import MapKit
 import CoreLocation
+import UIKit
 
 // MARK: - Map Configuration
 
@@ -35,6 +36,17 @@ enum MapConstants {
 
     /// Approximate miles per degree of latitude (used for region calculations)
     static let milesPerDegree: Double = 69.0
+
+    // MARK: - Route Visualization
+
+    /// Color for approach route (driver heading to pickup)
+    static let approachRouteColor = UIColor.systemBlue
+
+    /// Color for active ride route (driver heading to destination with passenger)
+    static let activeRideRouteColor = UIColor.systemPurple
+
+    /// Route line width
+    static let routeLineWidth: CGFloat = 4.0
 }
 
 // MARK: - Timing Configuration

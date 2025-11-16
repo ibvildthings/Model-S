@@ -14,6 +14,12 @@ import MapKit
 import Combine
 import SwiftUI
 
+/// Route display mode for different ride phases
+enum RouteDisplayMode {
+    case approach    // Show driver → pickup route (blue)
+    case activeRide  // Show pickup → destination route (purple)
+}
+
 /// Manages map display state, user location, and map region
 /// Note: This does NOT manage ride request business logic - see RideRequestViewModel for that
 @MainActor
@@ -34,6 +40,9 @@ class MapViewModel: NSObject, ObservableObject {
 
     /// Driver's route polyline (driver location to pickup) - used for driver animation
     @Published var driverRoutePolyline: MKPolyline?
+
+    /// Current route display mode (approach vs active ride)
+    @Published var routeDisplayMode: RouteDisplayMode = .approach
 
     /// Current location permission status
     @Published var locationAuthorizationStatus: CLAuthorizationStatus = .notDetermined
@@ -335,6 +344,20 @@ class MapViewModel: NSObject, ObservableObject {
         print("📍 Switched viewport tracking to destination")
     }
 
+    /// Switch to active ride mode (shows pickup → destination route)
+    func switchToActiveRideRoute() {
+        routeDisplayMode = .activeRide
+        // Clear the driver route polyline as it's no longer needed
+        driverRoutePolyline = nil
+        print("🛣️ Switched to active ride route (pickup → destination)")
+    }
+
+    /// Switch to approach mode (shows driver → pickup route)
+    func switchToApproachRoute() {
+        routeDisplayMode = .approach
+        print("🛣️ Switched to approach route (driver → pickup)")
+    }
+
     /// Dynamically adjusts viewport to keep driver and target in frame (zooms in as they get closer)
     private func adjustViewportForDriverAndPickup() {
         guard let driver = driverLocation else { return }
@@ -411,6 +434,7 @@ class MapViewModel: NSObject, ObservableObject {
         shouldDynamicallyAdjustViewport = false
         viewportUpdateCounter = 0
         currentViewportTarget = .pickup // Reset to pickup for next ride
+        routeDisplayMode = .approach // Reset to approach mode for next ride
     }
 
     /// Updates the driver's position along the route
