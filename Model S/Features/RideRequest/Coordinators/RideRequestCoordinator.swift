@@ -26,6 +26,9 @@ class RideRequestCoordinator: ObservableObject {
     /// Map display state (published for view observation)
     @Published private(set) var mapViewModel: MapViewModel
 
+    /// Whether a route is currently being calculated (for loading indicators)
+    @Published private(set) var isCalculatingRoute = false
+
     // MARK: - Private Dependencies
 
     private let configuration: RideRequestConfiguration
@@ -36,6 +39,9 @@ class RideRequestCoordinator: ObservableObject {
 
     /// Last driver position where we calculated a route (to avoid excessive recalculations)
     private var lastRouteCalculationPosition: CLLocationCoordinate2D?
+
+    /// Current route calculation task (to cancel when new position arrives)
+    private var routeCalculationTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -66,7 +72,9 @@ class RideRequestCoordinator: ObservableObject {
             self.adjustViewportForDriver()
 
             // Dynamically update route from current position (Uber/Lyft style)
-            Task {
+            // Cancel any previous calculation to prevent race conditions
+            self.routeCalculationTask?.cancel()
+            self.routeCalculationTask = Task {
                 await self.updateDynamicRoute(from: location)
             }
         }.store(in: &cancellables)
@@ -491,9 +499,18 @@ class RideRequestCoordinator: ObservableObject {
         guard let target = targetCoordinate else { return }
 
         // Recalculate route from current driver position to target
+        isCalculatingRoute = true
         print("🛣️ Recalculating route from current position to \(isApproachPhase ? "pickup" : "destination")")
 
+        defer { isCalculatingRoute = false }
+
         if let newRoute = await flowController.calculateDriverRoute(from: driverLocation, to: target) {
+            // Check if task was cancelled while we were calculating
+            guard !Task.isCancelled else {
+                print("⏭️ Route calculation cancelled (newer position arrived)")
+                return
+            }
+
             // Update the appropriate route polyline
             if isApproachPhase {
                 mapViewModel.updateDriverRoute(newRoute)
