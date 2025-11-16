@@ -70,6 +70,36 @@ class RideAPIClient: RideRequestService {
                 print("❌ Backend error: \(errorResponse.message)")
                 throw RideRequestError.rideRequestFailed
             }
+            print("❌ Unexpected status code: \(httpResponse.statusCode)")
+            throw RideRequestError.rideRequestFailed
+        }
+
+        // Debug: Print raw response
+        if let responseString = String(data: data, encoding: .utf8) {
+            print("📦 Raw response: \(responseString)")
+        }
+
+        // Decode response
+        do {
+            let rideResponse = try JSONDecoder().decode(RideResponse.self, from: data)
+            print("✅ Ride created: \(rideResponse.rideId)")
+            print("   Status: \(rideResponse.status)")
+        } catch {
+            print("❌ JSON Decoding Error: \(error)")
+            if let decodingError = error as? DecodingError {
+                switch decodingError {
+                case .keyNotFound(let key, let context):
+                    print("   Missing key: \(key.stringValue) - \(context.debugDescription)")
+                case .typeMismatch(let type, let context):
+                    print("   Type mismatch: \(type) - \(context.debugDescription)")
+                case .valueNotFound(let type, let context):
+                    print("   Value not found: \(type) - \(context.debugDescription)")
+                case .dataCorrupted(let context):
+                    print("   Data corrupted: \(context.debugDescription)")
+                @unknown default:
+                    print("   Unknown decoding error")
+                }
+            }
             throw RideRequestError.rideRequestFailed
         }
 
