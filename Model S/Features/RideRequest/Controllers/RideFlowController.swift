@@ -264,7 +264,7 @@ class RideFlowController: ObservableObject {
 
             // Map backend status to frontend state
             switch statusResult.status {
-            case "assigned":
+            case .driverFound:
                 // Driver assigned but not yet en route
                 if case .searchingForDriver = currentState {
                     transition(to: .driverAssigned(
@@ -275,7 +275,7 @@ class RideFlowController: ObservableObject {
                     ))
                 }
 
-            case "enRoute":
+            case .driverEnRoute:
                 // Driver is on the way to pickup
                 if case .driverAssigned = currentState {
                     transition(to: .driverEnRoute(
@@ -287,7 +287,7 @@ class RideFlowController: ObservableObject {
                     ))
                 }
 
-            case "arriving":
+            case .driverArriving:
                 // Driver is arriving at pickup (< 1 min away)
                 if case .driverEnRoute = currentState {
                     print("🚗 Backend says driver is arriving")
@@ -299,7 +299,7 @@ class RideFlowController: ObservableObject {
                     ))
                 }
 
-            case "inProgress":
+            case .rideInProgress:
                 // Driver picked up passenger, heading to destination
                 if case .driverArriving = currentState {
                     print("🚗 Backend says ride is in progress")
@@ -322,7 +322,7 @@ class RideFlowController: ObservableObject {
                     ))
                 }
 
-            case "approaching":
+            case .approachingDestination:
                 // Approaching destination
                 if case .rideInProgress = currentState {
                     print("🏁 Backend says approaching destination")
@@ -334,7 +334,7 @@ class RideFlowController: ObservableObject {
                     ))
                 }
 
-            case "completed":
+            case .rideCompleted:
                 // Ride completed
                 print("✅ Backend says ride is completed")
                 stopPollingRideStatus()
@@ -346,6 +346,7 @@ class RideFlowController: ObservableObject {
                 ))
 
             default:
+                // Other states like selectingPickup, routeReady, etc. - ignore
                 break
             }
 
