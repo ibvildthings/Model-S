@@ -8,6 +8,7 @@
 
 import Foundation
 import Combine
+import MapKit
 
 /// Controls the entire ride request flow with a clean state machine
 /// This is the ONLY object that owns ride state - no nested ObservableObjects
@@ -25,6 +26,11 @@ class RideFlowController: ObservableObject {
     private let rideService: RideRequestService
     private let routeService: RouteCalculationService
     private let geocodingService: GeocodingService
+
+    // MARK: - Route Storage
+
+    /// Stores the actual MKRoute for map display
+    private(set) var currentMKRoute: MKRoute?
 
     // MARK: - Initialization
 
@@ -79,6 +85,11 @@ class RideFlowController: ObservableObject {
                 from: pickup.coordinate,
                 to: destination.coordinate
             )
+
+            // Store the MKRoute for map display (cast from Any)
+            if let mkRoute = result.polyline as? MKRoute {
+                currentMKRoute = mkRoute
+            }
 
             let routeInfo = RouteInfo(
                 distance: result.distance,
@@ -201,6 +212,7 @@ class RideFlowController: ObservableObject {
 
     /// Reset to initial state
     func reset() {
+        currentMKRoute = nil
         transition(to: .idle)
     }
 

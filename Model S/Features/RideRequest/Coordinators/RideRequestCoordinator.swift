@@ -243,6 +243,13 @@ class RideRequestCoordinator: ObservableObject {
         }
 
         switch currentState {
+        case .routeReady:
+            // Update map with the calculated route
+            if let mkRoute = flowController.currentMKRoute {
+                print("📍 Updating map with calculated route")
+                mapViewModel.updateRouteFromMKRoute(mkRoute)
+            }
+
         case .driverEnRoute:
             // Start animating driver if not already animating
             if mapViewModel.driverLocation == nil {
@@ -280,9 +287,10 @@ class RideRequestCoordinator: ObservableObject {
             print("🚙 Ride in progress, clearing driver marker")
             mapViewModel.clearDriverLocation()
 
-        case .idle, .selectingLocations, .routeReady:
-            // Clear driver location when going back to initial states
+        case .idle, .selectingLocations:
+            // Clear driver location and route when going back to initial states
             mapViewModel.clearDriverLocation()
+            mapViewModel.routePolyline = nil
 
         default:
             break
