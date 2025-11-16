@@ -231,9 +231,20 @@ class RideAPIClient: RideRequestService {
         switch status.lowercased() {
         case "searching":
             return .searchingForDriver
-        case "assigned", "enroute", "en_route", "arriving", "inprogress", "in_progress", "completed", "cancelled":
+        case "assigned":
             return .driverFound
+        case "enroute", "en_route":
+            return .driverEnRoute
+        case "arriving":
+            return .driverArriving
+        case "inprogress", "in_progress":
+            return .rideInProgress
+        case "approaching":
+            return .approachingDestination
+        case "completed":
+            return .rideCompleted
         default:
+            print("⚠️ Unknown backend status: \(status), defaulting to searchingForDriver")
             return .searchingForDriver
         }
     }
