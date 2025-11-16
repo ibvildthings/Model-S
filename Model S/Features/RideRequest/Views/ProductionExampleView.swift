@@ -211,6 +211,30 @@ struct RideRequestViewWithViewModel: View {
                 }
             }
 
+            // TEMPORARY: Quick Test Button - Remove before production
+            if !shouldShowStatusBanner && !coordinator.shouldShowConfirmSlider {
+                VStack {
+                    Spacer()
+
+                    Button(action: fillTestLocations) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 14))
+                            Text("Quick Test Locations")
+                                .font(.system(size: 14, weight: .semibold))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(Color.orange)
+                        .cornerRadius(12)
+                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                    }
+                    .padding(.bottom, 40)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+
             // Status Banner - Shows different states of ride request
             if shouldShowStatusBanner {
                 VStack(spacing: 0) {
@@ -374,6 +398,34 @@ struct RideRequestViewWithViewModel: View {
 
     // MARK: - Actions
     // All complex logic is now in the coordinator - view is just presentation!
+
+    // TEMPORARY: Quick test locations - Remove before production
+    private func fillTestLocations() {
+        // Test locations in Cupertino/San Jose area
+        let testPickup = CLLocationCoordinate2D(latitude: 37.3323, longitude: -122.0312) // Cupertino
+        let testDestination = CLLocationCoordinate2D(latitude: 37.3218, longitude: -122.0182) // Nearby restaurant
+
+        Task {
+            // Fill pickup
+            await coordinator.selectLocation(
+                coordinate: testPickup,
+                name: "Apple Park Visitor Center",
+                isPickup: true
+            )
+            pickupText = "Apple Park Visitor Center"
+
+            // Small delay so user can see it happening
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+
+            // Fill destination
+            await coordinator.selectLocation(
+                coordinate: testDestination,
+                name: "Izumi Matcha",
+                isPickup: false
+            )
+            destinationText = "Izumi Matcha"
+        }
+    }
 
     private func handleConfirmRide() {
         // Coordinator handles all validation and state management
