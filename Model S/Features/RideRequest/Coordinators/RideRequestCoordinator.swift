@@ -251,7 +251,7 @@ class RideRequestCoordinator: ObservableObject {
                 mapViewModel.updateRouteFromMKRoute(mkRoute)
             }
 
-        case .driverEnRoute(_, _, _, _, _):
+        case .driverEnRoute(_, let driver, _, _, _):
             print("🔄 Handling .driverEnRoute")
             // Start animating driver if not already animating
             if mapViewModel.driverLocation == nil {
@@ -275,9 +275,9 @@ class RideRequestCoordinator: ObservableObject {
                     }
                 }
 
-                // Start driver from beginning of route
-                print("🚗 Starting driver animation")
-                mapViewModel.startDriverAnimation()
+                // Start driver from their actual location (from backend)
+                print("🚗 Starting driver animation from driver's actual location: \(driver.currentLocation)")
+                mapViewModel.startDriverAnimation(from: driver.currentLocation)
             } else {
                 print("🔄 Driver location already set: \(mapViewModel.driverLocation!)")
             }
