@@ -261,7 +261,7 @@ class RideRequestCoordinator: ObservableObject {
                 mapViewModel.updateRouteFromMKRoute(mkRoute)
             }
 
-        case .driverEnRoute(_, let driver, _, let pickup, _):
+        case .driverEnRoute(_, let driver, let eta, let pickup, _):
             print("🔄 Handling .driverEnRoute")
             // Start animating driver if not already animating
             if mapViewModel.driverLocation == nil {
@@ -281,15 +281,16 @@ class RideRequestCoordinator: ObservableObject {
                         ) {
                             mapViewModel.updateDriverRoute(driverRoute)
                             print("🚗 Starting driver animation from driver's actual location: \(driverLocation)")
-                            mapViewModel.startDriverAnimation(from: driverLocation)
+                            print("🎯 Using backend ETA: \(eta)s to synchronize animation")
+                            mapViewModel.startDriverAnimation(from: driverLocation, estimatedDuration: eta)
                         } else {
                             print("❌ Failed to calculate driver route, falling back to default animation")
-                            mapViewModel.startDriverAnimation(from: driverLocation)
+                            mapViewModel.startDriverAnimation(from: driverLocation, estimatedDuration: eta)
                         }
                     }
                 } else {
                     print("⚠️ Driver has no location, starting animation from route beginning")
-                    mapViewModel.startDriverAnimation()
+                    mapViewModel.startDriverAnimation(estimatedDuration: eta)
                 }
             } else {
                 print("🔄 Driver location already set: \(mapViewModel.driverLocation!)")
@@ -300,7 +301,7 @@ class RideRequestCoordinator: ObservableObject {
             print("🚗 Driver arriving soon...")
             break
 
-        case .rideInProgress(_, let driver, _, let pickup, let destination):
+        case .rideInProgress(_, let driver, let eta, let pickup, let destination):
             // Driver picked up passenger, now animate to destination
             print("🔄 Handling .rideInProgress")
 
@@ -316,9 +317,11 @@ class RideRequestCoordinator: ObservableObject {
                     // We already have the pickup-to-destination route
                     mapViewModel.updateDriverRoute(mkRoute)
 
-                    // Start animation from pickup location
+                    // Use the route's estimated travel time for animation sync
+                    let destinationETA = mkRoute.expectedTravelTime
                     print("🚗 Starting drive to destination from pickup: \(pickup.coordinate)")
-                    mapViewModel.startDriverAnimation(from: pickup.coordinate)
+                    print("🎯 Using route ETA: \(destinationETA)s to synchronize animation")
+                    mapViewModel.startDriverAnimation(from: pickup.coordinate, estimatedDuration: destinationETA)
                 } else {
                     print("⚠️ No route available for destination animation")
                 }

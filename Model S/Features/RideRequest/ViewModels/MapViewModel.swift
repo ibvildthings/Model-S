@@ -57,6 +57,9 @@ class MapViewModel: NSObject, ObservableObject {
     /// Current progress along the route (0.0 to 1.0)
     private var routeProgress: Double = 0.0
 
+    /// Animation speed (progress increment per update) - calculated from ETA
+    private var animationSpeed: Double = 0.008 // Default fallback
+
     /// Track if we've already notified about approaching
     private var hasNotifiedApproaching = false
 
@@ -207,12 +210,27 @@ class MapViewModel: NSObject, ObservableObject {
     // MARK: - Driver Animation
 
     /// Starts animating the driver's movement along the route to pickup location
-    /// - Parameter startingCoordinate: Initial driver position (or nil to start from beginning of route)
-    func startDriverAnimation(from startingCoordinate: CLLocationCoordinate2D? = nil) {
+    /// - Parameters:
+    ///   - startingCoordinate: Initial driver position (or nil to start from beginning of route)
+    ///   - estimatedDuration: Backend's ETA in seconds (used to sync animation speed)
+    func startDriverAnimation(from startingCoordinate: CLLocationCoordinate2D? = nil, estimatedDuration: TimeInterval? = nil) {
         // Use driver's route (driver to pickup) if available, otherwise fall back to main route
         guard let polyline = driverRoutePolyline ?? routePolyline else {
             print("❌ Cannot start driver animation: no route available")
             return
+        }
+
+        // Calculate animation speed based on backend ETA
+        if let eta = estimatedDuration, eta > 0 {
+            // Update interval is 0.1 seconds
+            let updateInterval: TimeInterval = 0.1
+            let totalUpdates = eta / updateInterval
+            animationSpeed = 1.0 / totalUpdates
+            print("🎯 Animation synchronized with backend ETA: \(eta)s, speed: \(animationSpeed)")
+        } else {
+            // Fallback to default speed if no ETA provided
+            animationSpeed = 0.008
+            print("⚠️ No ETA provided, using default animation speed")
         }
 
         print("🚗 Starting driver animation with \(polyline.pointCount) points (using \(driverRoutePolyline != nil ? "driver route" : "main route"))")
@@ -380,6 +398,7 @@ class MapViewModel: NSObject, ObservableObject {
         driverLocation = nil
         driverRoutePolyline = nil
         routeProgress = 0.0
+        animationSpeed = 0.008 // Reset to default
         hasNotifiedApproaching = false
         shouldDynamicallyAdjustViewport = false
         viewportUpdateCounter = 0
@@ -394,8 +413,8 @@ class MapViewModel: NSObject, ObservableObject {
             return
         }
 
-        // Increment progress (adjust speed here - 0.01 = slower, 0.05 = faster)
-        routeProgress += 0.008
+        // Increment progress using calculated speed (synchronized with backend ETA)
+        routeProgress += animationSpeed
 
         // Check if we've reached the end
         if routeProgress >= 1.0 {
