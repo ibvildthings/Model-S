@@ -20,6 +20,10 @@ class RideFlowController: ObservableObject {
     /// Current state of the ride flow - the only source of truth
     @Published private(set) var currentState: RideState = .idle
 
+    /// Real-time driver location from backend (updated every poll)
+    /// This is separate from state to avoid creating new states on every position update
+    @Published private(set) var realTimeDriverLocation: CLLocationCoordinate2D?
+
     // MARK: - Dependencies
 
     private let stateMachine: RideStateMachine
@@ -228,6 +232,7 @@ class RideFlowController: ObservableObject {
     func reset() {
         stopPollingRideStatus()
         currentMKRoute = nil
+        realTimeDriverLocation = nil // Clear backend driver position
         transition(to: .idle)
     }
 
@@ -238,8 +243,10 @@ class RideFlowController: ObservableObject {
         // Stop any existing polling
         stopPollingRideStatus()
 
-        // Poll every 2 seconds
-        statusPollingTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        // Poll every 1 second for smoother driver movement
+        // Backend updates driver position every 500ms, so 1s polling captures most updates
+        // while being more battery-efficient than matching backend's 500ms rate
+        statusPollingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
 
             Task { @MainActor in
@@ -267,6 +274,15 @@ class RideFlowController: ObservableObject {
 
             guard let driver = statusResult.driver else {
                 return
+            }
+
+            // CRITICAL: Update driver position from backend (real-time position updates)
+            // This is the ONLY source of truth for driver location - backend sends real GPS data
+            // Frontend should display whatever position backend sends, not calculate it locally
+            if let driverLocation = driver.currentLocation {
+                realTimeDriverLocation = driverLocation
+                // Log position updates (every 2s) to show backend is driving the animation
+                print("📍 Backend position update: \(String(format: "%.4f", driverLocation.latitude)), \(String(format: "%.4f", driverLocation.longitude))")
             }
 
             // Map backend status to frontend state

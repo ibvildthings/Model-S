@@ -53,6 +53,13 @@ class RideRequestCoordinator: ObservableObject {
             self?.handleStateChange(newState)
         }.store(in: &cancellables)
 
+        // Observe real-time driver position updates from backend
+        flowController.$realTimeDriverLocation.sink { [weak self] driverLocation in
+            guard let self = self, let location = driverLocation else { return }
+            // Update map with backend's real-time driver position
+            self.mapViewModel.driverLocation = location
+        }.store(in: &cancellables)
+
         // Forward mapViewModel changes to coordinator's objectWillChange
         mapViewModel.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
@@ -263,37 +270,23 @@ class RideRequestCoordinator: ObservableObject {
 
         case .driverEnRoute(_, let driver, let eta, let pickup, _):
             print("🔄 Handling .driverEnRoute")
-            // Start animating driver if not already animating
-            if mapViewModel.driverLocation == nil {
-                print("🔄 Driver location is nil, setting up animation")
 
-                // REMOVED: Animation callbacks no longer trigger state changes
-                // Backend polling now controls all state transitions
-                // Animation is purely visual
+            // NEW ARCHITECTURE: Backend position updates drive the map (no local animation)
+            // The flowController's $realTimeDriverLocation publisher will update the map
+            // Every poll (2s) with real GPS data from backend simulation
 
-                // Calculate and set driver's route from their location to pickup
-                if let driverLocation = driver.currentLocation {
-                    Task {
-                        print("🚗 Calculating driver route from \(driverLocation) to \(pickup.coordinate)")
-                        if let driverRoute = await flowController.calculateDriverRoute(
-                            from: driverLocation,
-                            to: pickup.coordinate
-                        ) {
-                            mapViewModel.updateDriverRoute(driverRoute)
-                            print("🚗 Starting driver animation from driver's actual location: \(driverLocation)")
-                            print("🎯 Using backend ETA: \(eta)s to synchronize animation")
-                            mapViewModel.startDriverAnimation(from: driverLocation, estimatedDuration: eta)
-                        } else {
-                            print("❌ Failed to calculate driver route, falling back to default animation")
-                            mapViewModel.startDriverAnimation(from: driverLocation, estimatedDuration: eta)
-                        }
+            // Still calculate and show the driver's route for visualization
+            if let driverLocation = driver.currentLocation {
+                Task {
+                    print("🚗 Calculating driver route from \(driverLocation) to \(pickup.coordinate)")
+                    if let driverRoute = await flowController.calculateDriverRoute(
+                        from: driverLocation,
+                        to: pickup.coordinate
+                    ) {
+                        mapViewModel.updateDriverRoute(driverRoute)
+                        print("✅ Driver route displayed (backend controls position updates)")
                     }
-                } else {
-                    print("⚠️ Driver has no location, starting animation from route beginning")
-                    mapViewModel.startDriverAnimation(estimatedDuration: eta)
                 }
-            } else {
-                print("🔄 Driver location already set: \(mapViewModel.driverLocation!)")
             }
 
         case .driverArriving(_, _, _, _):
@@ -302,29 +295,19 @@ class RideRequestCoordinator: ObservableObject {
             break
 
         case .rideInProgress(_, let driver, let eta, let pickup, let destination):
-            // Driver picked up passenger, now animate to destination
+            // Driver picked up passenger, now driving to destination
             print("🔄 Handling .rideInProgress")
 
-            // Only start destination animation if we haven't already
-            if mapViewModel.driverRoutePolyline != nil {
-                print("🚙 Passenger picked up, starting route to destination")
+            // NEW ARCHITECTURE: Backend position updates continue to drive the map
+            // No local animation needed - backend sends real-time positions
 
-                // Switch viewport to track driver + destination
-                mapViewModel.switchToDestinationTracking()
+            // Switch viewport to track driver + destination
+            mapViewModel.switchToDestinationTracking()
 
-                // Calculate route from pickup to destination
-                if let mkRoute = flowController.currentMKRoute {
-                    // We already have the pickup-to-destination route
-                    mapViewModel.updateDriverRoute(mkRoute)
-
-                    // Use the route's estimated travel time for animation sync
-                    let destinationETA = mkRoute.expectedTravelTime
-                    print("🚗 Starting drive to destination from pickup: \(pickup.coordinate)")
-                    print("🎯 Using route ETA: \(destinationETA)s to synchronize animation")
-                    mapViewModel.startDriverAnimation(from: pickup.coordinate, estimatedDuration: destinationETA)
-                } else {
-                    print("⚠️ No route available for destination animation")
-                }
+            // Update the route visualization to pickup-to-destination
+            if let mkRoute = flowController.currentMKRoute {
+                mapViewModel.updateDriverRoute(mkRoute)
+                print("✅ Destination route displayed (backend controls position updates)")
             }
             break
 
