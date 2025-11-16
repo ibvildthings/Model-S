@@ -66,6 +66,13 @@ class MapViewModel: NSObject, ObservableObject {
     /// Enable dynamic viewport adjustment during driver animation
     private var shouldDynamicallyAdjustViewport = false
 
+    /// Target point for viewport adjustment (pickup or destination)
+    private enum ViewportTarget {
+        case pickup
+        case destination
+    }
+    private var currentViewportTarget: ViewportTarget = .pickup
+
     /// Callback when user location updates (used by coordinator)
     var onLocationUpdate: ((CLLocation) -> Void)?
 
@@ -296,19 +303,41 @@ class MapViewModel: NSObject, ObservableObject {
         }
     }
 
-    /// Dynamically adjusts viewport to keep driver and pickup in frame (zooms in as they get closer)
+    /// Switch viewport target (call when transitioning from pickup to destination phase)
+    func switchToDestinationTracking() {
+        currentViewportTarget = .destination
+        print("📍 Switched viewport tracking to destination")
+    }
+
+    /// Dynamically adjusts viewport to keep driver and target in frame (zooms in as they get closer)
     private func adjustViewportForDriverAndPickup() {
-        guard let driver = driverLocation, let pickup = pickupLocation else { return }
+        guard let driver = driverLocation else { return }
 
-        // Calculate distance between driver and pickup
+        // Determine target based on current phase
+        let targetCoordinate: CLLocationCoordinate2D
+        let targetName: String
+
+        switch currentViewportTarget {
+        case .pickup:
+            guard let pickup = pickupLocation else { return }
+            targetCoordinate = pickup.coordinate
+            targetName = "pickup"
+
+        case .destination:
+            guard let destination = destinationLocation else { return }
+            targetCoordinate = destination.coordinate
+            targetName = "destination"
+        }
+
+        // Calculate distance between driver and target
         let driverCL = CLLocation(latitude: driver.latitude, longitude: driver.longitude)
-        let pickupCL = CLLocation(latitude: pickup.coordinate.latitude, longitude: pickup.coordinate.longitude)
-        let distance = driverCL.distance(from: pickupCL) // in meters
+        let targetCL = CLLocation(latitude: targetCoordinate.latitude, longitude: targetCoordinate.longitude)
+        let distance = driverCL.distance(from: targetCL) // in meters
 
-        // Calculate center point between driver and pickup
+        // Calculate center point between driver and target
         let center = CLLocationCoordinate2D(
-            latitude: (driver.latitude + pickup.coordinate.latitude) / 2,
-            longitude: (driver.longitude + pickup.coordinate.longitude) / 2
+            latitude: (driver.latitude + targetCoordinate.latitude) / 2,
+            longitude: (driver.longitude + targetCoordinate.longitude) / 2
         )
 
         // Dynamic padding based on distance - zooms in as driver gets closer
@@ -325,8 +354,8 @@ class MapViewModel: NSObject, ObservableObject {
         }
 
         // Calculate span based on distance
-        let latDelta = abs(driver.latitude - pickup.coordinate.latitude) * paddingMultiplier
-        let lonDelta = abs(driver.longitude - pickup.coordinate.longitude) * paddingMultiplier
+        let latDelta = abs(driver.latitude - targetCoordinate.latitude) * paddingMultiplier
+        let lonDelta = abs(driver.longitude - targetCoordinate.longitude) * paddingMultiplier
 
         let span = MKCoordinateSpan(
             latitudeDelta: max(latDelta, 0.005), // Minimum span for close proximity
@@ -354,6 +383,7 @@ class MapViewModel: NSObject, ObservableObject {
         hasNotifiedApproaching = false
         shouldDynamicallyAdjustViewport = false
         viewportUpdateCounter = 0
+        currentViewportTarget = .pickup // Reset to pickup for next ride
     }
 
     /// Updates the driver's position along the route

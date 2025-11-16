@@ -290,11 +290,41 @@ class RideRequestCoordinator: ObservableObject {
             print("🚗 Driver arriving soon...")
             break
 
-        case .rideInProgress(_, _, _, _, _), .approachingDestination(_, _, _, _):
-            // Driver has reached pickup, clear driver animation
-            print("🔄 Handling .rideInProgress or .approachingDestination")
-            print("🚙 Ride in progress, clearing driver marker")
+        case .rideInProgress(_, let driver, _, let pickup, let destination):
+            // Driver picked up passenger, now animate to destination
+            print("🔄 Handling .rideInProgress")
+
+            // Only start destination animation if we haven't already
+            if mapViewModel.driverRoutePolyline != nil {
+                print("🚙 Passenger picked up, starting route to destination")
+
+                // Switch viewport to track driver + destination
+                mapViewModel.switchToDestinationTracking()
+
+                // Calculate route from pickup to destination
+                if let mkRoute = flowController.currentMKRoute {
+                    // We already have the pickup-to-destination route
+                    mapViewModel.updateDriverRoute(mkRoute)
+
+                    // Start animation from pickup location
+                    print("🚗 Starting drive to destination from pickup: \(pickup.coordinate)")
+                    mapViewModel.startDriverAnimation(from: pickup.coordinate)
+                } else {
+                    print("⚠️ No route available for destination animation")
+                }
+            }
+            break
+
+        case .approachingDestination(_, _, _, _):
+            // Animation continues toward destination
+            print("🏁 Approaching destination...")
+            break
+
+        case .rideCompleted:
+            // Ride finished, clean up
+            print("✅ Ride completed, clearing driver animation")
             mapViewModel.clearDriverLocation()
+            break
 
         case .idle, .selectingLocations:
             print("🔄 Handling .idle or .selectingLocations")
