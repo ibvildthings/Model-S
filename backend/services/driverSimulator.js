@@ -40,23 +40,27 @@ class DriverSimulator {
     // Generate route polyline from driver to pickup
     const routeToPickup = generateRoutePolyline(driverStartLocation, ride.pickup, 30);
 
+    // Calculate duration based on distance to pickup
+    // Speed: ~10-15 seconds for driver-to-pickup phase
+    const durationToPickupSeconds = 10 + Math.random() * 5;
+    const updateIntervalMs = 500; // Update every 500ms
+    const totalUpdatesToPickup = (durationToPickupSeconds * 1000) / updateIntervalMs;
+    const initialProgressIncrement = 1 / totalUpdatesToPickup;
+
+    console.log(`   Duration to pickup: ${durationToPickupSeconds.toFixed(1)}s`);
+
     const simulation = {
       rideId: ride.id,
       driver: driver,
       currentPhase: 'toPickup', // toPickup, toDestination
       progress: 0,
+      progressIncrement: initialProgressIncrement, // Store in simulation so it can be updated
       start: driverStartLocation, // Driver's actual starting location
       end: { ...ride.pickup },
       route: routeToPickup, // Route points for visualization
-      interval: null
+      interval: null,
+      updateIntervalMs: updateIntervalMs
     };
-
-    // Speed: complete journey in 15-30 seconds for testing
-    // (In production, this would match the actual ETA)
-    const durationSeconds = 20 + Math.random() * 10;
-    const updateIntervalMs = 500; // Update every 500ms
-    const totalUpdates = (durationSeconds * 1000) / updateIntervalMs;
-    const progressIncrement = 1 / totalUpdates;
 
     // Assign driver
     driverPool.assignDriver(driver.id, ride.id);
@@ -89,7 +93,8 @@ class DriverSimulator {
 
     // Start movement simulation
     simulation.interval = setInterval(() => {
-      simulation.progress += progressIncrement;
+      // Use progressIncrement from simulation object (can be updated between phases)
+      simulation.progress += simulation.progressIncrement;
 
       if (simulation.progress >= 1.0) {
         // Reached current waypoint
@@ -108,6 +113,24 @@ class DriverSimulator {
           setTimeout(() => {
             console.log(`🚗 Starting ride to destination`);
             onStateChange('inProgress');
+
+            // Calculate distance from pickup to destination
+            const distanceToDestination = calculateDistance(
+              ride.pickup.lat,
+              ride.pickup.lng,
+              ride.destination.lat,
+              ride.destination.lng
+            );
+
+            console.log(`   Distance to destination: ${Math.round(distanceToDestination)}m`);
+
+            // IMPORTANT: Recalculate duration for pickup-to-destination phase
+            // Minimum 30 seconds for ride-in-progress to give user time to experience it
+            const durationToDestinationSeconds = Math.max(30, 30 + Math.random() * 15);
+            const totalUpdatesToDestination = (durationToDestinationSeconds * 1000) / simulation.updateIntervalMs;
+            simulation.progressIncrement = 1 / totalUpdatesToDestination;
+
+            console.log(`   Duration to destination: ${durationToDestinationSeconds.toFixed(1)}s (min 30s for better UX)`);
 
             // Generate route from pickup to destination
             const routeToDestination = generateRoutePolyline(ride.pickup, ride.destination, 30);
@@ -201,7 +224,7 @@ class DriverSimulator {
           route: simulation.route // Continue sending route for visualization
         });
       }
-    }, updateIntervalMs);
+    }, simulation.updateIntervalMs);
 
     this.activeSimulations.set(ride.id, simulation);
   }
