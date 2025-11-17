@@ -66,6 +66,13 @@ function stopSimulation(driverId) {
 }
 
 /**
+ * Generate a single ride request immediately (useful after rejection)
+ */
+function generateSingleRequest(driverId, onRideRequest) {
+  generateRideRequest(driverId, onRideRequest);
+}
+
+/**
  * Generate a random ride request
  */
 function generateRideRequest(driverId, onRideRequest) {
@@ -127,5 +134,6 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 
 module.exports = {
   startSimulation,
-  stopSimulation
+  stopSimulation,
+  generateSingleRequest
 };

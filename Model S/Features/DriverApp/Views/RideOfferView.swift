@@ -4,6 +4,7 @@
  */
 
 import SwiftUI
+import MapKit
 
 struct RideOfferView: View {
 
@@ -39,6 +40,15 @@ struct RideOfferView: View {
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color.blue)
+
+                // Map Preview
+                if let request = rideRequest {
+                    RideOfferMapView(request: request)
+                        .frame(height: 200)
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                        .padding(.top)
+                }
 
                 // Ride Details
                 VStack(spacing: 20) {
@@ -196,6 +206,77 @@ struct RideOfferView: View {
                 timer.invalidate()
             }
         }
+    }
+}
+
+// MARK: - Ride Offer Map View
+
+struct RideOfferMapView: View {
+    let request: RideRequest
+
+    @State private var region: MKCoordinateRegion
+    @State private var annotations: [RideOfferAnnotation] = []
+
+    init(request: RideRequest) {
+        self.request = request
+
+        // Calculate region to show both pickup and destination
+        let centerLat = (request.pickup.coordinate.latitude + request.destination.coordinate.latitude) / 2
+        let centerLng = (request.pickup.coordinate.longitude + request.destination.coordinate.longitude) / 2
+
+        let latDelta = abs(request.pickup.coordinate.latitude - request.destination.coordinate.latitude) * 2.5
+        let lngDelta = abs(request.pickup.coordinate.longitude - request.destination.coordinate.longitude) * 2.5
+
+        _region = State(initialValue: MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
+            span: MKCoordinateSpan(
+                latitudeDelta: max(latDelta, 0.02),
+                longitudeDelta: max(lngDelta, 0.02)
+            )
+        ))
+
+        // Create annotations
+        var newAnnotations: [RideOfferAnnotation] = []
+        newAnnotations.append(RideOfferAnnotation(
+            coordinate: request.pickup.coordinate,
+            type: .pickup
+        ))
+        newAnnotations.append(RideOfferAnnotation(
+            coordinate: request.destination.coordinate,
+            type: .destination
+        ))
+        _annotations = State(initialValue: newAnnotations)
+    }
+
+    var body: some View {
+        Map(coordinateRegion: $region, annotationItems: annotations) { annotation in
+            MapAnnotation(coordinate: annotation.coordinate) {
+                ZStack {
+                    Circle()
+                        .fill(annotation.type == .pickup ? Color.green : Color.red)
+                        .frame(width: 30, height: 30)
+                        .shadow(radius: 2)
+
+                    Image(systemName: annotation.type == .pickup ? "figure.stand" : "mappin.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white)
+                }
+            }
+        }
+        .disabled(true) // Disable interaction
+    }
+}
+
+// MARK: - Ride Offer Annotation
+
+struct RideOfferAnnotation: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+    let type: AnnotationType
+
+    enum AnnotationType {
+        case pickup
+        case destination
     }
 }
 

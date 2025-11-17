@@ -36,9 +36,17 @@ struct ActiveRideView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Map (placeholder for now)
-            MapPlaceholder()
+            // Map View
+            if let ride = currentRide {
+                DriverMapView(
+                    currentRide: ride,
+                    isHeadingToPickup: isHeadingToPickup
+                )
                 .frame(height: 400)
+            } else {
+                MapPlaceholder()
+                    .frame(height: 400)
+            }
 
             // Ride Info Card
             VStack(spacing: 20) {
@@ -191,6 +199,172 @@ struct ActiveRideView: View {
         default:
             break
         }
+    }
+}
+
+// MARK: - Driver Map View
+
+struct DriverMapView: View {
+    let currentRide: ActiveRide
+    let isHeadingToPickup: Bool
+
+    @State private var region: MKCoordinateRegion
+    @State private var annotations: [MapAnnotation] = []
+
+    init(currentRide: ActiveRide, isHeadingToPickup: Bool) {
+        self.currentRide = currentRide
+        self.isHeadingToPickup = isHeadingToPickup
+
+        // Calculate region to show all points
+        let targetLocation = isHeadingToPickup ? currentRide.pickup : currentRide.destination
+
+        // Center on midpoint between driver and target
+        let centerLat = (currentRide.currentDriverLocation.coordinate.latitude + targetLocation.coordinate.latitude) / 2
+        let centerLng = (currentRide.currentDriverLocation.coordinate.longitude + targetLocation.coordinate.longitude) / 2
+
+        // Calculate span to show both points
+        let latDelta = abs(currentRide.currentDriverLocation.coordinate.latitude - targetLocation.coordinate.latitude) * 2.5
+        let lngDelta = abs(currentRide.currentDriverLocation.coordinate.longitude - targetLocation.coordinate.longitude) * 2.5
+
+        _region = State(initialValue: MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
+            span: MKCoordinateSpan(
+                latitudeDelta: max(latDelta, 0.01),
+                longitudeDelta: max(lngDelta, 0.01)
+            )
+        ))
+
+        // Initialize annotations
+        var newAnnotations: [MapAnnotation] = []
+
+        // Driver location
+        newAnnotations.append(MapAnnotation(
+            coordinate: currentRide.currentDriverLocation.coordinate,
+            title: "You",
+            type: .driver
+        ))
+
+        if isHeadingToPickup {
+            // Show pickup location
+            newAnnotations.append(MapAnnotation(
+                coordinate: currentRide.pickup.coordinate,
+                title: "Pickup",
+                subtitle: currentRide.pickup.name,
+                type: .pickup
+            ))
+        } else {
+            // Show destination
+            newAnnotations.append(MapAnnotation(
+                coordinate: currentRide.destination.coordinate,
+                title: "Destination",
+                subtitle: currentRide.destination.name,
+                type: .destination
+            ))
+        }
+
+        _annotations = State(initialValue: newAnnotations)
+    }
+
+    var body: some View {
+        Map(coordinateRegion: $region, annotationItems: annotations) { annotation in
+            MapAnnotation(coordinate: annotation.coordinate) {
+                AnnotationView(annotation: annotation)
+            }
+        }
+    }
+}
+
+// MARK: - Map Annotation Model
+
+struct MapAnnotation: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+    let title: String
+    var subtitle: String?
+    let type: AnnotationType
+
+    enum AnnotationType {
+        case driver
+        case pickup
+        case destination
+    }
+}
+
+// MARK: - Annotation View
+
+struct AnnotationView: View {
+    let annotation: MapAnnotation
+
+    var body: some View {
+        VStack(spacing: 0) {
+            ZStack {
+                Circle()
+                    .fill(backgroundColor)
+                    .frame(width: 40, height: 40)
+                    .shadow(radius: 3)
+
+                Image(systemName: iconName)
+                    .font(.system(size: 20))
+                    .foregroundColor(.white)
+            }
+
+            // Pointer
+            Triangle()
+                .fill(backgroundColor)
+                .frame(width: 12, height: 8)
+                .offset(y: -4)
+        }
+        .overlay(
+            VStack(spacing: 2) {
+                Text(annotation.title)
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white)
+                    .cornerRadius(4)
+                    .shadow(radius: 2)
+
+                Spacer()
+                    .frame(height: 50)
+            }
+            .offset(y: -55)
+        )
+    }
+
+    private var backgroundColor: Color {
+        switch annotation.type {
+        case .driver:
+            return .blue
+        case .pickup:
+            return .green
+        case .destination:
+            return .red
+        }
+    }
+
+    private var iconName: String {
+        switch annotation.type {
+        case .driver:
+            return "car.fill"
+        case .pickup:
+            return "figure.stand"
+        case .destination:
+            return "mappin.circle.fill"
+        }
+    }
+}
+
+// MARK: - Triangle Shape
+
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.closeSubpath()
+        return path
     }
 }
 

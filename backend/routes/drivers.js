@@ -368,6 +368,27 @@ router.post('/:driverId/rides/:rideId/reject', (req, res) => {
 
   console.log(`❌ Driver ${driver.name} rejected ride ${rideId}`);
 
+  // Check if this was a simulated offer
+  const simulatedOffer = simulatedRideOffers.get(driverId);
+  if (simulatedOffer && simulatedOffer.rideId === rideId) {
+    // Clear the rejected simulated offer
+    simulatedRideOffers.delete(driverId);
+    console.log(`🗑️ Cleared rejected simulated offer for driver ${driver.name}`);
+
+    // Generate a new offer immediately (after a short delay)
+    setTimeout(() => {
+      rideRequestSimulator.generateSingleRequest(driverId, (rideRequest) => {
+        const offer = {
+          rideId: uuidv4(),
+          ...rideRequest,
+          simulated: true
+        };
+        simulatedRideOffers.set(driverId, offer);
+        console.log(`📲 New simulated offer sent to driver ${driver.name} after rejection`);
+      });
+    }, 3000); // 3 second delay before next offer
+  }
+
   res.json({
     success: true,
     message: 'Ride rejected',
