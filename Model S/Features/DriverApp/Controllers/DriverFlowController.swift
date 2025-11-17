@@ -25,11 +25,11 @@ class DriverFlowController: ObservableObject {
     private let apiClient: DriverAPIClient
     private let locationManager: CLLocationManager
 
-    // MARK: - Timers & Tasks
+    // MARK: - Background Tasks
 
-    private var statsUpdateTimer: Timer?
-    private var rideOfferExpiryTimer: Timer?
-    private var offerPollingTimer: Timer?
+    private var statsUpdateTask: Task<Void, Never>?
+    private var rideOfferExpiryTask: Task<Void, Never>?
+    private var offerPollingTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
@@ -41,8 +41,9 @@ class DriverFlowController: ObservableObject {
     }
 
     deinit {
-        statsUpdateTimer?.invalidate()
-        rideOfferExpiryTimer?.invalidate()
+        statsUpdateTask?.cancel()
+        rideOfferExpiryTask?.cancel()
+        offerPollingTask?.cancel()
         print("🧹 DriverFlowController deallocated, cleaned up resources")
     }
 
@@ -91,7 +92,7 @@ class DriverFlowController: ObservableObject {
             transition(to: .online(stats: stats))
 
             // Start updating stats periodically
-            startStatsTimer()
+            startStatsTask()
 
             // Start polling for ride offers
             startOfferPolling()
@@ -111,8 +112,8 @@ class DriverFlowController: ObservableObject {
             return
         }
 
-        // Stop timers
-        stopTimers()
+        // Stop background tasks
+        stopTasks()
 
         do {
             // Logout from backend
@@ -167,8 +168,8 @@ class DriverFlowController: ObservableObject {
         let newState = DriverStateMachine.receiveRideOffer(request: request, currentStats: stats)
         transition(to: newState)
 
-        // Start expiry timer
-        startRideOfferExpiryTimer(request: request)
+        // Start expiry task
+        startRideOfferExpiryTask(request: request)
 
         print("📱 New ride offer received: \(request.rideId)")
     }
@@ -181,8 +182,8 @@ class DriverFlowController: ObservableObject {
             return
         }
 
-        // Stop expiry timer
-        rideOfferExpiryTimer?.invalidate()
+        // Stop expiry task
+        rideOfferExpiryTask?.cancel()
 
         do {
             // Accept ride on backend
@@ -225,8 +226,8 @@ class DriverFlowController: ObservableObject {
             return
         }
 
-        // Stop expiry timer
-        rideOfferExpiryTimer?.invalidate()
+        // Stop expiry task
+        rideOfferExpiryTask?.cancel()
 
         do {
             // Reject ride on backend
@@ -382,48 +383,52 @@ class DriverFlowController: ObservableObject {
         currentState = validatedState
     }
 
-    // MARK: - Timers
+    // MARK: - Background Tasks
 
-    private func startStatsTimer() {
-        statsUpdateTimer?.invalidate()
+    private func startStatsTask() {
+        statsUpdateTask?.cancel()
 
-        statsUpdateTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+        statsUpdateTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(10))
+                guard !Task.isCancelled else { break }
                 await self?.updateStats()
             }
         }
     }
 
-    private func startRideOfferExpiryTimer(request: RideRequest) {
-        rideOfferExpiryTimer?.invalidate()
+    private func startRideOfferExpiryTask(request: RideRequest) {
+        rideOfferExpiryTask?.cancel()
 
-        rideOfferExpiryTimer = Timer.scheduledTimer(withTimeInterval: request.timeRemaining, repeats: false) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.handleRideOfferExpiry()
-            }
+        rideOfferExpiryTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(request.timeRemaining))
+            guard !Task.isCancelled else { return }
+            self?.handleRideOfferExpiry()
         }
     }
 
     private func startOfferPolling() {
-        offerPollingTimer?.invalidate()
+        offerPollingTask?.cancel()
 
         // Poll every 3 seconds for ride offers
-        offerPollingTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
+        offerPollingTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(3))
+                guard !Task.isCancelled else { break }
                 await self?.checkForRideOffers()
             }
         }
     }
 
-    private func stopTimers() {
-        statsUpdateTimer?.invalidate()
-        statsUpdateTimer = nil
+    private func stopTasks() {
+        statsUpdateTask?.cancel()
+        statsUpdateTask = nil
 
-        rideOfferExpiryTimer?.invalidate()
-        rideOfferExpiryTimer = nil
+        rideOfferExpiryTask?.cancel()
+        rideOfferExpiryTask = nil
 
-        offerPollingTimer?.invalidate()
-        offerPollingTimer = nil
+        offerPollingTask?.cancel()
+        offerPollingTask = nil
     }
 
     private func handleRideOfferExpiry() {
@@ -463,7 +468,7 @@ class DriverFlowController: ObservableObject {
                 )
 
                 // Stop polling while we have an offer
-                offerPollingTimer?.invalidate()
+                offerPollingTask?.cancel()
 
                 receiveRideOffer(request)
             }
