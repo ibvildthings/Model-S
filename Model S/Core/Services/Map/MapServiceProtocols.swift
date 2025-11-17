@@ -140,10 +140,11 @@ struct MapServiceConfiguration {
     static let apple = MapServiceConfiguration(provider: .apple, apiKey: nil)
 
     /// Google Maps configuration with API key
-    /// Note: Replace with your actual Google Maps API key
+    /// API key is loaded securely from Secrets.plist (gitignored)
+    /// See Secrets.example.plist for setup instructions
     static let google = MapServiceConfiguration(
         provider: .google,
-        apiKey: "AIzaSyBia66kN2xuED5s6Vx6F-NeSdrjxD7xLC0" // Replace with actual API key
+        apiKey: SecretsManager.googleMapsAPIKey
     )
 
     /// Default configuration - now uses Google Maps
