@@ -79,7 +79,7 @@ struct RideSummaryView: View {
                     icon: "mappin.circle.fill",
                     iconColor: .green,
                     title: "From",
-                    value: rideSummary?.pickup.address ?? "Unknown"
+                    value: rideSummary?.pickup.name ?? "Unknown"
                 )
 
                 Divider()
@@ -88,7 +88,7 @@ struct RideSummaryView: View {
                     icon: "mappin.circle.fill",
                     iconColor: .red,
                     title: "To",
-                    value: rideSummary?.destination.address ?? "Unknown"
+                    value: rideSummary?.destination.name ?? "Unknown"
                 )
             }
             .padding()

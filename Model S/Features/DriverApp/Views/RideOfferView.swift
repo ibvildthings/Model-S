@@ -97,7 +97,7 @@ struct RideOfferView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
 
-                            Text(rideRequest?.pickup.address ?? "Pickup Location")
+                            Text(rideRequest?.pickup.name ?? "Pickup Location")
                                 .font(.body)
                         }
 
@@ -118,7 +118,7 @@ struct RideOfferView: View {
                                 .font(.caption)
                                 .foregroundColor(.secondary)
 
-                            Text(rideRequest?.destination.address ?? "Destination")
+                            Text(rideRequest?.destination.name ?? "Destination")
                                 .font(.body)
                         }
 

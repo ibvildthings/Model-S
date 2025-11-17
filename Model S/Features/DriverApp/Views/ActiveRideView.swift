@@ -98,18 +98,18 @@ struct ActiveRideView: View {
 
                 // Location Info
                 if isHeadingToPickup {
-                    LocationRow(
+                    DriverLocationRow(
                         icon: "mappin.circle.fill",
                         iconColor: .green,
                         title: "Pickup Location",
-                        address: currentRide?.pickup.address ?? "Unknown"
+                        address: currentRide?.pickup.name ?? "Unknown"
                     )
                 } else {
-                    LocationRow(
+                    DriverLocationRow(
                         icon: "mappin.circle.fill",
                         iconColor: .red,
                         title: "Destination",
-                        address: currentRide?.destination.address ?? "Unknown"
+                        address: currentRide?.destination.name ?? "Unknown"
                     )
                 }
 
@@ -218,9 +218,9 @@ struct MapPlaceholder: View {
     }
 }
 
-// MARK: - Location Row
+// MARK: - Driver Location Row
 
-struct LocationRow: View {
+struct DriverLocationRow: View {
     let icon: String
     let iconColor: Color
     let title: String
