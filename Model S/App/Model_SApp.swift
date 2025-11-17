@@ -6,24 +6,31 @@
 //
 
 import SwiftUI
+#if canImport(GoogleMaps)
 import GoogleMaps
+#endif
 
 @main
 struct Model_SApp: App {
     init() {
-        // Initialize Google Maps with API key
-        // This enables Google Maps visual display
+        // Initialize Google Maps SDK if available
+        #if canImport(GoogleMaps)
         if let apiKey = MapServiceConfiguration.google.apiKey,
            apiKey != "YOUR_GOOGLE_MAPS_API_KEY" {
             GMSServices.provideAPIKey(apiKey)
             print("✅ Google Maps SDK initialized")
-        } else {
-            print("⚠️ Google Maps API key not configured - using placeholder")
-        }
 
-        // Configure map provider (default is Google Maps)
-        // You can change this to .apple if you prefer
-        MapProviderManager.shared.useGoogleMaps()
+            // Configure to use Google Maps
+            MapProviderManager.shared.useGoogleMaps()
+        } else {
+            print("⚠️ Google Maps API key not configured - using Apple Maps")
+            MapProviderManager.shared.useAppleMaps()
+        }
+        #else
+        print("⚠️ Google Maps SDK not installed - using Apple Maps")
+        print("📖 See GOOGLE_MAPS_SETUP.md for installation instructions")
+        MapProviderManager.shared.useAppleMaps()
+        #endif
     }
 
     var body: some Scene {

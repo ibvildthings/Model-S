@@ -5,9 +5,14 @@
 //  UIViewRepresentable wrapper for Google Maps (GMSMapView)
 //  Provides the same interface as MapViewWrapper but uses Google Maps SDK
 //
+//  NOTE: Requires Google Maps SDK to be installed via SPM or CocoaPods
+//  See GOOGLE_MAPS_SETUP.md for installation instructions
+//
 
 import SwiftUI
 import MapKit
+
+#if canImport(GoogleMaps)
 import GoogleMaps
 
 /// Google Maps implementation using GMSMapView
@@ -279,3 +284,100 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
         }
     }
 }
+
+#else
+
+/// Fallback when Google Maps SDK is not installed
+/// Shows informative placeholder and uses Apple Maps
+struct GoogleMapViewWrapper: UIViewRepresentable {
+    @Binding var region: MKCoordinateRegion
+    var pickupLocation: CLLocationCoordinate2D?
+    var destinationLocation: CLLocationCoordinate2D?
+    var driverLocation: CLLocationCoordinate2D?
+    var route: Any?
+    var driverRoute: Any?
+    var routeDisplayMode: RouteDisplayMode
+    var showsUserLocation: Bool
+    var routeLineColor: Color
+    var routeLineWidth: CGFloat
+
+    func makeUIView(context: Context) -> UIView {
+        let containerView = UIView()
+        containerView.backgroundColor = .systemBackground
+
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 20
+        stackView.alignment = .center
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+
+        // Icon
+        let imageView = UIImageView(image: UIImage(systemName: "map.fill"))
+        imageView.tintColor = .systemBlue
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.heightAnchor.constraint(equalToConstant: 80).isActive = true
+        imageView.widthAnchor.constraint(equalToConstant: 80).isActive = true
+
+        // Title
+        let titleLabel = UILabel()
+        titleLabel.text = "Google Maps SDK Required"
+        titleLabel.font = .boldSystemFont(ofSize: 24)
+        titleLabel.textColor = .label
+        titleLabel.textAlignment = .center
+
+        // Message
+        let messageLabel = UILabel()
+        messageLabel.text = "To see Google Maps, install the SDK"
+        messageLabel.font = .systemFont(ofSize: 18)
+        messageLabel.textColor = .secondaryLabel
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+
+        // Instructions
+        let instructionsLabel = UILabel()
+        instructionsLabel.text = "See GOOGLE_MAPS_SETUP.md for instructions"
+        instructionsLabel.font = .systemFont(ofSize: 14)
+        instructionsLabel.textColor = .systemBlue
+        instructionsLabel.textAlignment = .center
+        instructionsLabel.numberOfLines = 0
+
+        // Current status
+        let statusLabel = UILabel()
+        statusLabel.text = "Currently using: Apple Maps\n(Google services still active)"
+        statusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        statusLabel.textColor = .systemGreen
+        statusLabel.textAlignment = .center
+        statusLabel.numberOfLines = 0
+
+        stackView.addArrangedSubview(imageView)
+        stackView.addArrangedSubview(titleLabel)
+        stackView.addArrangedSubview(messageLabel)
+        stackView.addArrangedSubview(instructionsLabel)
+        stackView.addArrangedSubview(statusLabel)
+
+        containerView.addSubview(stackView)
+
+        NSLayoutConstraint.activate([
+            stackView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            stackView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            stackView.leadingAnchor.constraint(greaterThanOrEqualTo: containerView.leadingAnchor, constant: 40),
+            stackView.trailingAnchor.constraint(lessThanOrEqualTo: containerView.trailingAnchor, constant: -40)
+        ])
+
+        return containerView
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        // Placeholder doesn't need updates
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+
+    class Coordinator: NSObject {
+    }
+}
+
+#endif
