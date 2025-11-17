@@ -390,9 +390,9 @@ class DriverFlowController: ObservableObject {
 
         statsUpdateTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(10))
-                guard !Task.isCancelled else { break }
                 await self?.updateStats()
+                guard !Task.isCancelled else { break }
+                try? await Task.sleep(for: .seconds(10))
             }
         }
     }
@@ -413,9 +413,9 @@ class DriverFlowController: ObservableObject {
         // Poll every 3 seconds for ride offers
         offerPollingTask = Task { @MainActor [weak self] in
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(3))
-                guard !Task.isCancelled else { break }
                 await self?.checkForRideOffers()
+                guard !Task.isCancelled else { break }
+                try? await Task.sleep(for: .seconds(3))
             }
         }
     }
