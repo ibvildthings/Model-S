@@ -29,6 +29,7 @@ class DriverFlowController: ObservableObject {
 
     private var statsUpdateTimer: Timer?
     private var rideOfferExpiryTimer: Timer?
+    private var offerPollingTimer: Timer?
 
     // MARK: - Initialization
 
@@ -91,6 +92,9 @@ class DriverFlowController: ObservableObject {
 
             // Start updating stats periodically
             startStatsTimer()
+
+            // Start polling for ride offers
+            startOfferPolling()
 
             print("✅ Driver \(response.driver.name) logged in successfully")
 
@@ -232,12 +236,17 @@ class DriverFlowController: ObservableObject {
             let newState = DriverStateMachine.rejectRide(stats: stats)
             transition(to: newState)
 
+            // Resume polling for new offers
+            startOfferPolling()
+
             print("❌ Ride rejected: \(request.rideId)")
 
         } catch {
             print("❌ Failed to reject ride: \(error)")
             // Still transition to online
             transition(to: .online(stats: stats))
+            // Resume polling
+            startOfferPolling()
         }
     }
 
@@ -338,6 +347,9 @@ class DriverFlowController: ObservableObject {
 
         let newState = DriverStateMachine.finishRideSummary(stats: stats)
         transition(to: newState)
+
+        // Resume polling for new offers
+        startOfferPolling()
     }
 
     // MARK: - Location Updates
@@ -392,12 +404,26 @@ class DriverFlowController: ObservableObject {
         }
     }
 
+    private func startOfferPolling() {
+        offerPollingTimer?.invalidate()
+
+        // Poll every 3 seconds for ride offers
+        offerPollingTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.checkForRideOffers()
+            }
+        }
+    }
+
     private func stopTimers() {
         statsUpdateTimer?.invalidate()
         statsUpdateTimer = nil
 
         rideOfferExpiryTimer?.invalidate()
         rideOfferExpiryTimer = nil
+
+        offerPollingTimer?.invalidate()
+        offerPollingTimer = nil
     }
 
     private func handleRideOfferExpiry() {
@@ -409,6 +435,42 @@ class DriverFlowController: ObservableObject {
 
         // Automatically transition back to online
         transition(to: .online(stats: stats))
+
+        // Resume polling for new offers
+        startOfferPolling()
+    }
+
+    private func checkForRideOffers() async {
+        guard let driverId = driverId,
+              case .online(let stats) = currentState else {
+            return
+        }
+
+        do {
+            let response = try await apiClient.getOffers(driverId: driverId)
+
+            if response.hasOffer, let offer = response.offer {
+                // Received a ride offer!
+                print("🎯 Received ride offer: \(offer.rideId)")
+
+                let request = RideRequest(
+                    rideId: offer.rideId,
+                    pickup: offer.pickup,
+                    destination: offer.destination,
+                    distance: offer.distance,
+                    estimatedEarnings: offer.estimatedEarnings,
+                    expiresAt: ISO8601DateFormatter().date(from: offer.expiresAt) ?? Date().addingTimeInterval(30)
+                )
+
+                // Stop polling while we have an offer
+                offerPollingTimer?.invalidate()
+
+                receiveRideOffer(request)
+            }
+        } catch {
+            // Silent failure for offer polling
+            print("⚠️ Failed to check for offers: \(error)")
+        }
     }
 
     private func updateStats() async {

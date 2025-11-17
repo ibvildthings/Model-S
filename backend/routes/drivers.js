@@ -42,6 +42,9 @@ router.post('/login', async (req, res) => {
       driver.updateLocation(location.lat, location.lng);
     }
 
+    // Make driver available
+    driver.available = true;
+
     // Create session
     const session = {
       driverId: driver.id,
@@ -181,6 +184,37 @@ router.put('/:driverId/location', (req, res) => {
 });
 
 /**
+ * GET /api/drivers/:driverId/offers
+ * Get pending ride offers for driver
+ */
+router.get('/:driverId/offers', (req, res) => {
+  const { driverId } = req.params;
+
+  const driver = driverPool.getDriverById(driverId);
+
+  if (!driver) {
+    return res.status(404).json({
+      error: 'Driver not found'
+    });
+  }
+
+  // Import rides module to check for pending offers
+  const { getPendingOfferForDriver } = require('./rides');
+  const offer = getPendingOfferForDriver(driverId);
+
+  if (offer) {
+    res.json({
+      hasOffer: true,
+      offer
+    });
+  } else {
+    res.json({
+      hasOffer: false
+    });
+  }
+});
+
+/**
  * POST /api/drivers/:driverId/rides/:rideId/accept
  * Accept a ride request
  */
@@ -209,8 +243,16 @@ router.post('/:driverId/rides/:rideId/accept', (req, res) => {
     });
   }
 
-  // Assign ride to driver
-  driver.assignRide(rideId);
+  // Get the ride and assign driver
+  const { assignDriverToRide } = require('./rides');
+  const success = assignDriverToRide(rideId, driver);
+
+  if (!success) {
+    return res.status(400).json({
+      error: 'Failed to assign driver to ride',
+      message: 'Ride may no longer be available'
+    });
+  }
 
   console.log(`✅ Driver ${driver.name} accepted ride ${rideId}`);
 
@@ -278,6 +320,10 @@ router.put('/:driverId/rides/:rideId/status', (req, res) => {
   }
 
   console.log(`📍 Driver ${driver.name} updated ride ${rideId} status to: ${status}`);
+
+  // Update the actual ride status
+  const { updateRideStatus } = require('./rides');
+  updateRideStatus(rideId, status);
 
   // If ride completed, update session
   if (status === 'completed') {

@@ -8,11 +8,67 @@ const { v4: uuidv4 } = require('uuid');
 const Ride = require('../models/Ride');
 const driverMatcher = require('../services/driverMatcher');
 const driverSimulator = require('../services/driverSimulator');
+const driverPool = require('../services/driverPool');
+const { driverSessions } = require('./drivers');
 
 const router = express.Router();
 
 // In-memory storage (replace with database in production)
 const rides = new Map();
+const pendingRideOffers = new Map(); // rideId -> driverId (offers sent to real drivers)
+
+/**
+ * Get online drivers (those with active sessions)
+ */
+function getOnlineDrivers() {
+  const onlineDriverIds = Array.from(driverSessions.keys());
+  return onlineDriverIds
+    .map(id => driverPool.getDriverById(id))
+    .filter(driver => driver && driver.available);
+}
+
+/**
+ * Find nearest online driver to a location
+ */
+function findNearestOnlineDriver(pickup) {
+  const onlineDrivers = getOnlineDrivers();
+
+  if (onlineDrivers.length === 0) {
+    return null;
+  }
+
+  // Calculate distances and find nearest
+  const driversWithDistance = onlineDrivers.map(driver => {
+    const distance = calculateDistance(
+      pickup.lat,
+      pickup.lng,
+      driver.location.lat,
+      driver.location.lng
+    );
+    return { driver, distance };
+  });
+
+  driversWithDistance.sort((a, b) => a.distance - b.distance);
+  return driversWithDistance[0];
+}
+
+/**
+ * Simple distance calculation (Haversine formula)
+ */
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 6371e3; // Earth's radius in meters
+  const φ1 = (lat1 * Math.PI) / 180;
+  const φ2 = (lat2 * Math.PI) / 180;
+  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
+  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
 
 /**
  * POST /api/rides/request
@@ -55,8 +111,62 @@ router.post('/request', async (req, res) => {
       createdAt: ride.createdAt
     });
 
-    // Start driver matching asynchronously
-    driverMatcher.matchRideToDriver(ride, (match) => {
+    // Check for online real drivers first
+    const nearestDriver = findNearestOnlineDriver(pickup);
+
+    if (nearestDriver) {
+      // Found an online driver! Send them the ride offer
+      const { driver, distance } = nearestDriver;
+      const estimatedEarnings = calculateFare(distance);
+
+      console.log(`🎯 Found online driver: ${driver.name}`);
+      console.log(`   Distance: ${Math.round(distance)}m`);
+      console.log(`   Estimated earnings: $${estimatedEarnings}`);
+
+      // Store pending offer
+      pendingRideOffers.set(ride.id, {
+        driverId: driver.id,
+        distance,
+        estimatedEarnings,
+        offeredAt: Date.now()
+      });
+
+      // Set ride status to searching (waiting for driver acceptance)
+      ride.updateStatus('searching');
+
+      // Set timeout to revert to simulated driver if no response in 30 seconds
+      setTimeout(() => {
+        const offer = pendingRideOffers.get(ride.id);
+        if (offer && ride.status === 'searching') {
+          console.log(`⏰ Ride ${ride.id} offer expired, using simulated driver`);
+          pendingRideOffers.delete(ride.id);
+
+          // Fall back to simulated driver
+          useSimulatedDriver(ride);
+        }
+      }, 30000);
+
+      return; // Wait for driver to accept
+    }
+
+    // No online drivers, use simulated driver
+    console.log('No online drivers available, using simulation');
+    useSimulatedDriver(ride);
+
+  } catch (error) {
+    console.error('Error creating ride:', error);
+    res.status(500).json({
+      error: 'Failed to create ride',
+      message: error.message
+    });
+  }
+});
+
+/**
+ * Helper: Use simulated driver for a ride
+ */
+function useSimulatedDriver(ride) {
+  driverMatcher.matchRideToDriver(ride, (match) => {
       if (match) {
         const { driver, distance, eta } = match;
 
@@ -96,15 +206,17 @@ router.post('/request', async (req, res) => {
         broadcastRideUpdate(ride);
       }
     });
+}
 
-  } catch (error) {
-    console.error('Error creating ride:', error);
-    res.status(500).json({
-      error: 'Failed to create ride',
-      message: error.message
-    });
-  }
-});
+/**
+ * Calculate fare based on distance
+ */
+function calculateFare(distanceMeters) {
+  const distanceKm = distanceMeters / 1000;
+  const baseFare = 2.0;
+  const perKm = 1.5;
+  return parseFloat((baseFare + distanceKm * perKm).toFixed(2));
+}
 
 /**
  * GET /api/rides/:rideId
@@ -188,7 +300,92 @@ function setBroadcastFunctions(rideUpdateFn, driverPositionFn) {
   broadcastDriverPosition = driverPositionFn;
 }
 
+/**
+ * Get pending ride offer for a specific driver
+ */
+function getPendingOfferForDriver(driverId) {
+  // Find any ride with a pending offer for this driver
+  for (const [rideId, offer] of pendingRideOffers.entries()) {
+    if (offer.driverId === driverId) {
+      const ride = rides.get(rideId);
+      if (ride) {
+        return {
+          rideId: ride.id,
+          pickup: ride.pickup,
+          destination: ride.destination,
+          distance: offer.distance,
+          estimatedEarnings: offer.estimatedEarnings,
+          expiresAt: new Date(offer.offeredAt + 30000).toISOString()
+        };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Assign a driver to a ride
+ */
+function assignDriverToRide(rideId, driver) {
+  const ride = rides.get(rideId);
+  const offer = pendingRideOffers.get(rideId);
+
+  if (!ride || !offer) {
+    return false;
+  }
+
+  // Remove pending offer
+  pendingRideOffers.delete(rideId);
+
+  // Assign driver to ride
+  const distance = offer.distance;
+  const eta = Math.round(distance / 10); // Rough estimate: 10m/s = 36 km/h
+  ride.assignDriver(driver, eta);
+
+  // Assign ride to driver
+  driver.assignRide(rideId);
+
+  console.log(`🎯 Driver ${driver.name} assigned to ride ${rideId}`);
+
+  // Broadcast update
+  broadcastRideUpdate(ride);
+
+  return true;
+}
+
+/**
+ * Update ride status based on driver actions
+ */
+function updateRideStatus(rideId, status) {
+  const ride = rides.get(rideId);
+
+  if (!ride) {
+    return false;
+  }
+
+  // Map driver status to ride status
+  const statusMap = {
+    'arrived': 'arriving',
+    'pickedUp': 'inProgress',
+    'approaching': 'approachingDestination',
+    'completed': 'completed'
+  };
+
+  const rideStatus = statusMap[status] || status;
+  ride.updateStatus(rideStatus);
+
+  console.log(`📍 Ride ${rideId} status updated to: ${rideStatus}`);
+
+  // Broadcast update
+  broadcastRideUpdate(ride);
+
+  return true;
+}
+
 module.exports = {
   router,
-  setBroadcastFunctions
+  setBroadcastFunctions,
+  getPendingOfferForDriver,
+  assignDriverToRide,
+  updateRideStatus
 };

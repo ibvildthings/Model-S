@@ -199,6 +199,27 @@ class DriverAPIClient {
         print("✅ Ride status updated successfully")
     }
 
+    // MARK: - Ride Offers
+
+    /// Get pending ride offers for driver
+    func getOffers(driverId: String) async throws -> RideOfferResponse {
+        let url = URL(string: "\(baseURL)/api/drivers/\(driverId)/offers")!
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+
+        let (data, response) = try await performRequestWithRetry(maxRetries: 1) {
+            try await self.session.data(for: request)
+        }
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              httpResponse.statusCode == 200 else {
+            throw DriverAPIError.networkError
+        }
+
+        let offerResponse = try JSONDecoder().decode(RideOfferResponse.self, from: data)
+        return offerResponse
+    }
+
     // MARK: - Statistics
 
     /// Get driver statistics
@@ -341,6 +362,20 @@ struct DriverStatsResponse: Codable {
         let totalEarnings: Double
         let acceptanceRate: Double
         let rating: Double
+    }
+}
+
+struct RideOfferResponse: Codable {
+    let hasOffer: Bool
+    let offer: RideOfferDetails?
+
+    struct RideOfferDetails: Codable {
+        let rideId: String
+        let pickup: LocationPayload
+        let destination: LocationPayload
+        let distance: Double
+        let estimatedEarnings: Double
+        let expiresAt: String
     }
 }
 
