@@ -5,18 +5,12 @@
 //  UIViewRepresentable wrapper for Google Maps (GMSMapView)
 //  Provides the same interface as MapViewWrapper but uses Google Maps SDK
 //
-//  NOTE: To use this, you need to:
-//  1. Add Google Maps SDK via CocoaPods or Swift Package Manager
-//  2. Add "import GoogleMaps" at the top of Model_SApp.swift
-//  3. Initialize with: GMSServices.provideAPIKey("YOUR_API_KEY") in app init
-//
 
 import SwiftUI
 import MapKit
-// import GoogleMaps  // Uncomment when Google Maps SDK is added
+import GoogleMaps
 
 /// Google Maps implementation using GMSMapView
-/// Falls back to showing a placeholder when Google Maps SDK is not available
 struct GoogleMapViewWrapper: UIViewRepresentable {
     @Binding var region: MKCoordinateRegion
     var pickupLocation: CLLocationCoordinate2D?
@@ -29,31 +23,7 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
     var routeLineColor: Color
     var routeLineWidth: CGFloat
 
-    func makeUIView(context: Context) -> UIView {
-        // Check if Google Maps SDK is available
-        #if canImport(GoogleMaps)
-        return createGoogleMapView(context: context)
-        #else
-        return createPlaceholderView()
-        #endif
-    }
-
-    func updateUIView(_ uiView: UIView, context: Context) {
-        #if canImport(GoogleMaps)
-        updateGoogleMapView(uiView, context: context)
-        #else
-        updatePlaceholderView(uiView)
-        #endif
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    // MARK: - Google Maps Implementation
-
-    #if canImport(GoogleMaps)
-    private func createGoogleMapView(context: Context) -> UIView {
+    func makeUIView(context: Context) -> GMSMapView {
         // Create Google Maps view
         let camera = GMSCameraPosition.camera(
             withLatitude: region.center.latitude,
@@ -71,9 +41,7 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
         return mapView
     }
 
-    private func updateGoogleMapView(_ uiView: UIView, context: Context) {
-        guard let mapView = context.coordinator.mapView else { return }
-
+    func updateUIView(_ mapView: GMSMapView, context: Context) {
         // Update camera if region changed significantly
         if !context.coordinator.isUserInteracting {
             let camera = GMSCameraPosition.camera(
@@ -101,100 +69,34 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
         )
     }
 
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    // MARK: - Helper Methods
+
     private func zoomLevelFromSpan(_ span: MKCoordinateSpan) -> Float {
         // Convert MKCoordinateSpan to Google Maps zoom level (0-21)
         let latitudeDelta = span.latitudeDelta
         let zoom = log2(360.0 / latitudeDelta)
         return Float(max(0, min(21, zoom)))
     }
-    #endif
-
-    // MARK: - Placeholder Implementation
-
-    private func createPlaceholderView() -> UIView {
-        let containerView = UIView()
-        containerView.backgroundColor = .systemBackground
-
-        let stackView = UIStackView()
-        stackView.axis = .vertical
-        stackView.spacing = 16
-        stackView.alignment = .center
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-
-        // Icon
-        let imageView = UIImageView(image: UIImage(systemName: "map.fill"))
-        imageView.tintColor = .systemBlue
-        imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.heightAnchor.constraint(equalToConstant: 80).isActive = true
-        imageView.widthAnchor.constraint(equalToConstant: 80).isActive = true
-
-        // Title
-        let titleLabel = UILabel()
-        titleLabel.text = "Google Maps Ready"
-        titleLabel.font = .boldSystemFont(ofSize: 24)
-        titleLabel.textColor = .label
-        titleLabel.textAlignment = .center
-
-        // Message
-        let messageLabel = UILabel()
-        messageLabel.text = "Add Google Maps SDK to see the map here"
-        messageLabel.font = .systemFont(ofSize: 16)
-        messageLabel.textColor = .secondaryLabel
-        messageLabel.textAlignment = .center
-        messageLabel.numberOfLines = 0
-
-        // Instructions
-        let instructionsLabel = UILabel()
-        instructionsLabel.text = "1. Add GoogleMaps via CocoaPods/SPM\n2. Add API key in Model_SApp.swift\n3. Rebuild the app"
-        instructionsLabel.font = .systemFont(ofSize: 14)
-        instructionsLabel.textColor = .tertiaryLabel
-        instructionsLabel.textAlignment = .center
-        instructionsLabel.numberOfLines = 0
-
-        // Current provider info
-        let infoLabel = UILabel()
-        infoLabel.text = "Currently using: Google Maps Services\n(Search, Geocoding, Routes)"
-        infoLabel.font = .systemFont(ofSize: 12, weight: .medium)
-        infoLabel.textColor = .systemGreen
-        infoLabel.textAlignment = .center
-        infoLabel.numberOfLines = 0
-
-        stackView.addArrangedSubview(imageView)
-        stackView.addArrangedSubview(titleLabel)
-        stackView.addArrangedSubview(messageLabel)
-        stackView.addArrangedSubview(instructionsLabel)
-        stackView.addArrangedSubview(infoLabel)
-
-        containerView.addSubview(stackView)
-
-        NSLayoutConstraint.activate([
-            stackView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
-            stackView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
-            stackView.leadingAnchor.constraint(greaterThanOrEqualTo: containerView.leadingAnchor, constant: 40),
-            stackView.trailingAnchor.constraint(lessThanOrEqualTo: containerView.trailingAnchor, constant: -40)
-        ])
-
-        return containerView
-    }
-
-    private func updatePlaceholderView(_ uiView: UIView) {
-        // Placeholder doesn't need updates
-    }
 
     // MARK: - Coordinator
 
-    class Coordinator: NSObject {
+    class Coordinator: NSObject, GMSMapViewDelegate {
         var parent: GoogleMapViewWrapper
         var isUserInteracting = false
-
-        #if canImport(GoogleMaps)
         var mapView: GMSMapView?
         private var pickupMarker: GMSMarker?
         private var destinationMarker: GMSMarker?
         private var driverMarker: GMSMarker?
         private var currentPolyline: GMSPolyline?
         private var currentDisplayMode: RouteDisplayMode?
+
+        init(_ parent: GoogleMapViewWrapper) {
+            self.parent = parent
+        }
 
         func updateMarkers(pickup: CLLocationCoordinate2D?, destination: CLLocationCoordinate2D?, driver: CLLocationCoordinate2D?) {
             guard let mapView = mapView else { return }
@@ -293,6 +195,28 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
             }
         }
 
+        // MARK: - GMSMapViewDelegate
+
+        func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
+            isUserInteracting = true
+        }
+
+        func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
+            // Update parent's region when camera stops moving
+            let span = MKCoordinateSpan(
+                latitudeDelta: 360.0 / pow(2.0, Double(position.zoom)),
+                longitudeDelta: 360.0 / pow(2.0, Double(position.zoom))
+            )
+            let region = MKCoordinateRegion(center: position.target, span: span)
+
+            DispatchQueue.main.async {
+                self.parent.region = region
+                self.isUserInteracting = false
+            }
+        }
+
+        // MARK: - Icon Creation
+
         private func createMarkerIcon(color: UIColor, iconName: String) -> UIImage? {
             let size = CGSize(width: 40, height: 48)
             let renderer = UIGraphicsImageRenderer(size: size)
@@ -353,33 +277,5 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
                 }
             }
         }
-        #endif
-
-        init(_ parent: GoogleMapViewWrapper) {
-            self.parent = parent
-        }
     }
 }
-
-#if canImport(GoogleMaps)
-// MARK: - GMSMapViewDelegate
-extension GoogleMapViewWrapper.Coordinator: GMSMapViewDelegate {
-    func mapView(_ mapView: GMSMapView, didChange position: GMSCameraPosition) {
-        isUserInteracting = true
-    }
-
-    func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
-        // Update parent's region when camera stops moving
-        let span = MKCoordinateSpan(
-            latitudeDelta: 360.0 / pow(2.0, Double(position.zoom)),
-            longitudeDelta: 360.0 / pow(2.0, Double(position.zoom))
-        )
-        let region = MKCoordinateRegion(center: position.target, span: span)
-
-        DispatchQueue.main.async {
-            self.parent.region = region
-            self.isUserInteracting = false
-        }
-    }
-}
-#endif
