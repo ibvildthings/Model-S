@@ -259,6 +259,35 @@ class DriverFlowController: NSObject, ObservableObject {
         }
     }
 
+    /// Handle offer expiry (timeout)
+    func handleOfferExpiry() async {
+        guard case .rideOffered(let request, let stats) = currentState,
+              let driverId = driverId else {
+            print("⚠️ Cannot handle expiry - no active offer")
+            return
+        }
+
+        // Stop expiry task
+        rideOfferExpiryTask?.cancel()
+
+        print("⏰ Ride offer expired: \(request.rideId)")
+
+        // Send rejection to backend (offer expired)
+        do {
+            try await apiClient.rejectRide(driverId: driverId, rideId: request.rideId)
+        } catch {
+            print("⚠️ Failed to send expiry notification to backend: \(error)")
+            // Continue anyway - we still want to dismiss the offer
+        }
+
+        // Transition back to online
+        let newState = DriverStateMachine.rejectRide(stats: stats)
+        transition(to: newState)
+
+        // Resume polling for new offers
+        startOfferPolling()
+    }
+
     // MARK: - Ride Progress
 
     /// Mark arrival at pickup location

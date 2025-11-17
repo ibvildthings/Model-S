@@ -122,6 +122,14 @@ class DriverViewModel: ObservableObject {
         }
     }
 
+    func handleOfferExpiry() {
+        actionTask?.cancel()
+        actionTask = Task {
+            await controller.handleOfferExpiry()
+            actionTask = nil
+        }
+    }
+
     func arriveAtPickup() {
         actionTask?.cancel()
         actionTask = Task {
