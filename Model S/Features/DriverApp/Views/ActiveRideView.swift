@@ -35,101 +35,109 @@ struct ActiveRideView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Map View
-            if let ride = currentRide {
-                DriverMapView(
-                    currentRide: ride,
-                    isHeadingToPickup: isHeadingToPickup
-                )
-                .frame(height: 400)
-            } else {
-                MapPlaceholder()
-                    .frame(height: 400)
-            }
-
-            // Ride Info Card
-            VStack(spacing: 20) {
-                // Status Header
-                HStack {
-                    Circle()
-                        .fill(statusColor)
-                        .frame(width: 12, height: 12)
-
-                    Text(viewModel.statusText)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-
-                    Spacer()
+        GeometryReader { geometry in
+            VStack(spacing: 0) {
+                // Map View - Takes up 60% of screen for better visibility
+                if let ride = currentRide {
+                    DriverMapView(
+                        currentRide: ride,
+                        isHeadingToPickup: isHeadingToPickup
+                    )
+                    .frame(height: geometry.size.height * 0.6)
+                } else {
+                    MapPlaceholder()
+                        .frame(height: geometry.size.height * 0.6)
                 }
 
-                Divider()
+                // Ride Info Card - Compact bottom sheet
+                rideInfoCard
+                    .background(Color(UIColor.systemBackground))
+                    .cornerRadius(20, corners: [.topLeft, .topRight])
+                    .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: -5)
 
-                // Passenger Info (if available)
-                HStack(spacing: 15) {
-                    Image(systemName: "person.circle.fill")
-                        .font(.system(size: 50))
-                        .foregroundColor(.blue)
+                Spacer(minLength: 0)
+            }
+            .background(Color(UIColor.systemGray6))
+        }
+    }
 
-                    VStack(alignment: .leading, spacing: 5) {
+    private var rideInfoCard: some View {
+        VStack(spacing: 16) {
+            // Status Header - Compact
+            HStack {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 10, height: 10)
+
+                Text(viewModel.statusText)
+                    .font(.headline)
+                    .fontWeight(.semibold)
+
+                Spacer()
+            }
+
+            // Passenger Info + Location in one row
+            HStack(spacing: 12) {
+                // Passenger Avatar
+                Circle()
+                    .fill(Color.blue.opacity(0.1))
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Image(systemName: "person.fill")
+                            .foregroundColor(.blue)
+                            .font(.system(size: 20))
+                    )
+
+                // Passenger + Location Info
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
                         Text(currentRide?.passenger.name ?? "Passenger")
-                            .font(.headline)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
 
-                        HStack {
+                        HStack(spacing: 2) {
                             Image(systemName: "star.fill")
-                                .font(.caption)
+                                .font(.system(size: 10))
                                 .foregroundColor(.yellow)
-
                             Text(String(format: "%.1f", currentRide?.passenger.rating ?? 0))
-                                .font(.subheadline)
+                                .font(.caption2)
                                 .foregroundColor(.secondary)
                         }
                     }
 
-                    Spacer()
+                    HStack(spacing: 6) {
+                        Image(systemName: isHeadingToPickup ? "mappin.circle.fill" : "location.circle.fill")
+                            .font(.system(size: 12))
+                            .foregroundColor(isHeadingToPickup ? .green : .red)
 
-                    if let phone = currentRide?.passenger.phoneNumber {
-                        Button(action: {
-                            // Call passenger
-                        }) {
-                            Image(systemName: "phone.fill")
-                                .font(.title2)
-                                .foregroundColor(.green)
-                                .frame(width: 44, height: 44)
-                                .background(Color(UIColor.systemGray6))
-                                .clipShape(Circle())
-                        }
+                        Text(isHeadingToPickup ? (currentRide?.pickup.name ?? "Unknown") : (currentRide?.destination.name ?? "Unknown"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .lineLimit(1)
                     }
                 }
 
-                Divider()
+                Spacer()
 
-                // Location Info
-                if isHeadingToPickup {
-                    DriverLocationRow(
-                        icon: "mappin.circle.fill",
-                        iconColor: .green,
-                        title: "Pickup Location",
-                        address: currentRide?.pickup.name ?? "Unknown"
-                    )
-                } else {
-                    DriverLocationRow(
-                        icon: "mappin.circle.fill",
-                        iconColor: .red,
-                        title: "Destination",
-                        address: currentRide?.destination.name ?? "Unknown"
-                    )
+                // Call Button - Compact
+                if let phone = currentRide?.passenger.phoneNumber {
+                    Button(action: {
+                        // Call passenger
+                    }) {
+                        Image(systemName: "phone.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                            .frame(width: 36, height: 36)
+                            .background(Color.green)
+                            .clipShape(Circle())
+                    }
                 }
-
-                // Action Button
-                actionButton
             }
-            .padding()
-            .background(Color(UIColor.systemBackground))
 
-            Spacer()
+            // Action Button
+            actionButton
         }
-        .background(Color(UIColor.systemGray6))
+        .padding(20)
     }
 
     private var statusColor: Color {
@@ -392,34 +400,26 @@ struct MapPlaceholder: View {
     }
 }
 
-// MARK: - Driver Location Row
 
-struct DriverLocationRow: View {
-    let icon: String
-    let iconColor: Color
-    let title: String
-    let address: String
+// MARK: - View Extensions
 
-    var body: some View {
-        HStack(alignment: .top, spacing: 15) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(iconColor)
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
 
-                Text(address)
-                    .font(.body)
-            }
-
-            Spacer()
-        }
-        .padding()
-        .background(Color(UIColor.systemGray6))
-        .cornerRadius(10)
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(path.cgPath)
     }
 }
 

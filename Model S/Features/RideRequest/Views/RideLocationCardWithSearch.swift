@@ -64,9 +64,9 @@ struct RideLocationCardWithSearch: View {
                         .foregroundColor(.primary)
                     Spacer()
                 }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-                .padding(.bottom, 14)
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 16)
 
                 // Pickup Location Input
                 HStack(spacing: 12) {
@@ -110,11 +110,11 @@ struct RideLocationCardWithSearch: View {
                         .accessibilityHint("Set pickup to your current location")
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 14)
-                .background(Color(.systemGray6))
+                .background(Color(.systemGray6).opacity(0.6))
                 .cornerRadius(12)
-                .padding(.horizontal, 18)
+                .padding(.horizontal, 20)
 
                 // Divider with connecting line
                 HStack(spacing: 12) {
@@ -156,16 +156,13 @@ struct RideLocationCardWithSearch: View {
                             }
                         }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 14)
                 .padding(.vertical, 14)
-                .background(Color(.systemGray6))
+                .background(Color(.systemGray6).opacity(0.6))
                 .cornerRadius(12)
-                .padding(.horizontal, 18)
-                .padding(.bottom, 18)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
             }
-            .background(.ultraThinMaterial)
-            .cornerRadius(20)
-            .shadow(color: .black.opacity(0.12), radius: 16, x: 0, y: 4)
 
             // Search Suggestions (appears below card)
             if focusedField != nil && !searchService.searchResults.isEmpty {
@@ -175,12 +172,11 @@ struct RideLocationCardWithSearch: View {
                         handleSelection(result)
                     }
                 )
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .padding(.horizontal, 16)
         .onChange(of: focusedField) { newValue in
             if newValue == nil {
                 searchService.clearResults()

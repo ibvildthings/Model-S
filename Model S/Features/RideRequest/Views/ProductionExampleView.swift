@@ -137,233 +137,220 @@ struct RideRequestViewWithViewModel: View {
 
     var body: some View {
         ZStack {
-            // Map (managed by coordinator)
+            // Map (managed by coordinator) - Full screen hero element
             RideMapView(viewModel: coordinator.mapViewModel, configuration: RideRequestConfiguration.default)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                // Error Banner
+                // Error Banner - Compact top banner
                 if let error = coordinator.flowController.currentError {
                     ErrorBannerView(error: error, onDismiss: {
                         DispatchQueue.main.async {
                             coordinator.flowController.clearError()
                         }
                     })
-                    .padding(.top, 56)
+                    .padding(.top, 8)
+                    .padding(.horizontal, 16)
                     .transition(.move(edge: .top).combined(with: .opacity))
-                }
-
-                // Location Card with Autocomplete - Hide when status banner is showing
-                if !shouldShowStatusBanner {
-                    RideLocationCardWithSearch(
-                        pickupText: $pickupText,
-                        destinationText: $destinationText,
-                        focusedField: $focusedField,
-                        configuration: RideRequestConfiguration.default,
-                        userLocation: coordinator.mapViewModel.userLocation?.coordinate,
-                        onPickupTap: {
-                            focusedField = .pickup
-                            coordinator.didFocusPickup()
-                        },
-                        onDestinationTap: {
-                            focusedField = .destination
-                            coordinator.didFocusDestination()
-                        },
-                        onLocationSelected: { coordinate, name, isPickup in
-                            // Simplified - just call coordinator
-                            Task {
-                                await coordinator.selectLocation(coordinate: coordinate, name: name, isPickup: isPickup)
-                            }
-                        },
-                        onUseCurrentLocation: {
-                            handleUseCurrentLocation()
-                        }
-                    )
-                    .padding(.top, coordinator.flowController.currentError != nil ? 12 : 56)
-                    .transition(.move(edge: .top).combined(with: .opacity))
-
-                    // Route Info
-                    if let routeInfo = coordinator.flowController.routeInfo {
-                        RouteInfoView(
-                            travelTime: formatTravelTime(routeInfo.estimatedTravelTime),
-                            distance: formatDistance(routeInfo.distance)
-                        )
-                        .padding(.top, 12)
-                        .transition(.move(edge: .top).combined(with: .opacity))
-                    }
                 }
 
                 Spacer()
-            }
 
-            // Confirm Slider (managed by coordinator)
-            if coordinator.shouldShowConfirmSlider {
-                VStack {
-                    Spacer()
-
-                    RideConfirmSlider(
-                        configuration: RideRequestConfiguration.default,
-                        onConfirmRide: handleConfirmRide
-                    )
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 32)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-
-            // TEMPORARY: Quick Test Button - Remove before production
-            if !shouldShowStatusBanner && !coordinator.shouldShowConfirmSlider {
-                VStack {
-                    Spacer()
-
-                    Button(action: fillTestLocations) {
-                        HStack(spacing: 8) {
-                            Image(systemName: "bolt.fill")
-                                .font(.system(size: 14))
-                            Text("Quick Test Locations")
-                                .font(.system(size: 14, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(Color.orange)
-                        .cornerRadius(12)
-                        .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
-                    }
-                    .padding(.bottom, 40)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-            }
-
-            // Status Banner - Shows different states of ride request
-            if shouldShowStatusBanner {
-                VStack(spacing: 0) {
-                    VStack(spacing: 16) {
-                        // Status Header
-                        HStack(spacing: 12) {
-                            switch coordinator.flowController.legacyState {
-                            case .searchingForDriver, .rideRequested:
-                                ProgressView()
-                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                    .scaleEffect(1.1)
-                            case .driverFound:
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                    .font(.system(size: 28))
-                            case .driverEnRoute:
-                                Image(systemName: "car.fill")
-                                    .foregroundColor(.white)
-                                    .font(.system(size: 24))
-                            case .driverArriving:
-                                Image(systemName: "hand.wave.fill")
-                                    .foregroundColor(.yellow)
-                                    .font(.system(size: 24))
-                            case .rideInProgress:
-                                Image(systemName: "figure.seated.side.automatic")
-                                    .foregroundColor(.blue)
-                                    .font(.system(size: 24))
-                            case .approachingDestination:
-                                Image(systemName: "location.fill")
-                                    .foregroundColor(.green)
-                                    .font(.system(size: 24))
-                            case .rideCompleted:
-                                Image(systemName: "checkmark.seal.fill")
-                                    .foregroundColor(.green)
-                                    .font(.system(size: 28))
-                            default:
-                                EmptyView()
-                            }
-
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(statusBannerTitle)
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-
-                                if let subtitle = statusBannerSubtitle {
-                                    Text(subtitle)
-                                        .font(.subheadline)
-                                        .foregroundColor(.white.opacity(0.9))
-                                }
-                            }
-
-                            Spacer()
-                        }
-
-                        // Driver Info (when found)
-                        if let driver = coordinator.flowController.driver,
-                           coordinator.flowController.legacyState != .searchingForDriver {
-                            Divider()
-                                .background(Color.white.opacity(0.3))
-
+                // Bottom Sheet - Main interaction area
+                if !shouldShowStatusBanner {
+                    VStack(spacing: 0) {
+                        // Route Info - Compact banner above card when available
+                        if let routeInfo = coordinator.flowController.routeInfo {
                             HStack(spacing: 12) {
-                                // Driver avatar placeholder
-                                Circle()
-                                    .fill(Color.gray.opacity(0.3))
-                                    .frame(width: 56, height: 56)
-                                    .overlay(
-                                        Image(systemName: "person.fill")
-                                            .foregroundColor(.white.opacity(0.7))
-                                            .font(.system(size: 24))
-                                    )
+                                HStack(spacing: 6) {
+                                    Image(systemName: "clock.fill")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.blue)
+                                    Text(formatTravelTime(routeInfo.estimatedTravelTime))
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
+                                }
 
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(driver.name)
-                                        .font(.headline)
-                                        .foregroundColor(.white)
+                                Divider()
+                                    .frame(height: 16)
 
-                                    HStack(spacing: 8) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "star.fill")
-                                                .foregroundColor(.yellow)
-                                                .font(.system(size: 12))
-                                            Text(String(format: "%.1f", driver.rating))
-                                                .font(.subheadline)
-                                                .foregroundColor(.white.opacity(0.9))
-                                        }
-
-                                        Text("•")
-                                            .foregroundColor(.white.opacity(0.5))
-
-                                        Text("\(driver.vehicleColor) \(driver.vehicleMake) \(driver.vehicleModel)")
-                                            .font(.subheadline)
-                                            .foregroundColor(.white.opacity(0.9))
-                                            .lineLimit(1)
-                                    }
-
-                                    Text(driver.licensePlate)
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                        .foregroundColor(.white.opacity(0.7))
+                                HStack(spacing: 6) {
+                                    Image(systemName: "arrow.triangle.swap")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.blue)
+                                    Text(formatDistance(routeInfo.distance))
+                                        .font(.subheadline)
+                                        .fontWeight(.semibold)
                                 }
 
                                 Spacer()
                             }
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(.ultraThinMaterial)
+                            .cornerRadius(12)
+                            .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, 8)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
                         }
 
-                        // Cancel Button
+                        // Location Card - Now at bottom
+                        RideLocationCardWithSearch(
+                            pickupText: $pickupText,
+                            destinationText: $destinationText,
+                            focusedField: $focusedField,
+                            configuration: RideRequestConfiguration.default,
+                            userLocation: coordinator.mapViewModel.userLocation?.coordinate,
+                            onPickupTap: {
+                                focusedField = .pickup
+                                coordinator.didFocusPickup()
+                            },
+                            onDestinationTap: {
+                                focusedField = .destination
+                                coordinator.didFocusDestination()
+                            },
+                            onLocationSelected: { coordinate, name, isPickup in
+                                Task {
+                                    await coordinator.selectLocation(coordinate: coordinate, name: name, isPickup: isPickup)
+                                }
+                            },
+                            onUseCurrentLocation: {
+                                handleUseCurrentLocation()
+                            }
+                        )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+
+                        // Confirm Slider - Integrated into bottom card
+                        if coordinator.shouldShowConfirmSlider {
+                            RideConfirmSlider(
+                                configuration: RideRequestConfiguration.default,
+                                onConfirmRide: handleConfirmRide
+                            )
+                            .padding(.horizontal, 32)
+                            .padding(.top, 16)
+                            .padding(.bottom, 8)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+
+                        // TEMPORARY: Quick Test Button
+                        if !coordinator.shouldShowConfirmSlider {
+                            Button(action: fillTestLocations) {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "bolt.fill")
+                                        .font(.system(size: 13))
+                                    Text("Quick Test")
+                                        .font(.system(size: 13, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 10)
+                                .background(Color.orange)
+                                .cornerRadius(10)
+                            }
+                            .padding(.top, 12)
+                            .padding(.bottom, 8)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(20, corners: [.topLeft, .topRight])
+                    .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: -5)
+                    .padding(.bottom, -8) // Extend slightly beyond safe area
+                }
+            }
+
+            // Compact Status Banner at Top
+            if shouldShowStatusBanner {
+                VStack(spacing: 0) {
+                    HStack(spacing: 12) {
+                        // Status Icon
+                        Group {
+                            switch coordinator.flowController.legacyState {
+                            case .searchingForDriver, .rideRequested:
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .blue))
+                                    .scaleEffect(0.9)
+                            case .driverFound, .rideCompleted:
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .font(.system(size: 20))
+                            case .driverEnRoute, .driverArriving:
+                                Image(systemName: "car.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 18))
+                            case .rideInProgress, .approachingDestination:
+                                Image(systemName: "figure.walk")
+                                    .foregroundColor(.blue)
+                                    .font(.system(size: 18))
+                            default:
+                                EmptyView()
+                            }
+                        }
+
+                        // Status Text
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(statusBannerTitle)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+
+                            if let subtitle = statusBannerSubtitle {
+                                Text(subtitle)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        // Driver Info - Compact
+                        if let driver = coordinator.flowController.driver,
+                           coordinator.flowController.legacyState != .searchingForDriver {
+                            HStack(spacing: 8) {
+                                VStack(alignment: .trailing, spacing: 2) {
+                                    Text(driver.name)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "star.fill")
+                                            .foregroundColor(.yellow)
+                                            .font(.system(size: 10))
+                                        Text(String(format: "%.1f", driver.rating))
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+
+                                Circle()
+                                    .fill(Color.gray.opacity(0.2))
+                                    .frame(width: 36, height: 36)
+                                    .overlay(
+                                        Image(systemName: "person.fill")
+                                            .foregroundColor(.gray)
+                                            .font(.system(size: 16))
+                                    )
+                            }
+                        }
+
+                        // Cancel Button - Icon only
                         if coordinator.flowController.legacyState == .searchingForDriver ||
                            coordinator.flowController.legacyState == .rideRequested {
                             Button(action: {
                                 coordinator.cancelRideRequest()
                             }) {
-                                Text("Cancel Request")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .frame(height: 48)
-                                    .background(Color.red)
-                                    .cornerRadius(12)
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 24))
+                                    .foregroundColor(.red)
                             }
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 20)
-                    .background(.ultraThinMaterial)
-                    .cornerRadius(20)
-                    .shadow(color: .black.opacity(0.15), radius: 16, x: 0, y: 4)
                     .padding(.horizontal, 16)
-                    .padding(.top, 56)
+                    .padding(.vertical, 12)
+                    .background(.ultraThinMaterial)
+                    .cornerRadius(16)
+                    .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
 
                     Spacer()
                 }
@@ -595,6 +582,28 @@ struct RideRequestViewWithViewModel: View {
     private func formatDistance(_ meters: Double) -> String {
         let miles = meters / 1609.34
         return String(format: "%.1f mi", miles)
+    }
+}
+
+// MARK: - View Extensions
+
+extension View {
+    func cornerRadius(_ radius: CGFloat, corners: UIRectCorner) -> some View {
+        clipShape(RoundedCorner(radius: radius, corners: corners))
+    }
+}
+
+struct RoundedCorner: Shape {
+    var radius: CGFloat = .infinity
+    var corners: UIRectCorner = .allCorners
+
+    func path(in rect: CGRect) -> Path {
+        let path = UIBezierPath(
+            roundedRect: rect,
+            byRoundingCorners: corners,
+            cornerRadii: CGSize(width: radius, height: radius)
+        )
+        return Path(path.cgPath)
     }
 }
 
