@@ -7,7 +7,7 @@ import Foundation
 import CoreLocation
 
 /// Represents the current state of a driver
-enum DriverState: Equatable {
+indirect enum DriverState: Equatable {
     /// Driver is offline (not logged in)
     case offline
 

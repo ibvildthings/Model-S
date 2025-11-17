@@ -45,7 +45,7 @@ class DriverAPIClient {
 
         let payload = DriverLoginPayload(
             driverId: driverId,
-            location: LocationPayload(lat: location.latitude, lng: location.longitude)
+            location: LocationPayload(lat: location.latitude, lng: location.longitude, address: nil)
         )
 
         request.httpBody = try JSONEncoder().encode(payload)
@@ -120,7 +120,7 @@ class DriverAPIClient {
         request.httpMethod = "PUT"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
-        let payload = LocationPayload(lat: location.latitude, lng: location.longitude)
+        let payload = LocationPayload(lat: location.latitude, lng: location.longitude, address: nil)
         request.httpBody = try JSONEncoder().encode(payload)
 
         let (_, response) = try await performRequestWithRetry(maxRetries: 1) {
@@ -296,10 +296,10 @@ struct DriverLoginPayload: Codable {
 
 struct DriverLoginResponse: Codable {
     let success: Bool
-    let driver: DriverInfoResponse
-    let session: SessionResponse
+    let driver: DriverInfo
+    let session: SessionInfo
 
-    struct DriverInfoResponse: Codable {
+    struct DriverInfo: Codable {
         let id: String
         let name: String
         let vehicleType: String
@@ -310,7 +310,7 @@ struct DriverLoginResponse: Codable {
         let available: Bool
     }
 
-    struct SessionResponse: Codable {
+    struct SessionInfo: Codable {
         let loginTime: String
         let totalEarnings: Double
         let completedRides: Int
@@ -321,27 +321,15 @@ struct AvailabilityPayload: Codable {
     let available: Bool
 }
 
-struct LocationPayload: Codable {
-    let lat: Double
-    let lng: Double
-    let address: String?
-
-    init(lat: Double, lng: Double, address: String? = nil) {
-        self.lat = lat
-        self.lng = lng
-        self.address = address
-    }
-}
-
 struct RideStatusPayload: Codable {
     let status: String
 }
 
 struct DriverStatsResponse: Codable {
-    let driver: DriverInfoResponse
+    let driver: BasicDriverInfo
     let stats: StatsInfo
 
-    struct DriverInfoResponse: Codable {
+    struct BasicDriverInfo: Codable {
         let id: String
         let name: String
         let rating: Double
