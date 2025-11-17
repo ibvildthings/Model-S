@@ -16,14 +16,15 @@ struct Model_SApp: App {
         // Initialize Google Maps SDK if available
         #if canImport(GoogleMaps)
         if let apiKey = MapServiceConfiguration.google.apiKey,
-           apiKey != "YOUR_GOOGLE_MAPS_API_KEY" {
+           apiKey != "YOUR_GOOGLE_MAPS_API_KEY" && !apiKey.isEmpty {
             GMSServices.provideAPIKey(apiKey)
-            print("✅ Google Maps SDK initialized")
+            print("✅ Google Maps SDK initialized with key: \(String(apiKey.prefix(10)))...")
 
             // Configure to use Google Maps
             MapProviderManager.shared.useGoogleMaps()
         } else {
             print("⚠️ Google Maps API key not configured - using Apple Maps")
+            print("💡 Add your API key in MapServiceProtocols.swift line 146")
             MapProviderManager.shared.useAppleMaps()
         }
         #else
