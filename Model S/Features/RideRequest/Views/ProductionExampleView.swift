@@ -12,61 +12,21 @@ import MapKit
 /// Example of how to integrate RideRequestView in a production app
 /// with all production-ready features enabled
 struct ProductionExampleView: View {
-    @State private var showRideRequest = true
+    @ObservedObject var coordinator: RideRequestCoordinator
+    var onRideConfirmed: (LocationPoint, LocationPoint, RouteInfo?) -> Void
+    var onCancel: () -> Void
 
     var body: some View {
-        ZStack {
-            if showRideRequest {
-                // Production-ready RideRequestView with full integration
-                RideRequestViewWithViewModel(
-                    configuration: productionConfig,
-                    onRideConfirmed: handleRideConfirmed,
-                    onCancel: {
-                        showRideRequest = false
-                    }
-                )
-            } else {
-                // Your main app UI
-                MainAppPlaceholder(onRequestRide: {
-                    showRideRequest = true
-                })
-            }
-        }
-    }
-
-    private var productionConfig: RideRequestConfiguration {
-        var config = RideRequestConfiguration.default
-        config.enableGeocoding = true
-        config.enableRouteCalculation = true
-        config.enableValidation = true
-        config.showRouteInfo = true
-        config.showErrorBanner = true
-        return config
-    }
-
-    private func handleRideConfirmed(pickup: LocationPoint, destination: LocationPoint, route: RouteInfo?) {
-        // In production, you would:
-        // 1. Submit ride request to your backend
-        // 2. Start driver search
-        // 3. Navigate to ride tracking screen
-
-        print("Ride confirmed!")
-        print("Pickup: \(pickup.name ?? "Unknown"), \(pickup.coordinate)")
-        print("Destination: \(destination.name ?? "Unknown"), \(destination.coordinate)")
-
-        if let route = route {
-            let minutes = Int(route.estimatedTravelTime / 60)
-            let miles = route.distance / 1609.34
-            print("ETA: \(minutes) min, Distance: \(String(format: "%.1f mi", miles))")
-        }
-
-        // Save ride to history
-        saveRideToHistory(pickup: pickup, destination: destination, route: route)
-
-        // Example: Send to backend
-        // Task {
-        //     await submitRideRequest(pickup: pickup, destination: destination)
-        // }
+        RideRequestViewWithViewModel(
+            coordinator: coordinator,
+            onRideConfirmed: { pickup, destination, route in
+                // Save ride to history
+                saveRideToHistory(pickup: pickup, destination: destination, route: route)
+                // Forward to parent
+                onRideConfirmed(pickup, destination, route)
+            },
+            onCancel: onCancel
+        )
     }
 
     private func saveRideToHistory(pickup: LocationPoint, destination: LocationPoint, route: RouteInfo?) {
@@ -93,28 +53,10 @@ struct ProductionExampleView: View {
     }
 }
 
-/// Placeholder for main app UI
-struct MainAppPlaceholder: View {
-    let onRequestRide: () -> Void
-
-    var body: some View {
-        VStack {
-            Text("Your App")
-                .font(.largeTitle)
-                .fontWeight(.bold)
-
-            Button("Request a Ride") {
-                onRequestRide()
-            }
-            .buttonStyle(.borderedProminent)
-        }
-    }
-}
-
 /// Enhanced RideRequestView that integrates with RideRequestViewModel
 /// SIMPLIFIED using RideRequestCoordinator for all business logic
 struct RideRequestViewWithViewModel: View {
-    @StateObject private var coordinator: RideRequestCoordinator
+    @ObservedObject var coordinator: RideRequestCoordinator
     @State private var pickupText: String
     @State private var destinationText = ""
     @FocusState private var focusedField: RideLocationCard.LocationField?
@@ -124,13 +66,13 @@ struct RideRequestViewWithViewModel: View {
     var onCancel: () -> Void
 
     init(
-        configuration: RideRequestConfiguration = .default,
+        coordinator: RideRequestCoordinator,
         onRideConfirmed: @escaping (LocationPoint, LocationPoint, RouteInfo?) -> Void,
         onCancel: @escaping () -> Void
     ) {
-        // Create coordinator with configuration
-        self._coordinator = StateObject(wrappedValue: RideRequestCoordinator(configuration: configuration))
-        self._pickupText = State(initialValue: configuration.defaultPickupText as String)
+        // Use existing coordinator (state persists across navigation)
+        self.coordinator = coordinator
+        self._pickupText = State(initialValue: "Current Location")
         self.onRideConfirmed = onRideConfirmed
         self.onCancel = onCancel
     }
@@ -586,5 +528,10 @@ struct RideRequestViewWithViewModel: View {
 }
 
 #Preview {
-    ProductionExampleView()
+    @Previewable @StateObject var coordinator = RideRequestCoordinator(configuration: .default)
+    ProductionExampleView(
+        coordinator: coordinator,
+        onRideConfirmed: { _, _, _ in },
+        onCancel: { }
+    )
 }
