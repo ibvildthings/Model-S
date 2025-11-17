@@ -76,7 +76,7 @@ protocol RouteCalculationService {
 /// Enum to specify which map provider to use
 enum MapProvider {
     case apple
-    case google // Future implementation
+    case google
 }
 
 /// Configuration for map services
@@ -84,7 +84,19 @@ struct MapServiceConfiguration {
     let provider: MapProvider
     let apiKey: String? // For Google Maps
 
-    static let `default` = MapServiceConfiguration(provider: .apple, apiKey: nil)
+    /// Apple Maps configuration (no API key required)
+    static let apple = MapServiceConfiguration(provider: .apple, apiKey: nil)
+
+    /// Google Maps configuration with API key
+    /// Note: Replace with your actual Google Maps API key
+    static let google = MapServiceConfiguration(
+        provider: .google,
+        apiKey: "YOUR_GOOGLE_MAPS_API_KEY" // Replace with actual API key
+    )
+
+    /// Default configuration - now uses Google Maps
+    /// Switch to .apple if you prefer Apple Maps
+    static let `default` = google
 }
 
 // MARK: - Map Service Factory
@@ -111,8 +123,10 @@ class MapServiceFactory {
         case .apple:
             return AppleLocationSearchService()
         case .google:
-            fatalError("Google Maps not yet implemented. Coming soon!")
-            // return GoogleLocationSearchService(apiKey: configuration.apiKey!)
+            guard let apiKey = configuration.apiKey else {
+                fatalError("Google Maps API key is required. Please configure MapServiceConfiguration with a valid API key.")
+            }
+            return GoogleLocationSearchService(apiKey: apiKey)
         }
     }
 
@@ -122,8 +136,10 @@ class MapServiceFactory {
         case .apple:
             return AppleGeocodingService()
         case .google:
-            fatalError("Google Maps not yet implemented. Coming soon!")
-            // return GoogleGeocodingService(apiKey: configuration.apiKey!)
+            guard let apiKey = configuration.apiKey else {
+                fatalError("Google Maps API key is required. Please configure MapServiceConfiguration with a valid API key.")
+            }
+            return GoogleGeocodingService(apiKey: apiKey)
         }
     }
 
@@ -133,8 +149,10 @@ class MapServiceFactory {
         case .apple:
             return AppleRouteCalculationService()
         case .google:
-            fatalError("Google Maps not yet implemented. Coming soon!")
-            // return GoogleRouteCalculationService(apiKey: configuration.apiKey!)
+            guard let apiKey = configuration.apiKey else {
+                fatalError("Google Maps API key is required. Please configure MapServiceConfiguration with a valid API key.")
+            }
+            return GoogleRouteCalculationService(apiKey: apiKey)
         }
     }
 }
