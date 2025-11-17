@@ -143,7 +143,7 @@ struct MapServiceConfiguration {
     /// Note: Replace with your actual Google Maps API key
     static let google = MapServiceConfiguration(
         provider: .google,
-        apiKey: "YOUR_GOOGLE_MAPS_API_KEY" // Replace with actual API key
+        apiKey: "AIzaSyBia66kN2xuED5s6Vx6F-NeSdrjxD7xLC0" // Replace with actual API key
     )
 
     /// Default configuration - now uses Google Maps

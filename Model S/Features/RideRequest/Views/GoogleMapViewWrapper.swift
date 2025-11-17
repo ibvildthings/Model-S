@@ -29,20 +29,71 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
     var routeLineWidth: CGFloat
 
     func makeUIView(context: Context) -> GMSMapView {
-        // Create Google Maps view
+        // Create camera position
         let camera = GMSCameraPosition.camera(
             withLatitude: region.center.latitude,
             longitude: region.center.longitude,
             zoom: zoomLevelFromSpan(region.span)
         )
-        let mapView = GMSMapView.map(withFrame: .zero, camera: camera)
+
+        // Create Google Maps view using modern initializer
+        let mapView = GMSMapView(frame: .zero)
+        mapView.camera = camera
         mapView.delegate = context.coordinator
+
+        // Explicitly set map type to ensure tiles load
+        mapView.mapType = .normal
+
+        // Enable location if requested
         mapView.isMyLocationEnabled = showsUserLocation
+
+        // Enable gestures
         mapView.settings.rotateGestures = true
         mapView.settings.zoomGestures = true
         mapView.settings.scrollGestures = true
+        mapView.settings.myLocationButton = true
+
+        // Debug logging
+        print("🗺️ Google Maps view created")
+        print("   📍 Location: \(region.center.latitude), \(region.center.longitude)")
+        print("   🔍 Zoom: \(zoomLevelFromSpan(region.span))")
+        print("   🗺️ Map type: normal")
+        print("")
+        print("⏳ Waiting for map tiles to load...")
+        print("   If tiles don't load, check Google Cloud Console:")
+        print("   1. Billing enabled? (MOST COMMON ISSUE)")
+        print("   2. 'Maps SDK for iOS' enabled? (not just 'Maps SDK')")
+        print("   3. API key restrictions correct?")
 
         context.coordinator.mapView = mapView
+
+        // Set a timer to check if tiles loaded after 3 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak coordinator = context.coordinator] in
+            guard let coordinator = coordinator else { return }
+
+            if !coordinator.tilesLoaded {
+                print("")
+                print("⚠️ WARNING: Map tiles have NOT loaded after 3 seconds")
+                print("   You should only see a blue dot (your location)")
+                print("   No map tiles = Google Cloud Console issue")
+                print("")
+                print("🔧 SOLUTION - Go to Google Cloud Console:")
+                print("")
+                print("   Step 1: Enable Billing (99% of the time this is the issue)")
+                print("   https://console.cloud.google.com/billing")
+                print("   Even the free tier requires a billing account!")
+                print("")
+                print("   Step 2: Enable 'Maps SDK for iOS' API")
+                print("   https://console.cloud.google.com/apis/library/maps-ios-backend.googleapis.com")
+                print("   Click 'Enable' button")
+                print("")
+                print("   Step 3: Check API Key Restrictions")
+                print("   https://console.cloud.google.com/apis/credentials")
+                print("   Set to 'None' for testing")
+                print("")
+            }
+        }
+
         return mapView
     }
 
@@ -98,6 +149,7 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
         private var driverMarker: GMSMarker?
         private var currentPolyline: GMSPolyline?
         private var currentDisplayMode: RouteDisplayMode?
+        fileprivate var tilesLoaded = false
 
         init(_ parent: GoogleMapViewWrapper) {
             self.parent = parent
@@ -217,6 +269,43 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
             DispatchQueue.main.async {
                 self.parent.region = region
                 self.isUserInteracting = false
+            }
+        }
+
+        func mapViewDidFinishTileRendering(_ mapView: GMSMapView) {
+            if !tilesLoaded {
+                tilesLoaded = true
+                print("")
+                print("✅ Google Maps tiles finished rendering successfully!")
+                print("   Map is now fully loaded and visible")
+            }
+        }
+
+        func mapView(_ mapView: GMSMapView, didFailLoadingMapWithError error: Error) {
+            print("")
+            print("❌ Google Maps FAILED to load map tiles")
+            print("   Error: \(error.localizedDescription)")
+            print("")
+            print("🔧 How to fix this:")
+            print("   1. Go to: https://console.cloud.google.com/billing")
+            print("      ➜ Enable billing for your project (REQUIRED even for free tier)")
+            print("")
+            print("   2. Go to: https://console.cloud.google.com/apis/library")
+            print("      ➜ Search: 'Maps SDK for iOS'")
+            print("      ➜ Click: Enable (make sure it's iOS, not JavaScript)")
+            print("")
+            print("   3. Go to: https://console.cloud.google.com/apis/credentials")
+            print("      ➜ Click your API key")
+            print("      ➜ Application restrictions: Set to 'None' for testing")
+            print("      ➜ Or add bundle ID: com.degenrides.Model-S")
+            print("")
+        }
+
+        func mapView(_ mapView: GMSMapView, didTapAt coordinate: CLLocationCoordinate2D) {
+            if !tilesLoaded {
+                print("")
+                print("⚠️ Map tapped but tiles haven't loaded yet")
+                print("   This confirms tiles are not loading from Google")
             }
         }
 
