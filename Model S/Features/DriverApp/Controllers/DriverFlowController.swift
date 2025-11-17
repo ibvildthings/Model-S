@@ -194,16 +194,16 @@ class DriverFlowController: NSObject, ObservableObject {
         rideOfferExpiryTask?.cancel()
 
         do {
-            // Accept ride on backend
-            try await apiClient.acceptRide(driverId: driverId, rideId: request.rideId)
+            // Accept ride on backend and get passenger info
+            let passengerInfo = try await apiClient.acceptRide(driverId: driverId, rideId: request.rideId)
 
             // Create active ride from request
             let activeRide = ActiveRide(
                 rideId: request.rideId,
                 pickup: request.pickup,
                 destination: request.destination,
-                passenger: ActiveRide.PassengerInfo(
-                    name: "Passenger", // Would come from backend
+                passenger: passengerInfo ?? ActiveRide.PassengerInfo(
+                    name: "Passenger", // Fallback if backend doesn't provide info
                     rating: 4.8,
                     phoneNumber: nil
                 ),

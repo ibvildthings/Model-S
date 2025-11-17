@@ -136,14 +136,14 @@ class DriverAPIClient {
     // MARK: - Ride Management
 
     /// Accept a ride request
-    func acceptRide(driverId: String, rideId: String) async throws {
+    func acceptRide(driverId: String, rideId: String) async throws -> ActiveRide.PassengerInfo? {
         print("📤 Accepting ride: \(rideId)")
 
         let url = URL(string: "\(baseURL)/api/drivers/\(driverId)/rides/\(rideId)/accept")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
 
-        let (_, response) = try await performRequestWithRetry {
+        let (data, response) = try await performRequestWithRetry {
             try await self.session.data(for: request)
         }
 
@@ -152,7 +152,28 @@ class DriverAPIClient {
             throw DriverAPIError.rideAcceptFailed
         }
 
+        // Try to parse passenger info from simulated ride response
+        do {
+            let acceptResponse = try JSONDecoder().decode(RideAcceptResponse.self, from: data)
+
+            if let rideInfo = acceptResponse.ride {
+                // Convert rating string to double
+                let rating = Double(rideInfo.passenger.rating) ?? 4.8
+
+                print("✅ Ride accepted successfully with passenger: \(rideInfo.passenger.name)")
+
+                return ActiveRide.PassengerInfo(
+                    name: rideInfo.passenger.name,
+                    rating: rating,
+                    phoneNumber: rideInfo.passenger.phone
+                )
+            }
+        } catch {
+            print("⚠️ Could not parse passenger info, using defaults: \(error)")
+        }
+
         print("✅ Ride accepted successfully")
+        return nil
     }
 
     /// Reject a ride request

@@ -5,11 +5,19 @@
 
 const express = require('express');
 const driverPool = require('../services/driverPool');
+const rideRequestSimulator = require('../services/rideRequestSimulator');
+const { v4: uuidv4 } = require('uuid');
 
 const router = express.Router();
 
 // In-memory driver sessions (replace with database in production)
 const driverSessions = new Map(); // driverId -> session data
+
+// Simulated ride offers for driver testing
+const simulatedRideOffers = new Map(); // driverId -> current simulated offer
+
+// Active simulated rides
+const activeSimulatedRides = new Map(); // rideId -> { driverId, pickup, destination, status, passenger }
 
 /**
  * POST /api/drivers/login
@@ -57,6 +65,18 @@ router.post('/login', async (req, res) => {
 
     console.log(`🚗 Driver ${driver.name} logged in`);
 
+    // Start simulated ride request generator for driver testing
+    rideRequestSimulator.startSimulation(driverId, (rideRequest) => {
+      // Store the simulated offer for this driver
+      const offer = {
+        rideId: uuidv4(),
+        ...rideRequest,
+        simulated: true
+      };
+      simulatedRideOffers.set(driverId, offer);
+      console.log(`📲 Simulated offer sent to driver ${driver.name}`);
+    });
+
     res.json({
       success: true,
       driver: driver.toJSON(),
@@ -92,6 +112,12 @@ router.post('/:driverId/logout', (req, res) => {
 
   // Make driver unavailable
   driver.available = false;
+
+  // Stop ride request simulator
+  rideRequestSimulator.stopSimulation(driverId);
+
+  // Clear any simulated offers
+  simulatedRideOffers.delete(driverId);
 
   // Get session data
   const session = driverSessions.get(driverId);
@@ -198,19 +224,29 @@ router.get('/:driverId/offers', (req, res) => {
     });
   }
 
-  // Import rides module to check for pending offers
+  // First check for real ride offers from passengers
   const { getPendingOfferForDriver } = require('./rides');
-  const offer = getPendingOfferForDriver(driverId);
+  const realOffer = getPendingOfferForDriver(driverId);
 
-  if (offer) {
+  if (realOffer) {
+    // Real ride offer takes priority
     res.json({
       hasOffer: true,
-      offer
+      offer: realOffer
     });
   } else {
-    res.json({
-      hasOffer: false
-    });
+    // Fall back to simulated offer for driver testing
+    const simulatedOffer = simulatedRideOffers.get(driverId);
+    if (simulatedOffer) {
+      res.json({
+        hasOffer: true,
+        offer: simulatedOffer
+      });
+    } else {
+      res.json({
+        hasOffer: false
+      });
+    }
   }
 });
 
@@ -243,25 +279,76 @@ router.post('/:driverId/rides/:rideId/accept', (req, res) => {
     });
   }
 
-  // Get the ride and assign driver
-  const { assignDriverToRide } = require('./rides');
-  const success = assignDriverToRide(rideId, driver);
+  // Check if this is a simulated offer
+  const simulatedOffer = simulatedRideOffers.get(driverId);
+  const isSimulated = simulatedOffer && simulatedOffer.rideId === rideId;
 
-  if (!success) {
-    return res.status(400).json({
-      error: 'Failed to assign driver to ride',
-      message: 'Ride may no longer be available'
+  if (isSimulated) {
+    // Handle simulated ride acceptance
+    console.log(`✅ Driver ${driver.name} accepted SIMULATED ride ${rideId}`);
+
+    // Stop generating new offers while driver has active ride
+    rideRequestSimulator.stopSimulation(driverId);
+
+    // Clear the current offer
+    simulatedRideOffers.delete(driverId);
+
+    // Create passenger info for simulated ride
+    const passengerNames = ['Sarah Johnson', 'Mike Chen', 'Emily Rodriguez', 'James Brown', 'Lisa Wang'];
+    const passengerName = passengerNames[Math.floor(Math.random() * passengerNames.length)];
+
+    // Create active simulated ride
+    const simulatedRide = {
+      rideId,
+      driverId,
+      pickup: simulatedOffer.pickup,
+      destination: simulatedOffer.destination,
+      distance: simulatedOffer.distance,
+      estimatedEarnings: simulatedOffer.estimatedEarnings,
+      status: 'accepted',
+      passenger: {
+        id: uuidv4(),
+        name: passengerName,
+        phone: '+1 (555) ' + Math.floor(Math.random() * 900 + 100) + '-' + Math.floor(Math.random() * 9000 + 1000),
+        rating: (Math.random() * 0.5 + 4.5).toFixed(1) // 4.5-5.0 rating
+      },
+      acceptedAt: new Date()
+    };
+
+    activeSimulatedRides.set(rideId, simulatedRide);
+
+    // Assign ride to driver
+    driver.assignRide(rideId);
+
+    res.json({
+      success: true,
+      message: 'Simulated ride accepted',
+      rideId,
+      driver: driver.toJSON(),
+      ride: simulatedRide
+    });
+
+  } else {
+    // Handle real ride acceptance
+    const { assignDriverToRide } = require('./rides');
+    const success = assignDriverToRide(rideId, driver);
+
+    if (!success) {
+      return res.status(400).json({
+        error: 'Failed to assign driver to ride',
+        message: 'Ride may no longer be available'
+      });
+    }
+
+    console.log(`✅ Driver ${driver.name} accepted REAL ride ${rideId}`);
+
+    res.json({
+      success: true,
+      message: 'Ride accepted',
+      rideId,
+      driver: driver.toJSON()
     });
   }
-
-  console.log(`✅ Driver ${driver.name} accepted ride ${rideId}`);
-
-  res.json({
-    success: true,
-    message: 'Ride accepted',
-    rideId,
-    driver: driver.toJSON()
-  });
 });
 
 /**
@@ -321,29 +408,73 @@ router.put('/:driverId/rides/:rideId/status', (req, res) => {
 
   console.log(`📍 Driver ${driver.name} updated ride ${rideId} status to: ${status}`);
 
-  // Update the actual ride status
-  const { updateRideStatus } = require('./rides');
-  updateRideStatus(rideId, status);
+  // Check if this is a simulated ride
+  const simulatedRide = activeSimulatedRides.get(rideId);
 
-  // If ride completed, update session
-  if (status === 'completed') {
-    driver.completeRide();
+  if (simulatedRide) {
+    // Update simulated ride status
+    simulatedRide.status = status;
 
-    const session = driverSessions.get(driverId);
-    if (session) {
-      session.completedRides += 1;
-      session.totalEarnings += calculateFare(); // Simple fare calculation
+    // If ride completed, clean up and restart simulator
+    if (status === 'completed') {
+      driver.completeRide();
+
+      const session = driverSessions.get(driverId);
+      if (session) {
+        session.completedRides += 1;
+        session.totalEarnings += simulatedRide.estimatedEarnings;
+      }
+
+      // Remove completed simulated ride
+      activeSimulatedRides.delete(rideId);
+
+      // Restart ride request simulator for next ride
+      rideRequestSimulator.startSimulation(driverId, (rideRequest) => {
+        const offer = {
+          rideId: uuidv4(),
+          ...rideRequest,
+          simulated: true
+        };
+        simulatedRideOffers.set(driverId, offer);
+        console.log(`📲 New simulated offer sent to driver ${driver.name}`);
+      });
+
+      console.log(`✅ Driver ${driver.name} completed SIMULATED ride ${rideId}, earned $${simulatedRide.estimatedEarnings}`);
     }
 
-    console.log(`✅ Driver ${driver.name} completed ride ${rideId}`);
-  }
+    res.json({
+      success: true,
+      status,
+      rideId,
+      driver: driver.toJSON(),
+      ride: simulatedRide
+    });
 
-  res.json({
-    success: true,
-    status,
-    rideId,
-    driver: driver.toJSON()
-  });
+  } else {
+    // Update real ride status
+    const { updateRideStatus } = require('./rides');
+    updateRideStatus(rideId, status);
+
+    // If ride completed, update session
+    if (status === 'completed') {
+      driver.completeRide();
+
+      const session = driverSessions.get(driverId);
+      if (session) {
+        session.completedRides += 1;
+        session.totalEarnings += calculateFare(); // Simple fare calculation
+      }
+
+      console.log(`✅ Driver ${driver.name} completed REAL ride ${rideId}`);
+    }
+
+    res.json({
+      success: true,
+      status,
+      rideId,
+      driver: driver.toJSON()
+    });
+  }
 });
 
 /**

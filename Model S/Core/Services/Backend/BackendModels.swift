@@ -48,6 +48,33 @@ struct LocationResponse: Codable, Sendable {
     let lng: Double
 }
 
+// MARK: - Driver Ride Accept Response
+
+struct RideAcceptResponse: Codable, Sendable {
+    let success: Bool
+    let message: String
+    let rideId: String
+    let ride: SimulatedRideInfo?
+}
+
+struct SimulatedRideInfo: Codable, Sendable {
+    let rideId: String
+    let driverId: String
+    let pickup: LocationPayload
+    let destination: LocationPayload
+    let distance: Double
+    let estimatedEarnings: Double
+    let status: String
+    let passenger: PassengerResponse
+}
+
+struct PassengerResponse: Codable, Sendable {
+    let id: String
+    let name: String
+    let phone: String
+    let rating: String
+}
+
 // MARK: - Error Response
 
 struct ErrorResponse: Codable, Sendable {
