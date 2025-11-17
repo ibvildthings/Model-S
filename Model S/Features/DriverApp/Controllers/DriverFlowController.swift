@@ -455,8 +455,8 @@ class DriverFlowController: ObservableObject {
 
                 let request = RideRequest(
                     rideId: offer.rideId,
-                    pickup: offer.pickup,
-                    destination: offer.destination,
+                    pickup: offer.pickup.toLocationPoint(),
+                    destination: offer.destination.toLocationPoint(),
                     distance: offer.distance,
                     estimatedEarnings: offer.estimatedEarnings,
                     expiresAt: ISO8601DateFormatter().date(from: offer.expiresAt) ?? Date().addingTimeInterval(30)
