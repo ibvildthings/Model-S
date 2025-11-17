@@ -209,7 +209,7 @@ struct DriverMapView: View {
     let isHeadingToPickup: Bool
 
     @State private var region: MKCoordinateRegion
-    @State private var annotations: [MapAnnotation] = []
+    @State private var annotations: [DriverMapMarker] = []
 
     init(currentRide: ActiveRide, isHeadingToPickup: Bool) {
         self.currentRide = currentRide
@@ -235,10 +235,10 @@ struct DriverMapView: View {
         ))
 
         // Initialize annotations
-        var newAnnotations: [MapAnnotation] = []
+        var newAnnotations: [DriverMapMarker] = []
 
         // Driver location
-        newAnnotations.append(MapAnnotation(
+        newAnnotations.append(DriverMapMarker(
             coordinate: currentRide.currentDriverLocation.coordinate,
             title: "You",
             type: .driver
@@ -246,7 +246,7 @@ struct DriverMapView: View {
 
         if isHeadingToPickup {
             // Show pickup location
-            newAnnotations.append(MapAnnotation(
+            newAnnotations.append(DriverMapMarker(
                 coordinate: currentRide.pickup.coordinate,
                 title: "Pickup",
                 subtitle: currentRide.pickup.name,
@@ -254,7 +254,7 @@ struct DriverMapView: View {
             ))
         } else {
             // Show destination
-            newAnnotations.append(MapAnnotation(
+            newAnnotations.append(DriverMapMarker(
                 coordinate: currentRide.destination.coordinate,
                 title: "Destination",
                 subtitle: currentRide.destination.name,
@@ -266,34 +266,34 @@ struct DriverMapView: View {
     }
 
     var body: some View {
-        Map(coordinateRegion: $region, annotationItems: annotations) { annotation in
-            MapAnnotation(coordinate: annotation.coordinate) {
-                AnnotationView(annotation: annotation)
+        Map(coordinateRegion: $region, annotationItems: annotations) { marker in
+            MapAnnotation(coordinate: marker.coordinate) {
+                DriverAnnotationView(marker: marker)
             }
         }
     }
 }
 
-// MARK: - Map Annotation Model
+// MARK: - Driver Map Marker
 
-struct MapAnnotation: Identifiable {
+struct DriverMapMarker: Identifiable {
     let id = UUID()
     let coordinate: CLLocationCoordinate2D
     let title: String
     var subtitle: String?
-    let type: AnnotationType
+    let type: MarkerType
 
-    enum AnnotationType {
+    enum MarkerType {
         case driver
         case pickup
         case destination
     }
 }
 
-// MARK: - Annotation View
+// MARK: - Driver Annotation View
 
-struct AnnotationView: View {
-    let annotation: MapAnnotation
+struct DriverAnnotationView: View {
+    let marker: DriverMapMarker
 
     var body: some View {
         VStack(spacing: 0) {
@@ -316,7 +316,7 @@ struct AnnotationView: View {
         }
         .overlay(
             VStack(spacing: 2) {
-                Text(annotation.title)
+                Text(marker.title)
                     .font(.caption)
                     .fontWeight(.semibold)
                     .padding(.horizontal, 8)
@@ -333,7 +333,7 @@ struct AnnotationView: View {
     }
 
     private var backgroundColor: Color {
-        switch annotation.type {
+        switch marker.type {
         case .driver:
             return .blue
         case .pickup:
@@ -344,7 +344,7 @@ struct AnnotationView: View {
     }
 
     private var iconName: String {
-        switch annotation.type {
+        switch marker.type {
         case .driver:
             return "car.fill"
         case .pickup:
