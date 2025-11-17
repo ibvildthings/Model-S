@@ -377,6 +377,122 @@ final class MapServiceTests: XCTestCase {
         // Default should be Google Maps as per requirements
         XCTAssertEqual(config.provider, .google)
     }
+
+    // MARK: - Map Provider Manager Tests
+
+    func testMapProviderManagerSingleton() {
+        // Given/When: Accessing shared instance
+        let manager1 = MapProviderManager.shared
+        let manager2 = MapProviderManager.shared
+
+        // Then: Should be the same instance
+        XCTAssertTrue(manager1 === manager2)
+    }
+
+    func testSwitchToAppleMaps() {
+        // Given: Manager
+        let manager = MapProviderManager.shared
+
+        // When: Switching to Apple Maps
+        manager.useAppleMaps()
+
+        // Then: Should update current provider and factory
+        XCTAssertEqual(manager.currentProvider, .apple)
+        XCTAssertEqual(MapServiceFactory.shared.configuration.provider, .apple)
+    }
+
+    func testSwitchToGoogleMaps() {
+        // Given: Manager
+        let manager = MapProviderManager.shared
+
+        // When: Switching to Google Maps
+        manager.useGoogleMaps()
+
+        // Then: Should update current provider
+        XCTAssertEqual(manager.currentProvider, .google)
+    }
+
+    func testToggleProvider() {
+        // Given: Manager starting with Apple
+        let manager = MapProviderManager.shared
+        manager.useAppleMaps()
+        XCTAssertEqual(manager.currentProvider, .apple)
+
+        // When: Toggling provider
+        manager.toggleProvider()
+
+        // Then: Should switch to Google
+        XCTAssertEqual(manager.currentProvider, .google)
+
+        // When: Toggling again
+        manager.toggleProvider()
+
+        // Then: Should switch back to Apple
+        XCTAssertEqual(manager.currentProvider, .apple)
+    }
+
+    func testMapProviderRawValue() {
+        // Test MapProvider raw value conversion
+        XCTAssertEqual(MapProvider.apple.rawValue, "apple")
+        XCTAssertEqual(MapProvider.google.rawValue, "google")
+
+        XCTAssertEqual(MapProvider(rawValue: "apple"), .apple)
+        XCTAssertEqual(MapProvider(rawValue: "google"), .google)
+        XCTAssertNil(MapProvider(rawValue: "invalid"))
+    }
+
+    func testMapProviderDisplayName() {
+        XCTAssertEqual(MapProvider.apple.displayName, "Apple Maps")
+        XCTAssertEqual(MapProvider.google.displayName, "Google Maps")
+    }
+
+    func testMapProviderIcon() {
+        XCTAssertEqual(MapProvider.apple.icon, "map.fill")
+        XCTAssertEqual(MapProvider.google.icon, "globe.americas.fill")
+    }
+
+    // MARK: - Integration Tests
+
+    func testFullProviderSwitch() {
+        // Given: Starting with Apple Maps
+        MapServiceFactory.shared.configure(with: .apple)
+
+        // When: Creating services
+        let appleSearch = MapServiceFactory.shared.createLocationSearchService()
+        let appleGeocode = MapServiceFactory.shared.createGeocodingService()
+        let appleRoute = MapServiceFactory.shared.createRouteCalculationService()
+
+        // Then: Should create Apple services
+        XCTAssertTrue(appleSearch is AppleLocationSearchService)
+        XCTAssertTrue(appleGeocode is AppleGeocodingService)
+        XCTAssertTrue(appleRoute is AppleRouteCalculationService)
+
+        // When: Switching to Google Maps
+        MapServiceFactory.shared.configure(with: .google)
+
+        // Then: New services should be Google
+        let googleSearch = MapServiceFactory.shared.createLocationSearchService()
+        let googleGeocode = MapServiceFactory.shared.createGeocodingService()
+        let googleRoute = MapServiceFactory.shared.createRouteCalculationService()
+
+        XCTAssertTrue(googleSearch is GoogleLocationSearchService)
+        XCTAssertTrue(googleGeocode is GoogleGeocodingService)
+        XCTAssertTrue(googleRoute is GoogleRouteCalculationService)
+    }
+
+    func testProviderPersistence() {
+        // Given: Manager with Apple Maps
+        let manager = MapProviderManager.shared
+        manager.useAppleMaps()
+
+        // When: Saving preference
+        UserDefaults.standard.set(MapProvider.apple.rawValue, forKey: "selectedMapProvider")
+
+        // Then: Should load Apple Maps on next access
+        let saved = UserDefaults.standard.string(forKey: "selectedMapProvider")
+        XCTAssertEqual(saved, "apple")
+        XCTAssertEqual(MapProvider(rawValue: saved!), .apple)
+    }
 }
 
 // MARK: - Apple Maps Service Tests
