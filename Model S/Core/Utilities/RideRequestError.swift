@@ -8,7 +8,8 @@
 import Foundation
 
 /// Errors that can occur during ride request flow
-enum RideRequestError: LocalizedError {
+/// - Note: Conforms to @unchecked Sendable because the associated Error in .unknown case is immutable
+enum RideRequestError: LocalizedError, @unchecked Sendable {
     case locationPermissionDenied
     case locationServicesDisabled
     case locationUnavailable

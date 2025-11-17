@@ -10,7 +10,7 @@ import CoreLocation
 
 /// Controls the entire driver flow with a clean state machine
 @MainActor
-class DriverFlowController: ObservableObject {
+class DriverFlowController: NSObject, ObservableObject {
 
     // MARK: - Published State (Single Source of Truth)
 
@@ -37,6 +37,7 @@ class DriverFlowController: ObservableObject {
         self.apiClient = apiClient ?? DriverAPIClient()
         self.locationManager = CLLocationManager()
 
+        super.init()
         setupLocationManager()
     }
 
@@ -50,6 +51,7 @@ class DriverFlowController: ObservableObject {
     // MARK: - Setup
 
     private func setupLocationManager() {
+        locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 10 // Update every 10 meters
     }
@@ -97,6 +99,9 @@ class DriverFlowController: ObservableObject {
             // Start polling for ride offers
             startOfferPolling()
 
+            // Start location updates
+            locationManager.startUpdatingLocation()
+
             print("✅ Driver \(response.driver.name) logged in successfully")
 
         } catch {
@@ -114,6 +119,9 @@ class DriverFlowController: ObservableObject {
 
         // Stop background tasks
         stopTasks()
+
+        // Stop location updates
+        locationManager.stopUpdatingLocation()
 
         do {
             // Logout from backend
@@ -508,5 +516,41 @@ class DriverFlowController: ObservableObject {
         let distanceKm = distance / 1000
         let earnings = 2 + (distanceKm * 1.5)
         return Double(round(100 * earnings) / 100)
+    }
+}
+
+// MARK: - CLLocationManagerDelegate
+
+extension DriverFlowController: CLLocationManagerDelegate {
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last?.coordinate else { return }
+
+        Task { @MainActor in
+            await updateLocation(location)
+        }
+    }
+
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("❌ Location error: \(error.localizedDescription)")
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        let status = manager.authorizationStatus
+        print("📍 Location authorization changed: \(status.rawValue)")
+    }
+
+    /// Update driver location on backend
+    private func updateLocation(_ coordinate: CLLocationCoordinate2D) async {
+        guard let driverId = driverId,
+              currentState.isOnline else {
+            return
+        }
+
+        do {
+            try await apiClient.updateLocation(driverId: driverId, location: coordinate)
+        } catch {
+            // Silent failure for location updates
+            print("⚠️ Failed to update location: \(error)")
+        }
     }
 }

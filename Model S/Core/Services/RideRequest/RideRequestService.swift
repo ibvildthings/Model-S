@@ -11,7 +11,8 @@ import CoreLocation
 // MARK: - Driver Info
 
 /// Represents driver information
-struct DriverInfo: Identifiable, Equatable {
+/// - Note: Conforms to @unchecked Sendable because CLLocationCoordinate2D is just two Doubles
+struct DriverInfo: Identifiable, Equatable, @unchecked Sendable {
     let id: String
     let name: String
     let rating: Double
@@ -53,7 +54,7 @@ struct DriverInfo: Identifiable, Equatable {
 // MARK: - Ride Request Result
 
 /// Represents the result of a ride request
-struct RideRequestResult {
+struct RideRequestResult: Sendable {
     let rideId: String
     let driver: DriverInfo?
     let status: RideRequestState

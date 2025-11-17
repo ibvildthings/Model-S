@@ -28,6 +28,12 @@ class DriverViewModel: ObservableObject {
     private let controller: DriverFlowController
     private var cancellables = Set<AnyCancellable>()
 
+    // MARK: - Background Tasks
+
+    private var loginTask: Task<Void, Never>?
+    private var logoutTask: Task<Void, Never>?
+    private var actionTask: Task<Void, Never>?
+
     // MARK: - Initialization
 
     init(controller: DriverFlowController? = nil) {
@@ -37,12 +43,18 @@ class DriverViewModel: ObservableObject {
         setupBindings()
     }
 
+    deinit {
+        loginTask?.cancel()
+        logoutTask?.cancel()
+        actionTask?.cancel()
+    }
+
     // MARK: - Setup
 
     private func setupBindings() {
         // Mirror controller state to view model
+        // No need for .receive(on:) since both controller and viewmodel are @MainActor
         controller.$currentState
-            .receive(on: DispatchQueue.main)
             .sink { [weak self] newState in
                 self?.driverState = newState
 
@@ -57,64 +69,80 @@ class DriverViewModel: ObservableObject {
     // MARK: - Authentication
 
     func login(driverId: String) {
+        loginTask?.cancel()
         isLoading = true
         errorMessage = nil
 
-        Task {
+        loginTask = Task {
             await controller.login(driverId: driverId)
             isLoading = false
+            loginTask = nil
         }
     }
 
     func logout() {
+        logoutTask?.cancel()
         isLoading = true
 
-        Task {
+        logoutTask = Task {
             await controller.logout()
             isLoading = false
+            logoutTask = nil
         }
     }
 
     // MARK: - Availability
 
     func toggleAvailability() {
-        Task {
+        actionTask?.cancel()
+        actionTask = Task {
             await controller.toggleAvailability()
+            actionTask = nil
         }
     }
 
     // MARK: - Ride Management
 
     func acceptRide() {
+        actionTask?.cancel()
         isLoading = true
 
-        Task {
+        actionTask = Task {
             await controller.acceptRide()
             isLoading = false
+            actionTask = nil
         }
     }
 
     func rejectRide() {
-        Task {
+        actionTask?.cancel()
+        actionTask = Task {
             await controller.rejectRide()
+            actionTask = nil
         }
     }
 
     func arriveAtPickup() {
-        Task {
+        actionTask?.cancel()
+        actionTask = Task {
             await controller.arriveAtPickup()
+            actionTask = nil
         }
     }
 
     func pickupPassenger() {
-        Task {
+        actionTask?.cancel()
+        actionTask = Task {
             await controller.pickupPassenger()
+            actionTask = nil
         }
     }
 
     func completeRide() {
-        Task {
+        actionTask?.cancel()
+        actionTask = Task {
             await controller.completeRide()
+            actionTask = nil
         }
     }
 
@@ -125,8 +153,10 @@ class DriverViewModel: ObservableObject {
     // MARK: - Location
 
     func updateLocation() {
-        Task {
+        actionTask?.cancel()
+        actionTask = Task {
             await controller.updateLocation()
+            actionTask = nil
         }
     }
 
@@ -161,8 +191,10 @@ class DriverViewModel: ObservableObject {
         if case .error(_, let previousState) = driverState {
             // For now, just go offline
             // In production, you might want smarter recovery
-            Task {
+            actionTask?.cancel()
+            actionTask = Task {
                 await controller.logout()
+                actionTask = nil
             }
         }
     }

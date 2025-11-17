@@ -248,6 +248,11 @@ class RideAPIClient: RideRequestService {
         var lastError: Error?
 
         for attempt in 0...maxRetries {
+            // Check for cancellation at the start of each attempt
+            guard !Task.isCancelled else {
+                throw CancellationError()
+            }
+
             do {
                 // Attempt the operation
                 let result = try await operation()
@@ -284,6 +289,11 @@ class RideAPIClient: RideRequestService {
 
                 // Wait before retrying
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+                // Check for cancellation after sleep, before retry
+                guard !Task.isCancelled else {
+                    throw CancellationError()
+                }
             }
         }
 

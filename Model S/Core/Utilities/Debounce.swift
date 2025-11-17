@@ -59,8 +59,8 @@ class Debouncer {
     }
 
     /// Cleanup - cancels any pending task when debouncer is deallocated
-    /// Note: deinit is nonisolated, so we access task directly (safe because it's just cancelling)
-    deinit {
+    /// Note: Task.cancel() is thread-safe, so it's safe to call from nonisolated deinit
+    nonisolated deinit {
         task?.cancel()
     }
 }

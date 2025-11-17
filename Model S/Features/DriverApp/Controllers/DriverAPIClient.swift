@@ -251,6 +251,11 @@ class DriverAPIClient {
         var lastError: Error?
 
         for attempt in 0...maxRetries {
+            // Check for cancellation at the start of each attempt
+            guard !Task.isCancelled else {
+                throw CancellationError()
+            }
+
             do {
                 let result = try await operation()
 
@@ -281,6 +286,11 @@ class DriverAPIClient {
                 print("🔄 Retrying in \(delay)s...")
 
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+
+                // Check for cancellation after sleep, before retry
+                guard !Task.isCancelled else {
+                    throw CancellationError()
+                }
             }
         }
 
@@ -310,17 +320,17 @@ class DriverAPIClient {
 
 // MARK: - API Models
 
-struct DriverLoginPayload: Codable {
+struct DriverLoginPayload: Codable, Sendable {
     let driverId: String
     let location: LocationPayload?
 }
 
-struct DriverLoginResponse: Codable {
+struct DriverLoginResponse: Codable, Sendable {
     let success: Bool
     let driver: DriverInfo
     let session: SessionInfo
 
-    struct DriverInfo: Codable {
+    struct DriverInfo: Codable, Sendable {
         let id: String
         let name: String
         let vehicleType: String
@@ -331,32 +341,32 @@ struct DriverLoginResponse: Codable {
         let available: Bool
     }
 
-    struct SessionInfo: Codable {
+    struct SessionInfo: Codable, Sendable {
         let loginTime: String
         let totalEarnings: Double
         let completedRides: Int
     }
 }
 
-struct AvailabilityPayload: Codable {
+struct AvailabilityPayload: Codable, Sendable {
     let available: Bool
 }
 
-struct RideStatusPayload: Codable {
+struct RideStatusPayload: Codable, Sendable {
     let status: String
 }
 
-struct DriverStatsResponse: Codable {
+struct DriverStatsResponse: Codable, Sendable {
     let driver: BasicDriverInfo
     let stats: StatsInfo
 
-    struct BasicDriverInfo: Codable {
+    struct BasicDriverInfo: Codable, Sendable {
         let id: String
         let name: String
         let rating: Double
     }
 
-    struct StatsInfo: Codable {
+    struct StatsInfo: Codable, Sendable {
         let onlineTime: TimeInterval
         let completedRides: Int
         let totalEarnings: Double
@@ -365,11 +375,11 @@ struct DriverStatsResponse: Codable {
     }
 }
 
-struct RideOfferResponse: Codable {
+struct RideOfferResponse: Codable, Sendable {
     let hasOffer: Bool
     let offer: RideOfferDetails?
 
-    struct RideOfferDetails: Codable {
+    struct RideOfferDetails: Codable, Sendable {
         let rideId: String
         let pickup: LocationPayload
         let destination: LocationPayload

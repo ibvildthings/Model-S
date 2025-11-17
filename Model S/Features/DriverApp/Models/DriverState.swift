@@ -7,7 +7,7 @@ import Foundation
 import CoreLocation
 
 /// Represents the current state of a driver
-indirect enum DriverState: Equatable {
+indirect enum DriverState: Equatable, Sendable {
     /// Driver is offline (not logged in)
     case offline
 
@@ -112,7 +112,7 @@ indirect enum DriverState: Equatable {
 }
 
 /// Driver statistics
-struct DriverStats: Equatable, Codable {
+struct DriverStats: Equatable, Codable, Sendable {
     var onlineTime: TimeInterval // seconds
     var completedRides: Int
     var totalEarnings: Double
@@ -129,7 +129,7 @@ struct DriverStats: Equatable, Codable {
 }
 
 /// Ride request offered to driver
-struct RideRequest: Equatable, Codable {
+struct RideRequest: Equatable, Codable, Sendable {
     let rideId: String
     let pickup: LocationPoint
     let destination: LocationPoint
@@ -147,7 +147,7 @@ struct RideRequest: Equatable, Codable {
 }
 
 /// Active ride information
-struct ActiveRide: Equatable, Codable {
+struct ActiveRide: Equatable, Codable, Sendable {
     let rideId: String
     let pickup: LocationPoint
     let destination: LocationPoint
@@ -156,7 +156,7 @@ struct ActiveRide: Equatable, Codable {
     var estimatedArrival: TimeInterval? // seconds
     var distanceToDestination: Double? // meters
 
-    struct PassengerInfo: Equatable, Codable {
+    struct PassengerInfo: Equatable, Codable, Sendable {
         let name: String
         let rating: Double
         let phoneNumber: String?
@@ -164,7 +164,7 @@ struct ActiveRide: Equatable, Codable {
 }
 
 /// Ride completion summary
-struct RideSummary: Equatable, Codable {
+struct RideSummary: Equatable, Codable, Sendable {
     let rideId: String
     let pickup: LocationPoint
     let destination: LocationPoint

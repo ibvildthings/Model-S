@@ -10,7 +10,7 @@ import Foundation
 
 /// Represents all possible states in the ride request flow
 /// Uses associated values to keep state and data together
-indirect enum RideState {
+indirect enum RideState: Sendable {
     /// Initial state - no locations selected
     case idle
 
@@ -198,7 +198,7 @@ indirect enum RideState {
 }
 
 /// Information about a calculated route
-struct RouteInfo: Equatable {
+struct RouteInfo: Equatable, Sendable {
     let distance: Double // meters
     let estimatedTravelTime: TimeInterval // seconds
     let polyline: String // Encoded polyline or identifier

@@ -10,18 +10,18 @@ import CoreLocation
 
 // MARK: - Ride Request/Response
 
-struct RideRequestPayload: Codable {
+struct RideRequestPayload: Codable, Sendable {
     let pickup: LocationPayload
     let destination: LocationPayload
 }
 
-struct LocationPayload: Codable {
+struct LocationPayload: Codable, Sendable {
     let lat: Double
     let lng: Double
     let address: String?
 }
 
-struct RideResponse: Codable {
+struct RideResponse: Codable, Sendable {
     let rideId: String
     let status: String
     let pickup: LocationPayload
@@ -32,7 +32,7 @@ struct RideResponse: Codable {
     let updatedAt: String?
 }
 
-struct DriverResponse: Codable {
+struct DriverResponse: Codable, Sendable {
     let id: String
     let name: String
     let vehicleType: String
@@ -43,14 +43,14 @@ struct DriverResponse: Codable {
     let available: Bool?
 }
 
-struct LocationResponse: Codable {
+struct LocationResponse: Codable, Sendable {
     let lat: Double
     let lng: Double
 }
 
 // MARK: - Error Response
 
-struct ErrorResponse: Codable {
+struct ErrorResponse: Codable, Sendable {
     let error: String
     let message: String
 }

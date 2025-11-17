@@ -11,7 +11,8 @@ import CoreLocation
 // MARK: - LocationPoint
 
 /// Represents a location point with coordinates and optional name
-struct LocationPoint: Identifiable, Equatable, Codable {
+/// - Note: Conforms to @unchecked Sendable because CLLocationCoordinate2D is just two Doubles
+struct LocationPoint: Identifiable, Equatable, Codable, @unchecked Sendable {
     /// Unique identifier for the location point
     let id: UUID
 
