@@ -48,13 +48,20 @@ protocol LocationSearchService: ObservableObject {
 /// This allows views to use @ObservedObject with any LocationSearchService implementation
 @MainActor
 class AnyLocationSearchService: ObservableObject {
-    @Published var searchResults: [LocationSearchResult] = []
-    @Published var isSearching: Bool = false
+    var searchResults: [LocationSearchResult] {
+        _getSearchResults()
+    }
+
+    var isSearching: Bool {
+        _getIsSearching()
+    }
 
     private let _search: (String) -> Void
     private let _updateSearchRegion: (CLLocationCoordinate2D, Double) -> Void
     private let _clearResults: () -> Void
     private let _getCoordinate: (LocationSearchResult) async throws -> (CLLocationCoordinate2D, String)
+    private let _getSearchResults: () -> [LocationSearchResult]
+    private let _getIsSearching: () -> Bool
     private var cancellables = Set<AnyCancellable>()
 
     init<S: LocationSearchService>(_ service: S) {
@@ -62,19 +69,13 @@ class AnyLocationSearchService: ObservableObject {
         self._updateSearchRegion = service.updateSearchRegion
         self._clearResults = service.clearResults
         self._getCoordinate = service.getCoordinate
+        self._getSearchResults = { service.searchResults }
+        self._getIsSearching = { service.isSearching }
 
-        // Mirror the published properties from the wrapped service
+        // Forward objectWillChange notifications from the wrapped service
         service.objectWillChange.sink { [weak self] _ in
             self?.objectWillChange.send()
         }.store(in: &cancellables)
-
-        // Sync searchResults
-        service.publisher(for: \.searchResults)
-            .assign(to: &$searchResults)
-
-        // Sync isSearching
-        service.publisher(for: \.isSearching)
-            .assign(to: &$isSearching)
     }
 
     func search(query: String) {
