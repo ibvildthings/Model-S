@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreLocation
+import Combine
 
 // MARK: - Location Search Service
 
@@ -41,6 +42,56 @@ protocol LocationSearchService: ObservableObject {
 
     /// Get coordinate for a selected search result
     func getCoordinate(for result: LocationSearchResult) async throws -> (CLLocationCoordinate2D, String)
+}
+
+/// Type-erased wrapper for LocationSearchService to work with SwiftUI property wrappers
+/// This allows views to use @ObservedObject with any LocationSearchService implementation
+@MainActor
+class AnyLocationSearchService: ObservableObject {
+    @Published var searchResults: [LocationSearchResult] = []
+    @Published var isSearching: Bool = false
+
+    private let _search: (String) -> Void
+    private let _updateSearchRegion: (CLLocationCoordinate2D, Double) -> Void
+    private let _clearResults: () -> Void
+    private let _getCoordinate: (LocationSearchResult) async throws -> (CLLocationCoordinate2D, String)
+    private var cancellables = Set<AnyCancellable>()
+
+    init<S: LocationSearchService>(_ service: S) {
+        self._search = service.search
+        self._updateSearchRegion = service.updateSearchRegion
+        self._clearResults = service.clearResults
+        self._getCoordinate = service.getCoordinate
+
+        // Mirror the published properties from the wrapped service
+        service.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+
+        // Sync searchResults
+        service.publisher(for: \.searchResults)
+            .assign(to: &$searchResults)
+
+        // Sync isSearching
+        service.publisher(for: \.isSearching)
+            .assign(to: &$isSearching)
+    }
+
+    func search(query: String) {
+        _search(query)
+    }
+
+    func updateSearchRegion(center: CLLocationCoordinate2D, radiusMiles: Double) {
+        _updateSearchRegion(center, radiusMiles)
+    }
+
+    func clearResults() {
+        _clearResults()
+    }
+
+    func getCoordinate(for result: LocationSearchResult) async throws -> (CLLocationCoordinate2D, String) {
+        try await _getCoordinate(result)
+    }
 }
 
 // MARK: - Geocoding Service

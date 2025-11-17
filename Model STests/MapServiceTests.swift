@@ -277,6 +277,66 @@ final class MapServiceTests: XCTestCase {
         XCTAssertNotNil(result.id)
     }
 
+    // MARK: - Type-Erased Wrapper Tests
+
+    func testAnyLocationSearchServiceWithApple() {
+        // Given: Apple location search service wrapped in type eraser
+        let appleService = AppleLocationSearchService()
+        let wrappedService = AnyLocationSearchService(appleService)
+
+        // Then: Should have correct initial state
+        XCTAssertEqual(wrappedService.searchResults.count, 0)
+        XCTAssertFalse(wrappedService.isSearching)
+    }
+
+    func testAnyLocationSearchServiceWithGoogle() {
+        // Given: Google location search service wrapped in type eraser
+        let googleService = GoogleLocationSearchService(apiKey: "test_key")
+        let wrappedService = AnyLocationSearchService(googleService)
+
+        // Then: Should have correct initial state
+        XCTAssertEqual(wrappedService.searchResults.count, 0)
+        XCTAssertFalse(wrappedService.isSearching)
+    }
+
+    func testAnyLocationSearchServiceClearResults() {
+        // Given: Wrapped service
+        let service = GoogleLocationSearchService(apiKey: "test_key")
+        let wrappedService = AnyLocationSearchService(service)
+
+        // When: Clearing results
+        wrappedService.clearResults()
+
+        // Then: Should be empty
+        XCTAssertEqual(wrappedService.searchResults.count, 0)
+        XCTAssertFalse(wrappedService.isSearching)
+    }
+
+    func testAnyLocationSearchServiceUpdateRegion() {
+        // Given: Wrapped service
+        let service = AppleLocationSearchService()
+        let wrappedService = AnyLocationSearchService(service)
+        let center = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+
+        // When: Updating region
+        wrappedService.updateSearchRegion(center: center, radiusMiles: 50.0)
+
+        // Then: Should complete without errors
+        XCTAssertNotNil(wrappedService)
+    }
+
+    func testAnyLocationSearchServiceEmptySearch() {
+        // Given: Wrapped service
+        let service = GoogleLocationSearchService(apiKey: "test_key")
+        let wrappedService = AnyLocationSearchService(service)
+
+        // When: Searching with empty query
+        wrappedService.search(query: "")
+
+        // Then: Should not be searching
+        XCTAssertFalse(wrappedService.isSearching)
+    }
+
     // MARK: - Route Result Tests
 
     func testRouteResultCreation() {

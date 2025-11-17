@@ -13,7 +13,7 @@ struct RideLocationCardWithSearch: View {
     @Binding var pickupText: String
     @Binding var destinationText: String
     @FocusState.Binding var focusedField: RideLocationCard.LocationField?
-    @StateObject private var searchService: AppleLocationSearchService
+    @ObservedObject private var searchService: AnyLocationSearchService
 
     var configuration: RideRequestConfiguration = .default
     var userLocation: CLLocationCoordinate2D?
@@ -43,13 +43,9 @@ struct RideLocationCardWithSearch: View {
         self.onLocationSelected = onLocationSelected
         self.onUseCurrentLocation = onUseCurrentLocation
 
-        // Create search service from factory (properly typed)
-        // Note: Currently only Apple Maps is implemented
+        // Create search service from factory - works with both Apple Maps and Google Maps
         let service = MapServiceFactory.shared.createLocationSearchService()
-        guard let appleService = service as? AppleLocationSearchService else {
-            fatalError("AppleLocationSearchService is required for RideLocationCardWithSearch")
-        }
-        self._searchService = StateObject(wrappedValue: appleService)
+        self.searchService = AnyLocationSearchService(service)
     }
 
     var body: some View {
