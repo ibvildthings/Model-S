@@ -114,12 +114,16 @@ router.post('/request', async (req, res) => {
     // Check for online real drivers first
     const nearestDriver = findNearestOnlineDriver(pickup);
 
-    if (nearestDriver) {
-      // Found an online driver! Send them the ride offer
+    // Check if the driver is actually logged in (has active session)
+    const { driverSessions } = require('./drivers');
+    const hasLoggedInDriver = nearestDriver && driverSessions.has(nearestDriver.driver.id);
+
+    if (hasLoggedInDriver) {
+      // Found a logged-in driver! Send them the ride offer
       const { driver, distance } = nearestDriver;
       const estimatedEarnings = calculateFare(distance);
 
-      console.log(`🎯 Found online driver: ${driver.name}`);
+      console.log(`🎯 Found logged-in driver: ${driver.name}`);
       console.log(`   Distance: ${Math.round(distance)}m`);
       console.log(`   Estimated earnings: $${estimatedEarnings}`);
 
@@ -134,23 +138,27 @@ router.post('/request', async (req, res) => {
       // Set ride status to searching (waiting for driver acceptance)
       ride.updateStatus('searching');
 
-      // Set timeout to revert to simulated driver if no response in 30 seconds
+      // Reduced timeout: 5 seconds instead of 30 for development
       setTimeout(() => {
         const offer = pendingRideOffers.get(ride.id);
         if (offer && ride.status === 'searching') {
-          console.log(`⏰ Ride ${ride.id} offer expired, using simulated driver`);
+          console.log(`⏰ Ride ${ride.id} offer expired (no response), using simulated driver`);
           pendingRideOffers.delete(ride.id);
 
           // Fall back to simulated driver
           useSimulatedDriver(ride);
         }
-      }, 30000);
+      }, 5000);
 
       return; // Wait for driver to accept
     }
 
-    // No online drivers, use simulated driver
-    console.log('No online drivers available, using simulation');
+    // No logged-in drivers, use simulated driver immediately
+    if (nearestDriver) {
+      console.log(`⚠️ Driver ${nearestDriver.driver.name} found but not logged in, using simulation`);
+    } else {
+      console.log('📵 No online drivers available, using simulation');
+    }
     useSimulatedDriver(ride);
 
   } catch (error) {
