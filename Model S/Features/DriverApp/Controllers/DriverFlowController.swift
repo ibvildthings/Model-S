@@ -195,7 +195,7 @@ class DriverFlowController: ObservableObject {
                     phoneNumber: nil
                 ),
                 currentDriverLocation: locationManager.location.map {
-                    LocationPoint(lat: $0.coordinate.latitude, lng: $0.coordinate.longitude)
+                    LocationPoint(coordinate: $0.coordinate, name: nil)
                 } ?? request.pickup,
                 estimatedArrival: nil,
                 distanceToDestination: request.distance

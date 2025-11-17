@@ -64,7 +64,9 @@ class RideFlowController: ObservableObject {
 
     /// Start fresh ride request flow
     func startFlow() {
-        transition(to: .selectingLocations(pickup: nil, destination: nil))
+        let noPickup: LocationPoint? = nil
+        let noDestination: LocationPoint? = nil
+        transition(to: .selectingLocations(pickup: noPickup, destination: noDestination))
     }
 
     /// Update pickup location

@@ -4,6 +4,7 @@
  */
 
 import Foundation
+import CoreLocation
 
 /// Represents the current state of a driver
 enum DriverState: Equatable {
@@ -172,18 +173,4 @@ struct RideSummary: Equatable, Codable {
     let earnings: Double
     let passengerRating: Double?
     let completedAt: Date
-}
-
-// MARK: - Location Point (if not already defined)
-
-struct LocationPoint: Equatable, Codable {
-    let lat: Double
-    let lng: Double
-    let address: String?
-
-    init(lat: Double, lng: Double, address: String? = nil) {
-        self.lat = lat
-        self.lng = lng
-        self.address = address
-    }
 }
