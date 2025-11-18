@@ -282,7 +282,7 @@ struct CoordinatedAppView: View {
         Group {
             switch coordinator.currentScreen {
             case .loading:
-                LoadingView()
+                LoadingView(message: "Loading...")
 
             case .authentication:
                 // TODO: Replace with actual auth view
@@ -301,19 +301,6 @@ struct CoordinatedAppView: View {
         }
         .onDisappear {
             coordinator.stop()
-        }
-    }
-}
-
-/// Simple loading view
-struct LoadingView: View {
-    var body: some View {
-        VStack {
-            ProgressView()
-                .scaleEffect(1.5)
-            Text("Loading...")
-                .foregroundColor(.secondary)
-                .padding(.top)
         }
     }
 }
