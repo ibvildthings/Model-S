@@ -272,7 +272,10 @@ struct DriverMapView: View {
     }
 
     var body: some View {
-        Map(coordinateRegion: $region, annotationItems: annotations) { marker in
+        Map(coordinateRegion: Binding(
+            get: { region.toMKCoordinateRegion },
+            set: { region = MapRegion(mkRegion: $0) }
+        ), annotationItems: annotations) { marker in
             MapAnnotation(coordinate: marker.coordinate) {
                 DriverAnnotationView(marker: marker)
             }

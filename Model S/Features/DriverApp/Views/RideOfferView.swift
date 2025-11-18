@@ -249,7 +249,10 @@ struct RideOfferMapView: View {
     }
 
     var body: some View {
-        Map(coordinateRegion: $region, annotationItems: annotations) { annotation in
+        Map(coordinateRegion: Binding(
+            get: { region.toMKCoordinateRegion },
+            set: { region = MapRegion(mkRegion: $0) }
+        ), annotationItems: annotations) { annotation in
             MapAnnotation(coordinate: annotation.coordinate) {
                 ZStack {
                     Circle()

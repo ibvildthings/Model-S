@@ -64,6 +64,32 @@ struct MapRegion: Equatable, Codable {
     }
 }
 
+// MARK: - MKCoordinateRegion Conversion
+
+import MapKit
+
+extension MapRegion {
+    /// Convert to MKCoordinateRegion for use with SwiftUI's native Map component
+    var toMKCoordinateRegion: MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(
+                latitudeDelta: span.latitudeDelta,
+                longitudeDelta: span.longitudeDelta
+            )
+        )
+    }
+
+    /// Create MapRegion from MKCoordinateRegion
+    init(mkRegion: MKCoordinateRegion) {
+        self.center = mkRegion.center
+        self.span = MapCoordinateSpan(
+            latitudeDelta: mkRegion.span.latitudeDelta,
+            longitudeDelta: mkRegion.span.longitudeDelta
+        )
+    }
+}
+
 /// Provider-agnostic bounding box for map regions
 /// Used to calculate regions that fit a set of coordinates
 struct MapBounds: Equatable {
