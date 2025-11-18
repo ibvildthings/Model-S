@@ -42,22 +42,28 @@ class RideRequestViewModel: ObservableObject {
         // Observe provider changes and recalculate route when provider switches
         MapProviderPreference.shared.$selectedProvider
             .dropFirst() // Skip initial value
-            .sink { [weak self] (newProvider: MapProvider) in
-                guard let self = self else { return }
-                Task {
-                    await MainActor.run {
-                        print("📍 Provider changed to \(newProvider.displayName), recreating services...")
-                        // Recreate services with new provider
-                        self.geocodingService = MapServiceFactory.shared.createGeocodingService()
-                        self.routeService = MapServiceFactory.shared.createRouteCalculationService()
-                    }
-                    // Recalculate route if both locations are set
-                    if await MainActor.run(body: { self.pickupLocation != nil && self.destinationLocation != nil }) {
-                        await self.calculateRoute()
-                    }
-                }
+            .sink { [weak self] newProvider in
+                self?.handleProviderChange(newProvider)
             }
             .store(in: &cancellables)
+    }
+
+    // MARK: - Provider Change Handling
+
+    /// Handles map provider changes by recreating services and recalculating routes
+    private func handleProviderChange(_ provider: MapProvider) {
+        print("📍 Provider changed to \(provider.displayName), recreating services...")
+
+        // Recreate services with new provider
+        geocodingService = MapServiceFactory.shared.createGeocodingService()
+        routeService = MapServiceFactory.shared.createRouteCalculationService()
+
+        // Recalculate route if both locations are set
+        if pickupLocation != nil && destinationLocation != nil {
+            Task {
+                await calculateRoute()
+            }
+        }
     }
 
     // MARK: - Geocoding
