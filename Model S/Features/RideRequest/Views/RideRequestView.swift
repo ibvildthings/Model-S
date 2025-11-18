@@ -165,11 +165,11 @@ struct MapProviderSwitcher: View {
             }
         }
         .pickerStyle(.segmented)
-        .frame(maxWidth: .infinity)
+        .padding(8)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
         )
     }
 }
