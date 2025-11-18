@@ -173,7 +173,10 @@ extension View {
 
 /// Environment key for current map service
 struct MapServiceKey: EnvironmentKey {
-    static let defaultValue: AnyMapService = MapProviderService.shared.currentService
+    @MainActor
+    static var defaultValue: AnyMapService {
+        MapProviderService.shared.currentService
+    }
 }
 
 extension EnvironmentValues {
