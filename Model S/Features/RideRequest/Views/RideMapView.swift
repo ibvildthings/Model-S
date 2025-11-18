@@ -16,7 +16,7 @@ struct RideMapView: View {
     var configuration: RideRequestConfiguration = .default
 
     // Observe map provider preference for dynamic switching
-    @StateObject private var providerPreference = MapProviderPreference.shared
+    @ObservedObject private var providerPreference = MapProviderPreference.shared
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
