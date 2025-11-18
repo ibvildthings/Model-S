@@ -29,6 +29,7 @@ class RideFlowController: ObservableObject {
     private let stateMachine: RideStateMachine
     private let rideService: RideRequestService
     private let mapService: AnyMapService
+    private let stateStore: AppStateStore?
 
     // MARK: - Route Storage
 
@@ -58,13 +59,16 @@ class RideFlowController: ObservableObject {
 
     init(
         rideService: RideRequestService? = nil,
-        mapService: AnyMapService? = nil
+        mapService: AnyMapService? = nil,
+        stateStore: AppStateStore? = nil
     ) {
         self.stateMachine = RideStateMachine()
         // 🌐 Using REAL backend server (change useMock to true for mock mode)
         self.rideService = rideService ?? RideRequestServiceFactory.shared.createRideRequestService(useMock: false)
         // Use unified map service
         self.mapService = mapService ?? MapProviderService.shared.currentService
+        // Optional state store for global state synchronization
+        self.stateStore = stateStore
     }
 
     deinit {
@@ -436,6 +440,9 @@ class RideFlowController: ObservableObject {
     /// Perform a validated state transition
     private func transition(to newState: RideState) {
         currentState = stateMachine.transition(from: currentState, to: newState)
+
+        // Sync with global state store if available
+        stateStore?.dispatch(.updateRideState(currentState))
     }
 
     // MARK: - Computed Properties for UI
