@@ -14,17 +14,6 @@ import MapKit
 import CoreLocation
 import Combine
 
-// MARK: - MKPolyline Extension
-
-extension MKPolyline {
-    /// Extract coordinates from MKPolyline to provider-agnostic array
-    func coordinates() -> [CLLocationCoordinate2D] {
-        var coords = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: pointCount)
-        getCoordinates(&coords, range: NSRange(location: 0, length: pointCount))
-        return coords
-    }
-}
-
 /// Coordinates the entire ride request flow
 /// Now uses RideFlowController for clean state management
 @MainActor
@@ -440,7 +429,7 @@ class RideRequestCoordinator: ObservableObject {
                     if let mkRoute = flowController.currentDriverMKRoute {
                         // Apple Maps
                         print("📍 Updating map with remaining route (Apple Maps)")
-                        mapViewModel.routePolyline = mkRoute.polyline
+                        mapViewModel.routePolyline = mkRoute.polyline.coordinates()
                         lastRouteCalculationPosition = driverLocation
                         print("✅ Remaining route displayed")
                     } else if let polyline = flowController.currentDriverPolyline {
@@ -449,7 +438,7 @@ class RideRequestCoordinator: ObservableObject {
 
                         // IMPORTANT: Update currentPolyline so dynamic updates work correctly
                         flowController.updateStoredPolyline(polyline)
-                        mapViewModel.routePolyline = polyline
+                        mapViewModel.routePolyline = polyline.coordinates()
 
                         // Zoom to show driver AND destination (not just the route)
                         // This matches Apple Maps bounding box approach
@@ -612,18 +601,18 @@ class RideRequestCoordinator: ObservableObject {
                 mapViewModel.updateDriverRoute(mkRoute)
             } else if let polyline = flowController.currentDriverPolyline {
                 // Google Maps - just update polyline, don't re-zoom (driver is moving)
-                mapViewModel.driverRoutePolyline = polyline
+                mapViewModel.driverRoutePolyline = polyline.coordinates()
             }
         } else {
             // Active ride: Update main route from current position to destination
             if let mkRoute = flowController.currentDriverMKRoute {
                 // Apple Maps
-                mapViewModel.routePolyline = mkRoute.polyline
+                mapViewModel.routePolyline = mkRoute.polyline.coordinates()
             } else if let polyline = flowController.currentDriverPolyline {
                 // Google Maps - Use the newly calculated route (driver → destination)
                 // Also store it in currentPolyline for consistency
                 flowController.updateStoredPolyline(polyline)
-                mapViewModel.routePolyline = polyline
+                mapViewModel.routePolyline = polyline.coordinates()
             }
         }
 
