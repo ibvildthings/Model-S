@@ -11,14 +11,6 @@ import Combine
 
 // MARK: - Map Provider Selection
 
-/// Supported map providers
-enum MapProvider: String, Codable, CaseIterable {
-    case apple = "Apple Maps"
-    case google = "Google Maps"
-
-    var id: String { rawValue }
-}
-
 /// Manages user's map provider preference
 @MainActor
 class MapProviderPreference: ObservableObject {
@@ -26,16 +18,17 @@ class MapProviderPreference: ObservableObject {
 
     @Published var selectedProvider: MapProvider {
         didSet {
-            UserDefaults.standard.set(selectedProvider.rawValue, forKey: "selectedMapProvider")
-            print("📍 Map provider switched to: \(selectedProvider.rawValue)")
+            // Save to UserDefaults
+            let providerString = selectedProvider == .apple ? "apple" : "google"
+            UserDefaults.standard.set(providerString, forKey: "selectedMapProvider")
+            print("📍 Map provider switched to: \(providerString)")
         }
     }
 
     private init() {
         // Load saved preference or default to Apple Maps
-        if let savedProvider = UserDefaults.standard.string(forKey: "selectedMapProvider"),
-           let provider = MapProvider(rawValue: savedProvider) {
-            self.selectedProvider = provider
+        if let savedProvider = UserDefaults.standard.string(forKey: "selectedMapProvider") {
+            self.selectedProvider = savedProvider == "google" ? .google : .apple
         } else {
             self.selectedProvider = .apple
         }
@@ -329,9 +322,16 @@ protocol RouteCalculationService {
 // MARK: - Map Service Provider
 
 /// Enum to specify which map provider to use
-enum MapProvider {
+enum MapProvider: CaseIterable, Hashable {
     case apple
     case google
+
+    var displayName: String {
+        switch self {
+        case .apple: return "Apple"
+        case .google: return "Google"
+        }
+    }
 }
 
 /// Configuration for map services
