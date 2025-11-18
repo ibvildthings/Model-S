@@ -185,7 +185,7 @@ class MapViewModel: NSObject, ObservableObject {
 
         // Center map on route with generous padding to show both pickup and destination clearly
         let bounds = MapBounds(coordinates: coordinates)
-        let newRegion = bounds.toRegion(paddingMultiplier: 1.3)
+        let newRegion = bounds.toRegion() // Uses default padding (2.0 = ~25% on each side)
 
         print("📍 Zooming to show route: center=\(newRegion.center), span=\(newRegion.span)")
 
@@ -215,7 +215,7 @@ class MapViewModel: NSObject, ObservableObject {
 
         // Center map on driver route with generous padding to show driver and pickup
         let bounds = MapBounds(coordinates: coordinates)
-        let newRegion = bounds.toRegion(paddingMultiplier: 1.3)
+        let newRegion = bounds.toRegion() // Uses default padding (2.0 = ~25% on each side)
 
         print("🚗 Zooming to show driver route: center=\(newRegion.center), span=\(newRegion.span)")
 
@@ -341,7 +341,7 @@ class MapViewModel: NSObject, ObservableObject {
 
         // Use MapBounds to calculate optimal region
         let bounds = MapBounds(coordinates: coordinates)
-        let newRegion = bounds.toRegion(paddingMultiplier: 1.3)
+        let newRegion = bounds.toRegion() // Uses default padding (2.0 = ~25% on each side)
 
         print("📍 Adjusting viewport to include driver: center=\(newRegion.center), span=\(newRegion.span)")
 
@@ -405,13 +405,13 @@ class MapViewModel: NSObject, ObservableObject {
         // When far: more padding, When close: less padding for tighter view
         let paddingMultiplier: Double
         if distance > 5000 { // > 5km
-            paddingMultiplier = 1.5
+            paddingMultiplier = 2.5
         } else if distance > 2000 { // 2-5km
-            paddingMultiplier = 1.3
+            paddingMultiplier = 2.2
         } else if distance > 500 { // 500m-2km
-            paddingMultiplier = 1.2
+            paddingMultiplier = 2.0
         } else { // < 500m
-            paddingMultiplier = 1.1 // Tighter zoom when very close
+            paddingMultiplier = 1.8 // Tighter zoom when very close
         }
 
         // Calculate span based on distance

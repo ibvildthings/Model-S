@@ -298,15 +298,15 @@ class RideRequestCoordinator: ObservableObject {
         // Dynamic padding based on distance - zooms in as driver gets closer
         let paddingMultiplier: Double
         if distance > 5000 { // > 5km
-            paddingMultiplier = 1.5
+            paddingMultiplier = 2.5
         } else if distance > 2000 { // 2-5km
-            paddingMultiplier = 1.3
+            paddingMultiplier = 2.2
         } else if distance > 500 { // 500m-2km
-            paddingMultiplier = 1.2
+            paddingMultiplier = 2.0
         } else if distance > 50 { // 50m-500m
-            paddingMultiplier = 1.15
+            paddingMultiplier = 1.8
         } else { // < 50m - VERY CLOSE, minimal padding
-            paddingMultiplier = 1.05 // Very tight zoom when at destination
+            paddingMultiplier = 1.5 // Tighter zoom when at destination
         }
 
         // Calculate span

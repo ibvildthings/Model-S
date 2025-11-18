@@ -136,8 +136,8 @@ struct MapBounds: Equatable {
     }
 
     /// Convert to MapRegion with padding
-    /// - Parameter paddingMultiplier: Multiplier for padding (e.g., 1.3 = 30% padding)
-    func toRegion(paddingMultiplier: Double = 1.3) -> MapRegion {
+    /// - Parameter paddingMultiplier: Multiplier for padding (e.g., 2.0 = ~25% padding on each side)
+    func toRegion(paddingMultiplier: Double = 2.0) -> MapRegion {
         let latDelta = (maxLatitude - minLatitude) * paddingMultiplier
         let lonDelta = (maxLongitude - minLongitude) * paddingMultiplier
 
