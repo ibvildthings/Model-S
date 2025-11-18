@@ -28,19 +28,17 @@ class RideRequestViewModel: ObservableObject {
     @Published var currentRideId: String?
     @Published var estimatedDriverArrival: TimeInterval?
 
-    private var geocodingService: any GeocodingService
-    private var routeService: any RouteCalculationService
+    private var mapService: AnyMapService
     private let rideRequestService: any RideRequestService
     private var cancellables = Set<AnyCancellable>()
 
     init(rideRequestService: (any RideRequestService)? = nil) {
-        // Create services from factory
-        self.geocodingService = MapServiceFactory.shared.createGeocodingService()
-        self.routeService = MapServiceFactory.shared.createRouteCalculationService()
+        // Use unified map service from provider service
+        self.mapService = MapProviderService.shared.currentService
         self.rideRequestService = rideRequestService ?? RideRequestServiceFactory.shared.createRideRequestService(useMock: true)
 
         // Observe provider changes and recalculate route when provider switches
-        MapProviderPreference.shared.$selectedProvider
+        MapProviderService.shared.$currentProvider
             .dropFirst() // Skip initial value
             .sink { [weak self] newProvider in
                 self?.handleProviderChange(newProvider)
@@ -50,23 +48,12 @@ class RideRequestViewModel: ObservableObject {
 
     // MARK: - Provider Change Handling
 
-    /// Handles map provider changes by recreating services and recalculating routes
+    /// Handles map provider changes by updating service reference and recalculating routes
     private func handleProviderChange(_ provider: MapProvider) {
-        let providerName: String
-        switch provider {
-        case .apple:
-            providerName = "Apple Maps"
-        case .google:
-            providerName = "Google Maps"
-        }
-        print("📍 Provider changed to \(providerName), recreating services...")
+        print("📍 Provider changed to \(provider.displayName), updating service...")
 
-        // Recreate services with new provider
-        let newGeocodingService: any GeocodingService = MapServiceFactory.shared.createGeocodingService()
-        let newRouteService: any RouteCalculationService = MapServiceFactory.shared.createRouteCalculationService()
-
-        self.geocodingService = newGeocodingService
-        self.routeService = newRouteService
+        // Update service reference
+        self.mapService = MapProviderService.shared.currentService
 
         // Recalculate route if both locations are set
         if pickupLocation != nil && destinationLocation != nil {
@@ -86,7 +73,7 @@ class RideRequestViewModel: ObservableObject {
         error = nil
 
         do {
-            let (coordinate, formattedAddress) = try await geocodingService.geocode(address: address)
+            let (coordinate, formattedAddress) = try await mapService.geocode(address: address)
 
             let locationPoint = LocationPoint(
                 coordinate: coordinate,
@@ -119,7 +106,7 @@ class RideRequestViewModel: ObservableObject {
         error = nil
 
         do {
-            let address = try await geocodingService.reverseGeocode(coordinate: coordinate)
+            let address = try await mapService.reverseGeocode(coordinate: coordinate)
 
             if isPickup {
                 pickupAddress = address
@@ -149,7 +136,7 @@ class RideRequestViewModel: ObservableObject {
         error = nil
 
         do {
-            let routeResult = try await routeService.calculateRoute(
+            let routeResult = try await mapService.calculateRoute(
                 from: pickup.coordinate,
                 to: destination.coordinate
             )

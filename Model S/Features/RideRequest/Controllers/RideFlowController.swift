@@ -28,8 +28,7 @@ class RideFlowController: ObservableObject {
 
     private let stateMachine: RideStateMachine
     private let rideService: RideRequestService
-    private let routeService: RouteCalculationService
-    private let geocodingService: GeocodingService
+    private let mapService: AnyMapService
 
     // MARK: - Route Storage
 
@@ -59,14 +58,13 @@ class RideFlowController: ObservableObject {
 
     init(
         rideService: RideRequestService? = nil,
-        routeService: RouteCalculationService? = nil,
-        geocodingService: GeocodingService? = nil
+        mapService: AnyMapService? = nil
     ) {
         self.stateMachine = RideStateMachine()
         // 🌐 Using REAL backend server (change useMock to true for mock mode)
         self.rideService = rideService ?? RideRequestServiceFactory.shared.createRideRequestService(useMock: false)
-        self.routeService = routeService ?? MapServiceFactory.shared.createRouteCalculationService()
-        self.geocodingService = geocodingService ?? MapServiceFactory.shared.createGeocodingService()
+        // Use unified map service
+        self.mapService = mapService ?? MapProviderService.shared.currentService
     }
 
     deinit {
@@ -114,7 +112,7 @@ class RideFlowController: ObservableObject {
     /// Calculate route between two locations
     func calculateRoute(from pickup: LocationPoint, to destination: LocationPoint) async {
         do {
-            let result = try await routeService.calculateRoute(
+            let result = try await mapService.calculateRoute(
                 from: pickup.coordinate,
                 to: destination.coordinate
             )
@@ -155,7 +153,7 @@ class RideFlowController: ObservableObject {
     /// Returns the MKRoute if successful, nil otherwise
     func calculateDriverRoute(from driverLocation: CLLocationCoordinate2D, to pickup: CLLocationCoordinate2D) async -> MKRoute? {
         do {
-            let result = try await routeService.calculateRoute(
+            let result = try await mapService.calculateRoute(
                 from: driverLocation,
                 to: pickup
             )

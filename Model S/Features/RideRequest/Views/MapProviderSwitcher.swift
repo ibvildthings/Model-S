@@ -3,44 +3,44 @@
 //  Model S
 //
 //  Shared map provider switcher component for both rider and driver apps
+//  Refactored to use unified MapProviderService architecture
 //
 
 import SwiftUI
 
 /// Compact floating button to switch between Apple Maps and Google Maps
 struct MapProviderSwitcher: View {
-    @StateObject private var providerPreference = MapProviderPreference.shared
+    @StateObject private var providerService = MapProviderService.shared
 
     var body: some View {
         Menu {
-            // Menu options
-            Button(action: {
-                withAnimation(.spring(response: 0.3)) {
-                    providerPreference.selectedProvider = .apple
-                }
-                triggerHaptic()
-            }) {
-                Label("Apple Maps", systemImage: "map.fill")
-                if providerPreference.selectedProvider == .apple {
-                    Image(systemName: "checkmark")
+            // Menu options - show only available providers
+            ForEach(providerService.availableProviders, id: \.self) { provider in
+                Button(action: {
+                    withAnimation(.spring(response: 0.3)) {
+                        providerService.switchTo(provider: provider)
+                    }
+                    triggerHaptic()
+                }) {
+                    Label(provider.displayName, systemImage: provider.icon)
+                    if providerService.currentProvider == provider {
+                        Image(systemName: "checkmark")
+                    }
                 }
             }
 
-            Button(action: {
-                withAnimation(.spring(response: 0.3)) {
-                    providerPreference.selectedProvider = .google
+            // Show unavailable providers with info
+            ForEach(MapProvider.allCases.filter { !providerService.isProviderAvailable($0) }, id: \.self) { provider in
+                Button(action: {}) {
+                    Label(provider.displayName, systemImage: provider.icon)
+                    Image(systemName: "exclamationmark.triangle")
                 }
-                triggerHaptic()
-            }) {
-                Label("Google Maps", systemImage: "globe")
-                if providerPreference.selectedProvider == .google {
-                    Image(systemName: "checkmark")
-                }
+                .disabled(true)
             }
         } label: {
             // Compact button showing current provider
             HStack(spacing: 6) {
-                Image(systemName: currentProviderIcon)
+                Image(systemName: providerService.currentProvider.icon)
                     .font(.system(size: 14, weight: .medium))
                 Text(currentProviderName)
                     .font(.system(size: 13, weight: .medium))
@@ -57,11 +57,7 @@ struct MapProviderSwitcher: View {
     }
 
     private var currentProviderName: String {
-        providerPreference.selectedProvider == .apple ? "Apple" : "Google"
-    }
-
-    private var currentProviderIcon: String {
-        providerPreference.selectedProvider == .apple ? "map.fill" : "globe"
+        providerService.currentProvider == .apple ? "Apple" : "Google"
     }
 
     private func triggerHaptic() {

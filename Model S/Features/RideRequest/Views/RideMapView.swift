@@ -4,6 +4,7 @@
 //
 //  Universal map view that switches between Apple Maps and Google Maps
 //  based on the configured map provider.
+//  Refactored to use unified MapProviderService architecture
 //
 //  Created by Pritesh Desai on 11/12/25.
 //
@@ -15,14 +16,13 @@ struct RideMapView: View {
     @ObservedObject var viewModel: MapViewModel
     var configuration: RideRequestConfiguration = .default
 
-    // Observe map provider preference for dynamic switching
-    // Using @StateObject ensures stable observation of the singleton across view updates
-    @StateObject private var providerPreference = MapProviderPreference.shared
+    // Observe map provider service for dynamic switching
+    @StateObject private var providerService = MapProviderService.shared
 
     var body: some View {
-        // Map view
+        // Map view - switches based on current provider
         Group {
-            switch providerPreference.selectedProvider {
+            switch providerService.currentProvider {
             case .apple:
                 appleMapView
             case .google:
@@ -44,7 +44,7 @@ struct RideMapView: View {
                 hapticFeedback()
             }
         }
-        .accessibilityLabel("Ride request map - \(providerPreference.selectedProvider == .apple ? "Apple Maps" : "Google Maps")")
+        .accessibilityLabel("Ride request map - \(providerService.currentProvider.displayName)")
     }
 
     // MARK: - Apple Maps View

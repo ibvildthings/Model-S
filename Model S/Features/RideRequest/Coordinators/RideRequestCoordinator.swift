@@ -32,7 +32,7 @@ class RideRequestCoordinator: ObservableObject {
     // MARK: - Private Dependencies
 
     private let configuration: RideRequestConfiguration
-    private let geocodingService: GeocodingService
+    private let mapService: AnyMapService
     private let geocodingDebouncer: Debouncer
     private var cancellables = Set<AnyCancellable>()
     private var autoResetTimer: Timer?
@@ -51,7 +51,8 @@ class RideRequestCoordinator: ObservableObject {
         self.configuration = configuration
         self.flowController = RideFlowController()
         self.mapViewModel = MapViewModel()
-        self.geocodingService = MapServiceFactory.shared.createGeocodingService()
+        // Use unified map service from provider service
+        self.mapService = MapProviderService.shared.currentService
         self.geocodingDebouncer = Debouncer(delay: TimingConstants.geocodingDebounceDelay)
 
         setupLocationUpdates()
@@ -148,7 +149,7 @@ class RideRequestCoordinator: ObservableObject {
     /// Geocodes an address (converts text to coordinates)
     private func geocodeAddress(_ address: String, isPickup: Bool) async {
         do {
-            let (coordinate, formattedAddress) = try await geocodingService.geocode(address: address)
+            let (coordinate, formattedAddress) = try await mapService.geocode(address: address)
             let locationPoint = LocationPoint(coordinate: coordinate, name: formattedAddress)
 
             // Update flow controller
@@ -240,7 +241,7 @@ class RideRequestCoordinator: ObservableObject {
                self.flowController.pickupLocation == nil {
                 Task {
                     do {
-                        let address = try await self.geocodingService.reverseGeocode(coordinate: location.coordinate)
+                        let address = try await self.mapService.reverseGeocode(coordinate: location.coordinate)
                         let locationPoint = LocationPoint(coordinate: location.coordinate, name: address)
                         self.flowController.updatePickup(locationPoint)
                         self.mapViewModel.updatePickupLocation(location.coordinate, name: address)

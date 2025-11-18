@@ -13,7 +13,7 @@ struct RideLocationCardWithSearch: View {
     @Binding var pickupText: String
     @Binding var destinationText: String
     @FocusState.Binding var focusedField: RideLocationCard.LocationField?
-    @ObservedObject private var searchService: AnyLocationSearchService
+    @StateObject private var providerService = MapProviderService.shared
 
     var configuration: RideRequestConfiguration = .default
     var userLocation: CLLocationCoordinate2D?
@@ -42,10 +42,11 @@ struct RideLocationCardWithSearch: View {
         self.onDestinationTap = onDestinationTap
         self.onLocationSelected = onLocationSelected
         self.onUseCurrentLocation = onUseCurrentLocation
+    }
 
-        // Create search service from factory - works with both Apple Maps and Google Maps
-        let service = MapServiceFactory.shared.createLocationSearchService()
-        self.searchService = AnyLocationSearchService(service)
+    // Computed property for current map service
+    private var mapService: AnyMapService {
+        providerService.currentService
     }
 
     var body: some View {
@@ -78,13 +79,13 @@ struct RideLocationCardWithSearch: View {
                         .accessibilityHint("Enter your pickup address")
                         .onChange(of: pickupText) { newValue in
                             if focusedField == .pickup {
-                                searchService.search(query: newValue)
+                                mapService.search(query: newValue)
                             }
                         }
                         .onTapGesture {
                             onPickupTap()
                             if !pickupText.isEmpty {
-                                searchService.search(query: pickupText)
+                                mapService.search(query: pickupText)
                             }
                         }
 
@@ -142,13 +143,13 @@ struct RideLocationCardWithSearch: View {
                         .accessibilityHint("Enter your destination address")
                         .onChange(of: destinationText) { newValue in
                             if focusedField == .destination {
-                                searchService.search(query: newValue)
+                                mapService.search(query: newValue)
                             }
                         }
                         .onTapGesture {
                             onDestinationTap()
                             if !destinationText.isEmpty {
-                                searchService.search(query: destinationText)
+                                mapService.search(query: destinationText)
                             }
                         }
                 }
@@ -161,9 +162,9 @@ struct RideLocationCardWithSearch: View {
             }
 
             // Search Suggestions (appears below card)
-            if focusedField != nil && !searchService.searchResults.isEmpty {
+            if focusedField != nil && !mapService.searchResults.isEmpty {
                 LocationSearchSuggestionsView(
-                    results: searchService.searchResults,
+                    results: mapService.searchResults,
                     onSelect: { result in
                         handleSelection(result)
                     }
@@ -175,17 +176,17 @@ struct RideLocationCardWithSearch: View {
         }
         .onChange(of: focusedField) { newValue in
             if newValue == nil {
-                searchService.clearResults()
+                mapService.clearResults()
             }
         }
         .onChange(of: userLocation) { newLocation in
             if let location = newLocation {
-                searchService.updateSearchRegion(center: location, radiusMiles: 50.0)
+                mapService.updateSearchRegion(center: location, radiusMiles: 50.0)
             }
         }
         .onAppear {
             if let location = userLocation {
-                searchService.updateSearchRegion(center: location, radiusMiles: 50.0)
+                mapService.updateSearchRegion(center: location, radiusMiles: 50.0)
             }
         }
     }
@@ -193,7 +194,7 @@ struct RideLocationCardWithSearch: View {
     private func handleSelection(_ result: LocationSearchResult) {
         Task {
             do {
-                let (coordinate, name) = try await searchService.getCoordinate(for: result)
+                let (coordinate, name) = try await mapService.getCoordinate(for: result)
 
                 await MainActor.run {
                     let isPickup = focusedField == .pickup
@@ -205,7 +206,7 @@ struct RideLocationCardWithSearch: View {
                     }
 
                     onLocationSelected(coordinate, name, isPickup)
-                    searchService.clearResults()
+                    mapService.clearResults()
                     focusedField = nil
                 }
             } catch {
