@@ -43,7 +43,7 @@ class RideRequestViewModel: ObservableObject {
         MapProviderPreference.shared.$selectedProvider
             .dropFirst() // Skip initial value
             .sink { [weak self] (newProvider: MapProvider) in
-                Task { @MainActor [weak self] in
+                Task { @MainActor in
                     guard let self = self else { return }
                     print("📍 Provider changed to \(newProvider.displayName), recreating services...")
                     // Recreate services with new provider
