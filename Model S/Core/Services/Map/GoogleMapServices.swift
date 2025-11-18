@@ -262,24 +262,67 @@ class GoogleRouteCalculationService: RouteCalculationService {
             URLQueryItem(name: "key", value: apiKey)
         ]
 
+        print("🚗 Google Directions API request:")
+        print("   From: \(from.latitude), \(from.longitude)")
+        print("   To: \(to.latitude), \(to.longitude)")
+
         let (data, response) = try await URLSession.shared.data(from: urlComponents.url!)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            print("❌ Invalid HTTP response")
+            throw RideRequestError.routeCalculationFailed
+        }
+
+        print("   HTTP Status: \(httpResponse.statusCode)")
+
+        guard httpResponse.statusCode == 200 else {
+            print("❌ HTTP error: \(httpResponse.statusCode)")
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("   Response: \(responseString)")
+            }
             throw RideRequestError.routeCalculationFailed
         }
 
         let json = try JSONDecoder().decode(DirectionsResponse.self, from: data)
+        print("   API Status: \(json.status)")
 
-        guard json.status == "OK",
-              let route = json.routes.first,
+        guard json.status == "OK" else {
+            print("")
+            print("❌ Google Directions API Error: \(json.status)")
+
+            // Provide specific error messages
+            switch json.status {
+            case "REQUEST_DENIED":
+                print("   🔧 Solution: Enable 'Directions API' in Google Cloud Console")
+                print("   https://console.cloud.google.com/apis/library/directions-backend.googleapis.com")
+            case "OVER_QUERY_LIMIT":
+                print("   🔧 You've exceeded your API quota")
+            case "ZERO_RESULTS":
+                print("   🔧 No route found between these locations")
+            case "NOT_FOUND":
+                print("   🔧 One of the locations could not be geocoded")
+            default:
+                print("   🔧 Unknown error - check API key and billing")
+            }
+            print("")
+
+            if let errorMessage = json.errorMessage {
+                print("   Error message: \(errorMessage)")
+            }
+
+            throw RideRequestError.routeCalculationFailed
+        }
+
+        guard let route = json.routes.first,
               let leg = route.legs.first else {
-            print("Google Directions API error: \(json.status)")
+            print("❌ No routes found in response")
             throw RideRequestError.routeCalculationFailed
         }
 
         // Decode polyline into coordinates for visualization
         let coordinates = decodePolyline(route.overviewPolyline.points)
+
+        print("✅ Route calculated: \(leg.distance.value)m, \(leg.duration.value)s")
 
         return RouteResult(
             distance: leg.distance.value,
@@ -423,6 +466,13 @@ private struct GeocodingResponse: Codable {
 private struct DirectionsResponse: Codable {
     let routes: [Route]
     let status: String
+    let errorMessage: String?
+
+    enum CodingKeys: String, CodingKey {
+        case routes
+        case status
+        case errorMessage = "error_message"
+    }
 
     struct Route: Codable {
         let legs: [Leg]

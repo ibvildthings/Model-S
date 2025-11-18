@@ -200,7 +200,21 @@ class MapViewModel: NSObject, ObservableObject {
     /// - Parameter route: The MKRoute for the driver's path to pickup
     func updateDriverRoute(_ route: MKRoute) {
         self.driverRoutePolyline = route.polyline
-        print("🚗 Driver route updated with \(route.polyline.pointCount) points")
+
+        // Center map on driver route with generous padding to show driver and pickup
+        let padding: Double = 5000 // Same padding as main route for consistency
+        let rect = route.polyline.boundingMapRect
+        let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
+        let newRegion = MKCoordinateRegion(paddedRect)
+
+        print("🚗 Zooming to show driver route: center=\(newRegion.center), span=\(newRegion.span)")
+
+        // Animate the region change for smooth transition
+        Task { @MainActor in
+            withAnimation(.easeInOut(duration: TimingConstants.mapAnimationDuration)) {
+                self.region = newRegion
+            }
+        }
     }
 
     /// Centers the map on the user's current location

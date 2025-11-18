@@ -15,6 +15,28 @@ import MapKit
 #if canImport(GoogleMaps)
 import GoogleMaps
 
+// MARK: - MKPolyline Extension
+
+extension MKPolyline {
+    func coordinates() -> [CLLocationCoordinate2D] {
+        var coords = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: pointCount)
+        getCoordinates(&coords, range: NSRange(location: 0, length: pointCount))
+        return coords
+    }
+}
+
+// MARK: - GMSPath Extension
+
+extension GMSPath {
+    func toCoordinates() -> [CLLocationCoordinate2D] {
+        var coords: [CLLocationCoordinate2D] = []
+        for index in 0..<count() {
+            coords.append(coordinate(at: index))
+        }
+        return coords
+    }
+}
+
 /// Google Maps implementation using GMSMapView
 struct GoogleMapViewWrapper: UIViewRepresentable {
     @Binding var region: MKCoordinateRegion
@@ -98,30 +120,56 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: GMSMapView, context: Context) {
-        // Update camera if region changed significantly
-        if !context.coordinator.isUserInteracting {
+        // Update region if changed significantly (matches Apple Maps behavior)
+        let currentCenter = mapView.camera.target
+        let currentZoom = mapView.camera.zoom
+        let targetZoom = zoomLevelFromSpan(region.span)
+
+        let centerChanged = abs(currentCenter.latitude - region.center.latitude) > 0.001 ||
+                           abs(currentCenter.longitude - region.center.longitude) > 0.001
+        let zoomChanged = abs(Double(currentZoom) - Double(targetZoom)) > 0.5
+
+        if (centerChanged || zoomChanged) && !context.coordinator.isUserInteracting {
             let camera = GMSCameraPosition.camera(
                 withLatitude: region.center.latitude,
                 longitude: region.center.longitude,
-                zoom: zoomLevelFromSpan(region.span)
+                zoom: targetZoom
             )
             mapView.animate(to: camera)
         }
 
-        // Update markers (annotations)
+        // Update annotations (markers)
         context.coordinator.updateMarkers(
             pickup: pickupLocation,
             destination: destinationLocation,
             driver: driverLocation
         )
 
-        // Update route polylines
+        // Convert route to coordinates if needed
+        let mainRouteCoords: [CLLocationCoordinate2D]?
+        if let coords = route as? [CLLocationCoordinate2D] {
+            mainRouteCoords = coords
+        } else if let polyline = route as? MKPolyline {
+            mainRouteCoords = polyline.coordinates()
+        } else {
+            mainRouteCoords = nil
+        }
+
+        let driverRouteCoords: [CLLocationCoordinate2D]?
+        if let coords = driverRoute as? [CLLocationCoordinate2D] {
+            driverRouteCoords = coords
+        } else if let polyline = driverRoute as? MKPolyline {
+            driverRouteCoords = polyline.coordinates()
+        } else {
+            driverRouteCoords = nil
+        }
+
+        // Update route overlay based on display mode
         context.coordinator.updateRoute(
-            mainRoute: route as? [CLLocationCoordinate2D],
-            driverRoute: driverRoute as? [CLLocationCoordinate2D],
-            displayMode: routeDisplayMode,
-            color: UIColor(routeLineColor),
-            width: routeLineWidth
+            mapView: mapView,
+            mainRoute: mainRouteCoords,
+            driverRoute: driverRouteCoords,
+            displayMode: routeDisplayMode
         )
     }
 
@@ -151,6 +199,10 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
         private var currentDisplayMode: RouteDisplayMode?
         fileprivate var tilesLoaded = false
 
+        // Track last known marker positions to avoid unnecessary updates
+        private var lastPickup: CLLocationCoordinate2D?
+        private var lastDestination: CLLocationCoordinate2D?
+
         init(_ parent: GoogleMapViewWrapper) {
             self.parent = parent
         }
@@ -158,77 +210,86 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
         func updateMarkers(pickup: CLLocationCoordinate2D?, destination: CLLocationCoordinate2D?, driver: CLLocationCoordinate2D?) {
             guard let mapView = mapView else { return }
 
-            // Update pickup marker
-            if let pickup = pickup {
-                if pickupMarker == nil {
+            // Update pickup marker only if it changed (matches Apple Maps)
+            if pickup != lastPickup {
+                // Remove old pickup
+                pickupMarker?.map = nil
+                pickupMarker = nil
+
+                // Add new pickup if it exists
+                if let pickup = pickup {
                     pickupMarker = GMSMarker(position: pickup)
                     pickupMarker?.title = "Pickup"
                     pickupMarker?.icon = createMarkerIcon(color: .systemGreen, iconName: "location.fill")
                     pickupMarker?.map = mapView
-                } else {
-                    pickupMarker?.position = pickup
                 }
-            } else {
-                pickupMarker?.map = nil
-                pickupMarker = nil
+
+                lastPickup = pickup
             }
 
-            // Update destination marker
-            if let destination = destination {
-                if destinationMarker == nil {
+            // Update destination marker only if it changed (matches Apple Maps)
+            if destination != lastDestination {
+                // Remove old destination
+                destinationMarker?.map = nil
+                destinationMarker = nil
+
+                // Add new destination if it exists
+                if let destination = destination {
                     destinationMarker = GMSMarker(position: destination)
                     destinationMarker?.title = "Destination"
                     destinationMarker?.icon = createMarkerIcon(color: .systemBlue, iconName: "mappin")
                     destinationMarker?.map = mapView
-                } else {
-                    destinationMarker?.position = destination
                 }
-            } else {
-                destinationMarker?.map = nil
-                destinationMarker = nil
+
+                lastDestination = destination
             }
 
-            // Update driver marker with animation
+            // Update driver marker with smooth animation (matches Apple Maps)
             if let driver = driver {
-                if driverMarker == nil {
+                if let existingDriver = driverMarker {
+                    // Animate position change
+                    CATransaction.begin()
+                    CATransaction.setAnimationDuration(0.3)
+                    existingDriver.position = driver
+                    CATransaction.commit()
+                } else {
+                    // Create new driver marker
                     driverMarker = GMSMarker(position: driver)
                     driverMarker?.title = "Driver"
                     driverMarker?.icon = createCarIcon()
                     driverMarker?.map = mapView
-                } else {
-                    // Animate driver movement
-                    CATransaction.begin()
-                    CATransaction.setAnimationDuration(0.3)
-                    driverMarker?.position = driver
-                    CATransaction.commit()
                 }
             } else {
+                // Remove driver marker if no driver location
                 driverMarker?.map = nil
                 driverMarker = nil
             }
         }
 
-        func updateRoute(mainRoute: [CLLocationCoordinate2D]?, driverRoute: [CLLocationCoordinate2D]?, displayMode: RouteDisplayMode, color: UIColor, width: CGFloat) {
-            guard let mapView = mapView else { return }
-
-            // Determine which route to display
+        func updateRoute(mapView: GMSMapView, mainRoute: [CLLocationCoordinate2D]?, driverRoute: [CLLocationCoordinate2D]?, displayMode: RouteDisplayMode) {
+            // Determine which route to display based on mode (matches Apple Maps)
             let routeToDisplay: [CLLocationCoordinate2D]?
             switch displayMode {
             case .approach:
+                // Show driver route (driver → pickup) if available, otherwise show main route
                 routeToDisplay = driverRoute ?? mainRoute
             case .activeRide:
+                // Show main route (pickup → destination)
                 routeToDisplay = mainRoute
             }
 
-            // Check if we need to update
-            let needsUpdate = currentDisplayMode != displayMode
+            // Check if we need to update the route (matches Apple Maps logic)
+            let needsUpdate = !areCoordinatesEqual(currentPolyline?.path?.toCoordinates(), routeToDisplay) ||
+                             currentDisplayMode != displayMode
 
-            if needsUpdate || currentPolyline == nil {
-                // Remove old polyline
-                currentPolyline?.map = nil
-                currentPolyline = nil
+            if needsUpdate {
+                // Remove old route polyline
+                if let currentPolyline = currentPolyline {
+                    currentPolyline.map = nil
+                    self.currentPolyline = nil
+                }
 
-                // Add new polyline
+                // Add new route polyline
                 if let coordinates = routeToDisplay, !coordinates.isEmpty {
                     let path = GMSMutablePath()
                     coordinates.forEach { path.add($0) }
@@ -246,10 +307,21 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
                     polyline.strokeWidth = MapConstants.routeLineWidth
                     polyline.map = mapView
 
-                    currentPolyline = polyline
+                    self.currentPolyline = polyline
                     currentDisplayMode = displayMode
+
+                    let routeType = displayMode == .approach ? "approach (driver → pickup)" : "active ride (pickup → destination)"
+                    print("🛣️ Displaying \(routeType) route")
                 }
             }
+        }
+
+        private func areCoordinatesEqual(_ lhs: [CLLocationCoordinate2D]?, _ rhs: [CLLocationCoordinate2D]?) -> Bool {
+            guard let lhs = lhs, let rhs = rhs else {
+                return lhs == nil && rhs == nil
+            }
+            guard lhs.count == rhs.count else { return false }
+            return zip(lhs, rhs).allSatisfy { $0 == $1 }
         }
 
         // MARK: - GMSMapViewDelegate

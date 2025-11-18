@@ -33,11 +33,27 @@ class RideFlowController: ObservableObject {
 
     // MARK: - Route Storage
 
-    /// Stores the actual MKRoute for map display
+    /// Stores the actual MKRoute for map display (Apple Maps)
     private(set) var currentMKRoute: MKRoute?
+
+    /// Stores the polyline for Google Maps display
+    private(set) var currentPolyline: MKPolyline?
+
+    /// Stores the driver route MKRoute (Apple Maps)
+    private(set) var currentDriverMKRoute: MKRoute?
+
+    /// Stores the driver route polyline (Google Maps)
+    private(set) var currentDriverPolyline: MKPolyline?
 
     /// Timer for polling backend ride status
     private var statusPollingTimer: Timer?
+
+    // MARK: - Route Management
+
+    /// Updates the stored polyline (for Google Maps route updates during active ride)
+    func updateStoredPolyline(_ polyline: MKPolyline) {
+        self.currentPolyline = polyline
+    }
 
     // MARK: - Initialization
 
@@ -103,9 +119,23 @@ class RideFlowController: ObservableObject {
                 to: destination.coordinate
             )
 
-            // Store the MKRoute for map display (cast from Any)
+            // Handle both Apple Maps (MKRoute) and Google Maps ([CLLocationCoordinate2D])
             if let mkRoute = result.polyline as? MKRoute {
+                // Apple Maps: Use MKRoute directly
                 currentMKRoute = mkRoute
+                print("📍 Route polyline type: MKRoute (Apple Maps)")
+            } else if let coordinates = result.polyline as? [CLLocationCoordinate2D] {
+                // Google Maps: Convert coordinate array to MKPolyline wrapped in MKRoute-like structure
+                let polyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
+                // Store as a pseudo-route - MapViewModel expects MKRoute but we can pass MKPolyline
+                currentMKRoute = nil // We'll pass the polyline directly via the result
+                print("📍 Route polyline type: [CLLocationCoordinate2D] (Google Maps)")
+                print("   Coordinates count: \(coordinates.count)")
+
+                // Store polyline for map display
+                currentPolyline = polyline
+            } else {
+                print("⚠️ Unknown route polyline type: \(type(of: result.polyline))")
             }
 
             let routeInfo = RouteInfo(
@@ -130,8 +160,26 @@ class RideFlowController: ObservableObject {
                 to: pickup
             )
 
-            // Return the MKRoute for driver animation
-            return result.polyline as? MKRoute
+            // Handle both Apple Maps and Google Maps
+            if let mkRoute = result.polyline as? MKRoute {
+                // Apple Maps: Store and return MKRoute
+                print("📍 Driver route type: MKRoute (Apple Maps)")
+                currentDriverMKRoute = mkRoute
+                return mkRoute
+            } else if let coordinates = result.polyline as? [CLLocationCoordinate2D] {
+                // Google Maps: Store as MKPolyline for consistent handling
+                print("📍 Driver route type: [CLLocationCoordinate2D] (Google Maps)")
+                print("   Driver route coordinates: \(coordinates.count)")
+
+                let polyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
+                currentDriverPolyline = polyline
+
+                // Create a pseudo MKRoute for compatibility
+                // Note: We can't create a real MKRoute, but we can use MKPolyline
+                return nil  // Coordinator will check currentDriverPolyline instead
+            }
+
+            return nil
         } catch {
             print("❌ Failed to calculate driver route: \(error)")
             return nil
