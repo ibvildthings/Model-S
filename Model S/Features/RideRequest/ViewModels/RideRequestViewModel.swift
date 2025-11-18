@@ -52,11 +52,15 @@ class RideRequestViewModel: ObservableObject {
 
     /// Handles map provider changes by recreating services and recalculating routes
     private func handleProviderChange(_ provider: MapProvider) {
-        print("📍 Provider changed to \(provider.displayName), recreating services...")
+        let providerName: String = provider.displayName
+        print("📍 Provider changed to \(providerName), recreating services...")
 
         // Recreate services with new provider
-        geocodingService = MapServiceFactory.shared.createGeocodingService()
-        routeService = MapServiceFactory.shared.createRouteCalculationService()
+        let newGeocodingService: any GeocodingService = MapServiceFactory.shared.createGeocodingService()
+        let newRouteService: any RouteCalculationService = MapServiceFactory.shared.createRouteCalculationService()
+
+        self.geocodingService = newGeocodingService
+        self.routeService = newRouteService
 
         // Recalculate route if both locations are set
         if pickupLocation != nil && destinationLocation != nil {
