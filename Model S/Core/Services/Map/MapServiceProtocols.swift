@@ -27,11 +27,9 @@ class MapProviderPreference: ObservableObject {
 
     private init() {
         // Load saved preference or default to Apple Maps
-        if let savedProvider = UserDefaults.standard.string(forKey: "selectedMapProvider") {
-            self.selectedProvider = savedProvider == "google" ? .google : .apple
-        } else {
-            self.selectedProvider = .apple
-        }
+        let savedProvider = UserDefaults.standard.string(forKey: "selectedMapProvider")
+        self._selectedProvider = Published(initialValue: savedProvider == "google" ? .google : .apple)
+        print("📍 Initialized map provider preference: \(savedProvider ?? "default to apple")")
     }
 }
 
