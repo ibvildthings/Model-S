@@ -52,7 +52,13 @@ class RideRequestViewModel: ObservableObject {
 
     /// Handles map provider changes by recreating services and recalculating routes
     private func handleProviderChange(_ provider: MapProvider) {
-        let providerName: String = provider.displayName
+        let providerName: String
+        switch provider {
+        case .apple:
+            providerName = "Apple Maps"
+        case .google:
+            providerName = "Google Maps"
+        }
         print("📍 Provider changed to \(providerName), recreating services...")
 
         // Recreate services with new provider
