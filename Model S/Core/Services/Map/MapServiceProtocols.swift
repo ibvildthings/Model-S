@@ -9,6 +9,39 @@ import Foundation
 import CoreLocation
 import Combine
 
+// MARK: - Map Provider Selection
+
+/// Supported map providers
+enum MapProvider: String, Codable, CaseIterable {
+    case apple = "Apple Maps"
+    case google = "Google Maps"
+
+    var id: String { rawValue }
+}
+
+/// Manages user's map provider preference
+@MainActor
+class MapProviderPreference: ObservableObject {
+    static let shared = MapProviderPreference()
+
+    @Published var selectedProvider: MapProvider {
+        didSet {
+            UserDefaults.standard.set(selectedProvider.rawValue, forKey: "selectedMapProvider")
+            print("📍 Map provider switched to: \(selectedProvider.rawValue)")
+        }
+    }
+
+    private init() {
+        // Load saved preference or default to Apple Maps
+        if let savedProvider = UserDefaults.standard.string(forKey: "selectedMapProvider"),
+           let provider = MapProvider(rawValue: savedProvider) {
+            self.selectedProvider = provider
+        } else {
+            self.selectedProvider = .apple
+        }
+    }
+}
+
 // MARK: - Provider-Agnostic Map Types
 
 /// Provider-agnostic coordinate span (similar to MKCoordinateSpan but with zoom support)
@@ -341,8 +374,10 @@ class MapServiceFactory {
     }
 
     /// Create a location search service instance
+    /// Uses the current user preference for map provider
     func createLocationSearchService() -> any LocationSearchService {
-        switch configuration.provider {
+        let provider = MapProviderPreference.shared.selectedProvider
+        switch provider {
         case .apple:
             return AppleLocationSearchService()
         case .google:
@@ -354,8 +389,10 @@ class MapServiceFactory {
     }
 
     /// Create a geocoding service instance
+    /// Uses the current user preference for map provider
     func createGeocodingService() -> any GeocodingService {
-        switch configuration.provider {
+        let provider = MapProviderPreference.shared.selectedProvider
+        switch provider {
         case .apple:
             return AppleGeocodingService()
         case .google:
@@ -367,8 +404,10 @@ class MapServiceFactory {
     }
 
     /// Create a route calculation service instance
+    /// Uses the current user preference for map provider
     func createRouteCalculationService() -> any RouteCalculationService {
-        switch configuration.provider {
+        let provider = MapProviderPreference.shared.selectedProvider
+        switch provider {
         case .apple:
             return AppleRouteCalculationService()
         case .google:

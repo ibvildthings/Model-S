@@ -28,8 +28,8 @@ class RideRequestViewModel: ObservableObject {
     @Published var currentRideId: String?
     @Published var estimatedDriverArrival: TimeInterval?
 
-    private let geocodingService: any GeocodingService
-    private let routeService: any RouteCalculationService
+    private var geocodingService: any GeocodingService
+    private var routeService: any RouteCalculationService
     private let rideRequestService: any RideRequestService
     private var cancellables = Set<AnyCancellable>()
 
@@ -38,6 +38,23 @@ class RideRequestViewModel: ObservableObject {
         self.geocodingService = MapServiceFactory.shared.createGeocodingService()
         self.routeService = MapServiceFactory.shared.createRouteCalculationService()
         self.rideRequestService = rideRequestService ?? RideRequestServiceFactory.shared.createRideRequestService(useMock: true)
+
+        // Observe provider changes and recalculate route when provider switches
+        MapProviderPreference.shared.$selectedProvider
+            .dropFirst() // Skip initial value
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    // Recreate services with new provider
+                    self.geocodingService = MapServiceFactory.shared.createGeocodingService()
+                    self.routeService = MapServiceFactory.shared.createRouteCalculationService()
+                    // Recalculate route if both locations are set
+                    if let pickup = self.pickupLocation, let destination = self.destinationLocation {
+                        await self.calculateRoute(from: pickup.coordinate, to: destination.coordinate)
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - Geocoding
