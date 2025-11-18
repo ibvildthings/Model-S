@@ -63,6 +63,11 @@ class DependencyContainer {
         createLoggingService()
     }()
 
+    /// Feature factory for creating feature modules
+    private(set) lazy var featureFactory: FeatureFactory = {
+        FeatureFactory(dependencies: self)
+    }()
+
     // MARK: - Initialization
 
     init(
