@@ -9,12 +9,12 @@ import SwiftUI
 import MapKit
 
 struct MapViewWrapper: UIViewRepresentable {
-    @Binding var region: MKCoordinateRegion
+    @Binding var region: MapRegion  // Provider-agnostic region type
     var pickupLocation: CLLocationCoordinate2D?
     var destinationLocation: CLLocationCoordinate2D?
     var driverLocation: CLLocationCoordinate2D?
-    var route: MKPolyline?
-    var driverRoute: MKPolyline?
+    var route: [CLLocationCoordinate2D]?  // Provider-agnostic coordinate array
+    var driverRoute: [CLLocationCoordinate2D]?  // Provider-agnostic coordinate array
     var routeDisplayMode: RouteDisplayMode
     var showsUserLocation: Bool
     var routeLineColor: Color
@@ -31,15 +31,24 @@ struct MapViewWrapper: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        // Convert MapRegion to MKCoordinateRegion for Apple Maps
+        let mkRegion = MKCoordinateRegion(
+            center: region.center,
+            span: MKCoordinateSpan(
+                latitudeDelta: region.span.latitudeDelta,
+                longitudeDelta: region.span.longitudeDelta
+            )
+        )
+
         // Update region if changed significantly
         let currentRegion = mapView.region
-        let regionChanged = abs(currentRegion.center.latitude - region.center.latitude) > 0.001 ||
-                           abs(currentRegion.center.longitude - region.center.longitude) > 0.001 ||
-                           abs(currentRegion.span.latitudeDelta - region.span.latitudeDelta) > 0.001 ||
-                           abs(currentRegion.span.longitudeDelta - region.span.longitudeDelta) > 0.001
+        let regionChanged = abs(currentRegion.center.latitude - mkRegion.center.latitude) > 0.001 ||
+                           abs(currentRegion.center.longitude - mkRegion.center.longitude) > 0.001 ||
+                           abs(currentRegion.span.latitudeDelta - mkRegion.span.latitudeDelta) > 0.001 ||
+                           abs(currentRegion.span.longitudeDelta - mkRegion.span.longitudeDelta) > 0.001
 
         if regionChanged && !context.coordinator.isUserInteracting {
-            mapView.setRegion(region, animated: true)
+            mapView.setRegion(mkRegion, animated: true)
         }
 
         // Update annotations
@@ -147,20 +156,25 @@ struct MapViewWrapper: UIViewRepresentable {
             }
         }
 
-        func updateRoute(mapView: MKMapView, mainRoute: MKPolyline?, driverRoute: MKPolyline?, displayMode: RouteDisplayMode) {
+        func updateRoute(mapView: MKMapView, mainRoute: [CLLocationCoordinate2D]?, driverRoute: [CLLocationCoordinate2D]?, displayMode: RouteDisplayMode) {
             // Determine which route to display based on mode
-            let routeToDisplay: MKPolyline?
+            let coordsToDisplay: [CLLocationCoordinate2D]?
             switch displayMode {
             case .approach:
                 // Show driver route (driver → pickup) if available, otherwise show main route
-                routeToDisplay = driverRoute ?? mainRoute
+                coordsToDisplay = driverRoute ?? mainRoute
             case .activeRide:
                 // Show main route (pickup → destination)
-                routeToDisplay = mainRoute
+                coordsToDisplay = mainRoute
             }
 
-            // Check if we need to update the route
-            let needsUpdate = currentRoute !== routeToDisplay || currentDisplayMode != displayMode
+            // Convert coordinates to MKPolyline
+            let routeToDisplay: MKPolyline? = coordsToDisplay.map { coords in
+                MKPolyline(coordinates: coords, count: coords.count)
+            }
+
+            // Check if we need to update the route (compare by coordinates, not reference)
+            let needsUpdate = !arePolylinesSame(currentRoute, routeToDisplay) || currentDisplayMode != displayMode
 
             if needsUpdate {
                 // Remove old route overlay
@@ -178,6 +192,18 @@ struct MapViewWrapper: UIViewRepresentable {
                     let routeType = displayMode == .approach ? "approach (driver → pickup)" : "active ride (pickup → destination)"
                     print("🛣️ Displaying \(routeType) route")
                 }
+            }
+        }
+
+        // Helper to compare polylines by coordinate count (avoid unnecessary updates)
+        private func arePolylinesSame(_ lhs: MKPolyline?, _ rhs: MKPolyline?) -> Bool {
+            switch (lhs, rhs) {
+            case (nil, nil):
+                return true
+            case (nil, _), (_, nil):
+                return false
+            case (let l?, let r?):
+                return l.pointCount == r.pointCount
             }
         }
 
@@ -243,9 +269,16 @@ struct MapViewWrapper: UIViewRepresentable {
         }
 
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
-            // Update parent's region when user pans/zooms
+            // Update parent's region when user pans/zooms (convert to MapRegion)
             DispatchQueue.main.async {
-                self.parent.region = mapView.region
+                let mkRegion = mapView.region
+                self.parent.region = MapRegion(
+                    center: mkRegion.center,
+                    span: MapCoordinateSpan(
+                        latitudeDelta: mkRegion.span.latitudeDelta,
+                        longitudeDelta: mkRegion.span.longitudeDelta
+                    )
+                )
                 self.isUserInteracting = false
             }
         }

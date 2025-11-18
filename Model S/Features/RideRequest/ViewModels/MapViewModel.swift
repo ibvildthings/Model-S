@@ -32,14 +32,14 @@ class MapViewModel: NSObject, ObservableObject {
     /// Location to show destination pin (presentation state only)
     @Published var destinationLocation: LocationPoint?
 
-    /// Current map region (center and zoom level)
-    @Published var region: MKCoordinateRegion
+    /// Current map region (center and zoom level) - provider-agnostic
+    @Published var region: MapRegion
 
-    /// Route polyline to display on map (pickup to destination)
-    @Published var routePolyline: MKPolyline?
+    /// Route polyline to display on map (pickup to destination) - provider-agnostic coordinates
+    @Published var routePolyline: [CLLocationCoordinate2D]?
 
-    /// Driver's route polyline (driver location to pickup) - used for driver animation
-    @Published var driverRoutePolyline: MKPolyline?
+    /// Driver's route polyline (driver location to pickup) - provider-agnostic coordinates
+    @Published var driverRoutePolyline: [CLLocationCoordinate2D]?
 
     /// Current route display mode (approach vs active ride)
     @Published var routeDisplayMode: RouteDisplayMode = .approach
@@ -99,10 +99,13 @@ class MapViewModel: NSObject, ObservableObject {
         let lastLocation = CLLocationManager().location
         let initialCenter = lastLocation?.coordinate ?? MapConstants.defaultCenter
 
-        // Start with user's location or default region
-        self.region = MKCoordinateRegion(
+        // Start with user's location or default region (using provider-agnostic MapRegion)
+        self.region = MapRegion(
             center: initialCenter,
-            span: MapConstants.defaultSpan
+            span: MapCoordinateSpan(
+                latitudeDelta: MapConstants.defaultSpan.latitudeDelta,
+                longitudeDelta: MapConstants.defaultSpan.longitudeDelta
+            )
         )
 
         super.init()
@@ -176,15 +179,13 @@ class MapViewModel: NSObject, ObservableObject {
     }
 
     /// Updates the route polyline and centers map on the route
-    /// - Parameter route: The MKRoute to display
-    func updateRouteFromMKRoute(_ route: MKRoute) {
-        self.routePolyline = route.polyline
+    /// - Parameter coordinates: Array of coordinates defining the route
+    func updateRoute(_ coordinates: [CLLocationCoordinate2D]) {
+        self.routePolyline = coordinates
 
         // Center map on route with generous padding to show both pickup and destination clearly
-        let padding: Double = 5000 // Increased padding for better visibility
-        let rect = route.polyline.boundingMapRect
-        let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
-        let newRegion = MKCoordinateRegion(paddedRect)
+        let bounds = MapBounds(coordinates: coordinates)
+        let newRegion = bounds.toRegion(paddingMultiplier: 1.3)
 
         print("📍 Zooming to show route: center=\(newRegion.center), span=\(newRegion.span)")
 
@@ -196,16 +197,25 @@ class MapViewModel: NSObject, ObservableObject {
         }
     }
 
+    /// Updates the route polyline and centers map on the route (backwards compatibility)
+    /// - Parameter route: The MKRoute to display (converts to coordinates)
+    func updateRouteFromMKRoute(_ route: MKRoute) {
+        // Extract coordinates from MKRoute for backwards compatibility
+        let polyline = route.polyline
+        var coordinates = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: polyline.pointCount)
+        polyline.getCoordinates(&coordinates, range: NSRange(location: 0, length: polyline.pointCount))
+
+        updateRoute(coordinates)
+    }
+
     /// Updates the driver's route polyline (from driver location to pickup)
-    /// - Parameter route: The MKRoute for the driver's path to pickup
-    func updateDriverRoute(_ route: MKRoute) {
-        self.driverRoutePolyline = route.polyline
+    /// - Parameter coordinates: Array of coordinates defining the driver's route
+    func updateDriverRouteCoordinates(_ coordinates: [CLLocationCoordinate2D]) {
+        self.driverRoutePolyline = coordinates
 
         // Center map on driver route with generous padding to show driver and pickup
-        let padding: Double = 5000 // Same padding as main route for consistency
-        let rect = route.polyline.boundingMapRect
-        let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
-        let newRegion = MKCoordinateRegion(paddedRect)
+        let bounds = MapBounds(coordinates: coordinates)
+        let newRegion = bounds.toRegion(paddingMultiplier: 1.3)
 
         print("🚗 Zooming to show driver route: center=\(newRegion.center), span=\(newRegion.span)")
 
@@ -217,12 +227,26 @@ class MapViewModel: NSObject, ObservableObject {
         }
     }
 
+    /// Updates the driver's route polyline (from driver location to pickup) - backwards compatibility
+    /// - Parameter route: The MKRoute for the driver's path to pickup (converts to coordinates)
+    func updateDriverRoute(_ route: MKRoute) {
+        // Extract coordinates from MKRoute for backwards compatibility
+        let polyline = route.polyline
+        var coordinates = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: polyline.pointCount)
+        polyline.getCoordinates(&coordinates, range: NSRange(location: 0, length: polyline.pointCount))
+
+        updateDriverRouteCoordinates(coordinates)
+    }
+
     /// Centers the map on the user's current location
     func centerOnUserLocation() {
         if let location = userLocation {
-            let newRegion = MKCoordinateRegion(
+            let newRegion = MapRegion(
                 center: location.coordinate,
-                span: MapConstants.defaultSpan
+                span: MapCoordinateSpan(
+                    latitudeDelta: MapConstants.defaultSpan.latitudeDelta,
+                    longitudeDelta: MapConstants.defaultSpan.longitudeDelta
+                )
             )
 
             Task { @MainActor in
@@ -246,7 +270,7 @@ class MapViewModel: NSObject, ObservableObject {
     ///   - estimatedDuration: Backend's ETA in seconds (used to sync animation speed)
     func startDriverAnimation(from startingCoordinate: CLLocationCoordinate2D? = nil, estimatedDuration: TimeInterval? = nil) {
         // Use driver's route (driver to pickup) if available, otherwise fall back to main route
-        guard let polyline = driverRoutePolyline ?? routePolyline else {
+        guard let coordinates = driverRoutePolyline ?? routePolyline else {
             print("❌ Cannot start driver animation: no route available")
             return
         }
@@ -264,7 +288,7 @@ class MapViewModel: NSObject, ObservableObject {
             print("⚠️ No ETA provided, using default animation speed")
         }
 
-        print("🚗 Starting driver animation with \(polyline.pointCount) points (using \(driverRoutePolyline != nil ? "driver route" : "main route"))")
+        print("🚗 Starting driver animation with \(coordinates.count) points (using \(driverRoutePolyline != nil ? "driver route" : "main route"))")
 
         // Stop any existing animation
         stopDriverAnimation()
@@ -276,15 +300,14 @@ class MapViewModel: NSObject, ObservableObject {
         if let start = startingCoordinate {
             driverLocation = start
             // Calculate initial progress based on starting position
-            routeProgress = calculateProgress(for: start, on: polyline)
+            routeProgress = calculateProgress(for: start, on: coordinates)
             print("🚗 Driver starting at custom position: \(start)")
         } else {
             // Start from beginning of route
             routeProgress = 0.0
-            if polyline.pointCount > 0 {
-                let points = polyline.points()
-                driverLocation = points[0].coordinate
-                print("🚗 Driver starting at beginning of route: \(points[0].coordinate)")
+            if !coordinates.isEmpty {
+                driverLocation = coordinates[0]
+                print("🚗 Driver starting at beginning of route: \(coordinates[0])")
             }
         }
 
@@ -316,39 +339,14 @@ class MapViewModel: NSObject, ObservableObject {
             coordinates.append(destination.coordinate)
         }
 
-        // Calculate bounding box for all coordinates
-        guard !coordinates.isEmpty else { return }
+        // Use MapBounds to calculate optimal region
+        let bounds = MapBounds(coordinates: coordinates)
+        let newRegion = bounds.toRegion(paddingMultiplier: 1.3)
 
-        var minLat = coordinates[0].latitude
-        var maxLat = coordinates[0].latitude
-        var minLon = coordinates[0].longitude
-        var maxLon = coordinates[0].longitude
-
-        for coord in coordinates {
-            minLat = min(minLat, coord.latitude)
-            maxLat = max(maxLat, coord.latitude)
-            minLon = min(minLon, coord.longitude)
-            maxLon = max(maxLon, coord.longitude)
-        }
-
-        let center = CLLocationCoordinate2D(
-            latitude: (minLat + maxLat) / 2,
-            longitude: (minLon + maxLon) / 2
-        )
-
-        // Add 30% padding to ensure all points are visible
-        let latDelta = (maxLat - minLat) * 1.3
-        let lonDelta = (maxLon - minLon) * 1.3
-
-        let span = MKCoordinateSpan(
-            latitudeDelta: max(latDelta, 0.01), // Minimum span
-            longitudeDelta: max(lonDelta, 0.01)
-        )
-
-        print("📍 Adjusting viewport to include driver: center=\(center), span=\(span)")
+        print("📍 Adjusting viewport to include driver: center=\(newRegion.center), span=\(newRegion.span)")
 
         withAnimation(.easeInOut(duration: 0.8)) {
-            region = MKCoordinateRegion(center: center, span: span)
+            region = newRegion
         }
     }
 
@@ -420,14 +418,14 @@ class MapViewModel: NSObject, ObservableObject {
         let latDelta = abs(driver.latitude - targetCoordinate.latitude) * paddingMultiplier
         let lonDelta = abs(driver.longitude - targetCoordinate.longitude) * paddingMultiplier
 
-        let span = MKCoordinateSpan(
+        let span = MapCoordinateSpan(
             latitudeDelta: max(latDelta, 0.005), // Minimum span for close proximity
             longitudeDelta: max(lonDelta, 0.005)
         )
 
         // Smooth animation for viewport changes
         withAnimation(.easeInOut(duration: 1.0)) {
-            region = MKCoordinateRegion(center: center, span: span)
+            region = MapRegion(center: center, span: span)
         }
     }
 
@@ -454,7 +452,7 @@ class MapViewModel: NSObject, ObservableObject {
     /// Updates the driver's position along the route
     private func updateDriverPosition() {
         // Use driver's route if available, otherwise fall back to main route
-        guard let polyline = driverRoutePolyline ?? routePolyline else {
+        guard let coordinates = driverRoutePolyline ?? routePolyline else {
             stopDriverAnimation()
             return
         }
@@ -478,12 +476,11 @@ class MapViewModel: NSObject, ObservableObject {
         }
 
         // Calculate new position along polyline
-        let points = polyline.points()
-        let totalPoints = polyline.pointCount
+        let totalPoints = coordinates.count
         let currentIndex = Int(Double(totalPoints - 1) * routeProgress)
 
         if currentIndex < totalPoints {
-            let newLocation = points[currentIndex].coordinate
+            let newLocation = coordinates[currentIndex]
             driverLocation = newLocation
 
             // Log every 50 updates to avoid spam
@@ -510,9 +507,8 @@ class MapViewModel: NSObject, ObservableObject {
     }
 
     /// Calculates progress (0.0-1.0) for a given coordinate on the polyline
-    private func calculateProgress(for coordinate: CLLocationCoordinate2D, on polyline: MKPolyline) -> Double {
-        let points = polyline.points()
-        let totalPoints = polyline.pointCount
+    private func calculateProgress(for coordinate: CLLocationCoordinate2D, on coordinates: [CLLocationCoordinate2D]) -> Double {
+        let totalPoints = coordinates.count
 
         guard totalPoints > 0 else { return 0.0 }
 
@@ -520,8 +516,7 @@ class MapViewModel: NSObject, ObservableObject {
         var closestIndex = 0
         var minDistance = Double.infinity
 
-        for i in 0..<totalPoints {
-            let point = points[i].coordinate
+        for (i, point) in coordinates.enumerated() {
             let distance = self.distance(from: coordinate, to: point)
             if distance < minDistance {
                 minDistance = distance
@@ -565,9 +560,12 @@ extension MapViewModel: CLLocationManagerDelegate {
         if isFirstLocation && pickupLocation == nil && destinationLocation == nil {
             print("📍 Centering map on user's location for the first time")
             withAnimation(.easeInOut(duration: 0.5)) {
-                region = MKCoordinateRegion(
+                region = MapRegion(
                     center: location.coordinate,
-                    span: MapConstants.defaultSpan
+                    span: MapCoordinateSpan(
+                        latitudeDelta: MapConstants.defaultSpan.latitudeDelta,
+                        longitudeDelta: MapConstants.defaultSpan.longitudeDelta
+                    )
                 )
             }
         }

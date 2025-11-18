@@ -327,7 +327,7 @@ class GoogleRouteCalculationService: RouteCalculationService {
         return RouteResult(
             distance: leg.distance.value,
             expectedTravelTime: leg.duration.value,
-            polyline: coordinates // Array of CLLocationCoordinate2D
+            coordinates: coordinates // Provider-agnostic coordinate array
         )
     }
 

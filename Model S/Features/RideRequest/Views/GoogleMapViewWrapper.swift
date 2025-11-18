@@ -39,23 +39,23 @@ extension GMSPath {
 
 /// Google Maps implementation using GMSMapView
 struct GoogleMapViewWrapper: UIViewRepresentable {
-    @Binding var region: MKCoordinateRegion
+    @Binding var region: MapRegion  // Provider-agnostic region type (no more conversion bugs!)
     var pickupLocation: CLLocationCoordinate2D?
     var destinationLocation: CLLocationCoordinate2D?
     var driverLocation: CLLocationCoordinate2D?
-    var route: Any? // Will be [CLLocationCoordinate2D] from GoogleRouteCalculationService
-    var driverRoute: Any?
+    var route: [CLLocationCoordinate2D]?  // Provider-agnostic coordinate array
+    var driverRoute: [CLLocationCoordinate2D]?  // Provider-agnostic coordinate array
     var routeDisplayMode: RouteDisplayMode
     var showsUserLocation: Bool
     var routeLineColor: Color
     var routeLineWidth: CGFloat
 
     func makeUIView(context: Context) -> GMSMapView {
-        // Create camera position
+        // Create camera position using MapRegion's built-in zoom level (no conversion needed!)
         let camera = GMSCameraPosition.camera(
             withLatitude: region.center.latitude,
             longitude: region.center.longitude,
-            zoom: zoomLevelFromSpan(region.span)
+            zoom: region.span.zoomLevel
         )
 
         // Create Google Maps view using modern initializer
@@ -78,7 +78,7 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
         // Debug logging
         print("🗺️ Google Maps view created")
         print("   📍 Location: \(region.center.latitude), \(region.center.longitude)")
-        print("   🔍 Zoom: \(zoomLevelFromSpan(region.span))")
+        print("   🔍 Zoom: \(region.span.zoomLevel)")
         print("   🗺️ Map type: normal")
         print("")
         print("⏳ Waiting for map tiles to load...")
@@ -120,10 +120,10 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: GMSMapView, context: Context) {
-        // Update region if changed significantly (matches Apple Maps behavior)
+        // Update region if changed significantly (using MapRegion's zoom level directly - no conversion!)
         let currentCenter = mapView.camera.target
         let currentZoom = mapView.camera.zoom
-        let targetZoom = zoomLevelFromSpan(region.span)
+        let targetZoom = region.span.zoomLevel  // Direct access, no lossy conversion!
 
         let centerChanged = abs(currentCenter.latitude - region.center.latitude) > 0.001 ||
                            abs(currentCenter.longitude - region.center.longitude) > 0.001
@@ -145,45 +145,18 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
             driver: driverLocation
         )
 
-        // Convert route to coordinates if needed
-        let mainRouteCoords: [CLLocationCoordinate2D]?
-        if let coords = route as? [CLLocationCoordinate2D] {
-            mainRouteCoords = coords
-        } else if let polyline = route as? MKPolyline {
-            mainRouteCoords = polyline.coordinates()
-        } else {
-            mainRouteCoords = nil
-        }
-
-        let driverRouteCoords: [CLLocationCoordinate2D]?
-        if let coords = driverRoute as? [CLLocationCoordinate2D] {
-            driverRouteCoords = coords
-        } else if let polyline = driverRoute as? MKPolyline {
-            driverRouteCoords = polyline.coordinates()
-        } else {
-            driverRouteCoords = nil
-        }
-
-        // Update route overlay based on display mode
+        // Routes are already in the correct format ([CLLocationCoordinate2D])
+        // No type conversion needed - pass directly!
         context.coordinator.updateRoute(
             mapView: mapView,
-            mainRoute: mainRouteCoords,
-            driverRoute: driverRouteCoords,
+            mainRoute: route,
+            driverRoute: driverRoute,
             displayMode: routeDisplayMode
         )
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
-    }
-
-    // MARK: - Helper Methods
-
-    private func zoomLevelFromSpan(_ span: MKCoordinateSpan) -> Float {
-        // Convert MKCoordinateSpan to Google Maps zoom level (0-21)
-        let latitudeDelta = span.latitudeDelta
-        let zoom = log2(360.0 / latitudeDelta)
-        return Float(max(0, min(21, zoom)))
     }
 
     // MARK: - Coordinator
@@ -332,11 +305,11 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
 
         func mapView(_ mapView: GMSMapView, idleAt position: GMSCameraPosition) {
             // Update parent's region when camera stops moving
-            let span = MKCoordinateSpan(
-                latitudeDelta: 360.0 / pow(2.0, Double(position.zoom)),
-                longitudeDelta: 360.0 / pow(2.0, Double(position.zoom))
+            // Use MapRegion's zoom-based initializer - no lossy conversions!
+            let region = MapRegion(
+                center: position.target,
+                zoom: position.zoom
             )
-            let region = MKCoordinateRegion(center: position.target, span: span)
 
             DispatchQueue.main.async {
                 self.parent.region = region
@@ -451,12 +424,12 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
 /// Fallback when Google Maps SDK is not installed
 /// Shows informative placeholder and uses Apple Maps
 struct GoogleMapViewWrapper: UIViewRepresentable {
-    @Binding var region: MKCoordinateRegion
+    @Binding var region: MapRegion  // Provider-agnostic region type
     var pickupLocation: CLLocationCoordinate2D?
     var destinationLocation: CLLocationCoordinate2D?
     var driverLocation: CLLocationCoordinate2D?
-    var route: Any?
-    var driverRoute: Any?
+    var route: [CLLocationCoordinate2D]?  // Provider-agnostic coordinate array
+    var driverRoute: [CLLocationCoordinate2D]?  // Provider-agnostic coordinate array
     var routeDisplayMode: RouteDisplayMode
     var showsUserLocation: Bool
     var routeLineColor: Color

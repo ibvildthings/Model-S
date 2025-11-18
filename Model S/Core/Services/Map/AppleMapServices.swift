@@ -185,10 +185,15 @@ class AppleRouteCalculationService: RouteCalculationService {
             throw RideRequestError.routeCalculationFailed
         }
 
+        // Extract coordinates from MKPolyline to provider-agnostic array
+        let polyline = route.polyline
+        var coordinates = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: polyline.pointCount)
+        polyline.getCoordinates(&coordinates, range: NSRange(location: 0, length: polyline.pointCount))
+
         return RouteResult(
             distance: route.distance,
             expectedTravelTime: route.expectedTravelTime,
-            polyline: route // Store full MKRoute for Apple implementation
+            coordinates: coordinates
         )
     }
 }
