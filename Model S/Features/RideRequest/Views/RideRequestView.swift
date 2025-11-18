@@ -65,9 +65,10 @@ struct RideRequestView: View {
 
             // Location Card Overlay (Top)
             VStack(spacing: 12) {
-                // Map provider switcher
+                // Map provider switcher - positioned at top of safe area
                 MapProviderSwitcher()
                     .padding(.horizontal, 16)
+                    .padding(.top, 8)  // Small padding from safe area top
 
                 RideLocationCard(
                     pickupText: $pickupText,
@@ -99,7 +100,6 @@ struct RideRequestView: View {
 
                 Spacer()
             }
-            .padding(.top, 60)
 
             // Confirm Slider (Bottom)
             if showSlider && rideState == .routeReady {
