@@ -58,7 +58,7 @@ struct RideMapView: View {
     private var mapProviderSwitcher: some View {
         Picker("Map Provider", selection: $providerPreference.selectedProvider) {
             ForEach(MapProvider.allCases, id: \.self) { provider in
-                Text(provider.displayName)
+                Text(provider == .apple ? "Apple" : "Google")
                     .tag(provider)
             }
         }

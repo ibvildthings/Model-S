@@ -325,13 +325,6 @@ protocol RouteCalculationService {
 enum MapProvider: CaseIterable, Hashable {
     case apple
     case google
-
-    var displayName: String {
-        switch self {
-        case .apple: return "Apple"
-        case .google: return "Google"
-        }
-    }
 }
 
 /// Configuration for map services
