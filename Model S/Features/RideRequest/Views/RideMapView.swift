@@ -2,6 +2,9 @@
 //  RideMapView.swift
 //  Model S
 //
+//  Universal map view that switches between Apple Maps and Google Maps
+//  based on the configured map provider.
+//
 //  Created by Pritesh Desai on 11/12/25.
 //
 
@@ -12,19 +15,20 @@ struct RideMapView: View {
     @ObservedObject var viewModel: MapViewModel
     var configuration: RideRequestConfiguration = .default
 
+    // Determine which map provider to use
+    private var mapProvider: MapProvider {
+        MapServiceFactory.shared.configuration.provider
+    }
+
     var body: some View {
-        MapViewWrapper(
-            region: $viewModel.region,
-            pickupLocation: viewModel.pickupLocation?.coordinate,
-            destinationLocation: viewModel.destinationLocation?.coordinate,
-            driverLocation: viewModel.driverLocation,
-            route: viewModel.routePolyline as? MKPolyline,
-            driverRoute: viewModel.driverRoutePolyline as? MKPolyline,
-            routeDisplayMode: viewModel.routeDisplayMode,
-            showsUserLocation: true,
-            routeLineColor: configuration.routeLineColor,
-            routeLineWidth: configuration.routeLineWidth
-        )
+        Group {
+            switch mapProvider {
+            case .apple:
+                appleMapView
+            case .google:
+                googleMapView
+            }
+        }
         .onChange(of: viewModel.pickupLocation) { _ in
             if viewModel.pickupLocation != nil {
                 hapticFeedback()
@@ -40,7 +44,41 @@ struct RideMapView: View {
                 hapticFeedback()
             }
         }
-        .accessibilityLabel("Ride request map")
+        .accessibilityLabel("Ride request map - \(mapProvider == .apple ? "Apple Maps" : "Google Maps")")
+    }
+
+    // MARK: - Apple Maps View
+
+    private var appleMapView: some View {
+        MapViewWrapper(
+            region: $viewModel.region,
+            pickupLocation: viewModel.pickupLocation?.coordinate,
+            destinationLocation: viewModel.destinationLocation?.coordinate,
+            driverLocation: viewModel.driverLocation,
+            route: viewModel.routePolyline as? MKPolyline,
+            driverRoute: viewModel.driverRoutePolyline as? MKPolyline,
+            routeDisplayMode: viewModel.routeDisplayMode,
+            showsUserLocation: true,
+            routeLineColor: configuration.routeLineColor,
+            routeLineWidth: configuration.routeLineWidth
+        )
+    }
+
+    // MARK: - Google Maps View
+
+    private var googleMapView: some View {
+        GoogleMapViewWrapper(
+            region: $viewModel.region,
+            pickupLocation: viewModel.pickupLocation?.coordinate,
+            destinationLocation: viewModel.destinationLocation?.coordinate,
+            driverLocation: viewModel.driverLocation,
+            route: viewModel.routePolyline, // Google uses [CLLocationCoordinate2D]
+            driverRoute: viewModel.driverRoutePolyline,
+            routeDisplayMode: viewModel.routeDisplayMode,
+            showsUserLocation: true,
+            routeLineColor: configuration.routeLineColor,
+            routeLineWidth: configuration.routeLineWidth
+        )
     }
 
     private func hapticFeedback() {
@@ -50,6 +88,11 @@ struct RideMapView: View {
 }
 
 // MARK: - Preview
-#Preview {
+#Preview("Apple Maps") {
     RideMapView(viewModel: MapViewModel())
+}
+
+#Preview("Google Maps") {
+    let _ = MapServiceFactory.shared.configure(with: .google)
+    return RideMapView(viewModel: MapViewModel())
 }

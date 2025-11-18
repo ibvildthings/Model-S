@@ -343,8 +343,29 @@ class RideRequestCoordinator: ObservableObject {
             print("🔄 Handling .routeReady")
             // Update map with the calculated route
             if let mkRoute = flowController.currentMKRoute {
-                print("📍 Updating map with calculated route")
+                // Apple Maps: Use MKRoute
+                print("📍 Updating map with calculated route (Apple Maps)")
                 mapViewModel.updateRouteFromMKRoute(mkRoute)
+            } else if let polyline = flowController.currentPolyline {
+                // Google Maps: Use MKPolyline (match Apple Maps behavior exactly)
+                print("📍 Updating map with calculated route (Google Maps)")
+                mapViewModel.routePolyline = polyline
+
+                // Center map on route with generous padding (matches Apple Maps 5000m padding)
+                let padding: Double = 5000
+                let rect = polyline.boundingMapRect
+                let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
+                let newRegion = MKCoordinateRegion(paddedRect)
+
+                print("📍 Zooming to show route: center=\(newRegion.center), span=\(newRegion.span)")
+
+                Task { @MainActor in
+                    withAnimation(.easeInOut(duration: TimingConstants.mapAnimationDuration)) {
+                        mapViewModel.region = newRegion
+                    }
+                }
+            } else {
+                print("⚠️ No route available to display")
             }
 
         case .driverEnRoute(_, let driver, let eta, let pickup, _):
@@ -364,13 +385,38 @@ class RideRequestCoordinator: ObservableObject {
             if let driverLocation = driver.currentLocation {
                 Task {
                     print("🚗 Calculating initial driver route from \(driverLocation) to \(pickup.coordinate)")
-                    if let driverRoute = await flowController.calculateDriverRoute(
+                    _ = await flowController.calculateDriverRoute(
                         from: driverLocation,
                         to: pickup.coordinate
-                    ) {
-                        mapViewModel.updateDriverRoute(driverRoute)
+                    )
+
+                    // Update map with driver route (handles both Apple and Google Maps)
+                    if let mkRoute = flowController.currentDriverMKRoute {
+                        // Apple Maps
+                        print("📍 Updating map with driver route (Apple Maps)")
+                        mapViewModel.updateDriverRoute(mkRoute)
                         lastRouteCalculationPosition = driverLocation
-                        print("✅ Driver route displayed (will update dynamically as driver moves)")
+                        print("✅ Driver route displayed")
+                    } else if let polyline = flowController.currentDriverPolyline {
+                        // Google Maps
+                        print("📍 Updating map with driver route (Google Maps)")
+                        mapViewModel.driverRoutePolyline = polyline
+
+                        // Center map on driver route with padding (matches Apple Maps behavior)
+                        let padding: Double = 5000
+                        let rect = polyline.boundingMapRect
+                        let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
+                        let newRegion = MKCoordinateRegion(paddedRect)
+
+                        print("🚗 Zooming to show driver route: center=\(newRegion.center), span=\(newRegion.span)")
+
+                        await MainActor.run {
+                            withAnimation(.easeInOut(duration: TimingConstants.mapAnimationDuration)) {
+                                mapViewModel.region = newRegion
+                            }
+                        }
+                        lastRouteCalculationPosition = driverLocation
+                        print("✅ Driver route displayed")
                     }
                 }
             }
@@ -399,14 +445,75 @@ class RideRequestCoordinator: ObservableObject {
             // Calculate initial route from current position to destination
             if let driverLocation = driver.currentLocation {
                 Task {
-                    print("🚗 Calculating initial route from current position to \(destination.coordinate)")
-                    if let destRoute = await flowController.calculateDriverRoute(
+                    print("🚗 Calculating remaining route from current position to \(destination.coordinate)")
+                    _ = await flowController.calculateDriverRoute(
                         from: driverLocation,
                         to: destination.coordinate
-                    ) {
-                        mapViewModel.routePolyline = destRoute.polyline
+                    )
+
+                    // Update map with remaining route (handles both Apple and Google Maps)
+                    if let mkRoute = flowController.currentDriverMKRoute {
+                        // Apple Maps
+                        print("📍 Updating map with remaining route (Apple Maps)")
+                        mapViewModel.routePolyline = mkRoute.polyline
                         lastRouteCalculationPosition = driverLocation
-                        print("✅ Destination route displayed (will update dynamically as driver moves)")
+                        print("✅ Remaining route displayed")
+                    } else if let polyline = flowController.currentDriverPolyline {
+                        // Google Maps - Store in currentPolyline for consistent access
+                        print("📍 Updating map with remaining route (Google Maps)")
+
+                        // IMPORTANT: Update currentPolyline so dynamic updates work correctly
+                        flowController.updateStoredPolyline(polyline)
+                        mapViewModel.routePolyline = polyline
+
+                        // Zoom to show driver AND destination (not just the route)
+                        // This matches Apple Maps bounding box approach
+                        let driverCoord = driverLocation
+                        let destCoord = destination.coordinate
+
+                        // Calculate center point between driver and destination
+                        let center = CLLocationCoordinate2D(
+                            latitude: (driverCoord.latitude + destCoord.latitude) / 2,
+                            longitude: (driverCoord.longitude + destCoord.longitude) / 2
+                        )
+
+                        // Calculate distance for dynamic padding
+                        let driverCL = CLLocation(latitude: driverCoord.latitude, longitude: driverCoord.longitude)
+                        let destCL = CLLocation(latitude: destCoord.latitude, longitude: destCoord.longitude)
+                        let distance = driverCL.distance(from: destCL)
+
+                        // Use same dynamic padding as Apple Maps
+                        let paddingMultiplier: Double
+                        if distance > 5000 {
+                            paddingMultiplier = 1.5
+                        } else if distance > 2000 {
+                            paddingMultiplier = 1.3
+                        } else if distance > 500 {
+                            paddingMultiplier = 1.2
+                        } else {
+                            paddingMultiplier = 1.1
+                        }
+
+                        // Calculate span to include both points with padding
+                        let latDelta = abs(driverCoord.latitude - destCoord.latitude) * paddingMultiplier
+                        let lonDelta = abs(driverCoord.longitude - destCoord.longitude) * paddingMultiplier
+
+                        let span = MKCoordinateSpan(
+                            latitudeDelta: max(latDelta, 0.01),
+                            longitudeDelta: max(lonDelta, 0.01)
+                        )
+
+                        let newRegion = MKCoordinateRegion(center: center, span: span)
+
+                        print("🚗 Zooming to show driver and destination: center=\(center), span=\(span), distance=\(Int(distance))m")
+
+                        await MainActor.run {
+                            withAnimation(.easeInOut(duration: TimingConstants.mapAnimationDuration)) {
+                                mapViewModel.region = newRegion
+                            }
+                        }
+                        lastRouteCalculationPosition = driverLocation
+                        print("✅ Remaining route displayed with driver and destination visible")
                     }
                 }
             }
@@ -504,24 +611,39 @@ class RideRequestCoordinator: ObservableObject {
 
         defer { isCalculatingRoute = false }
 
-        if let newRoute = await flowController.calculateDriverRoute(from: driverLocation, to: target) {
-            // Check if task was cancelled while we were calculating
-            guard !Task.isCancelled else {
-                print("⏭️ Route calculation cancelled (newer position arrived)")
-                return
-            }
+        _ = await flowController.calculateDriverRoute(from: driverLocation, to: target)
 
-            // Update the appropriate route polyline
-            if isApproachPhase {
-                mapViewModel.updateDriverRoute(newRoute)
-            } else {
-                // For active ride, update the main route polyline
-                mapViewModel.routePolyline = newRoute.polyline
-            }
-
-            // Update last calculation position
-            lastRouteCalculationPosition = driverLocation
-            print("✅ Route updated from current position")
+        // Check if task was cancelled while we were calculating
+        guard !Task.isCancelled else {
+            print("⏭️ Route calculation cancelled (newer position arrived)")
+            return
         }
+
+        // Update the appropriate route polyline (handles both Apple and Google Maps)
+        if isApproachPhase {
+            // Approach phase: Update driver route
+            if let mkRoute = flowController.currentDriverMKRoute {
+                // Apple Maps
+                mapViewModel.updateDriverRoute(mkRoute)
+            } else if let polyline = flowController.currentDriverPolyline {
+                // Google Maps - just update polyline, don't re-zoom (driver is moving)
+                mapViewModel.driverRoutePolyline = polyline
+            }
+        } else {
+            // Active ride: Update main route from current position to destination
+            if let mkRoute = flowController.currentDriverMKRoute {
+                // Apple Maps
+                mapViewModel.routePolyline = mkRoute.polyline
+            } else if let polyline = flowController.currentDriverPolyline {
+                // Google Maps - Use the newly calculated route (driver → destination)
+                // Also store it in currentPolyline for consistency
+                flowController.updateStoredPolyline(polyline)
+                mapViewModel.routePolyline = polyline
+            }
+        }
+
+        // Update last calculation position
+        lastRouteCalculationPosition = driverLocation
+        print("✅ Route updated from current position")
     }
 }

@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		7BD6A0F82ECB60CE0066E681 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = 7BD6A0F72ECB60CE0066E681 /* GoogleMaps */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		7B39005C2ECB14F4003DAE99 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -39,6 +43,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7BD6A0F82ECB60CE0066E681 /* GoogleMaps in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +95,7 @@
 			);
 			name = "Model S";
 			packageProductDependencies = (
+				7BD6A0F72ECB60CE0066E681 /* GoogleMaps */,
 			);
 			productName = "Model S";
 			productReference = 7B25F29C2EC4DD9E0012FF84 /* Model S.app */;
@@ -146,6 +152,9 @@
 			);
 			mainGroup = 7B25F2932EC4DD9E0012FF84;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				7BD6A0F62ECB60CE0066E681 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 7B25F29D2EC4DD9E0012FF84 /* Products */;
 			projectDirPath = "";
@@ -446,6 +455,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		7BD6A0F62ECB60CE0066E681 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/googlemaps/ios-maps-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 10.4.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		7BD6A0F72ECB60CE0066E681 /* GoogleMaps */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 7BD6A0F62ECB60CE0066E681 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;
+			productName = GoogleMaps;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 7B25F2942EC4DD9E0012FF84 /* Project object */;
 }

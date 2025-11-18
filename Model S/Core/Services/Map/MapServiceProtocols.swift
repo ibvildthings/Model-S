@@ -7,6 +7,7 @@
 
 import Foundation
 import CoreLocation
+import Combine
 
 // MARK: - Location Search Service
 
@@ -43,6 +44,57 @@ protocol LocationSearchService: ObservableObject {
     func getCoordinate(for result: LocationSearchResult) async throws -> (CLLocationCoordinate2D, String)
 }
 
+/// Type-erased wrapper for LocationSearchService to work with SwiftUI property wrappers
+/// This allows views to use @ObservedObject with any LocationSearchService implementation
+@MainActor
+class AnyLocationSearchService: ObservableObject {
+    var searchResults: [LocationSearchResult] {
+        _getSearchResults()
+    }
+
+    var isSearching: Bool {
+        _getIsSearching()
+    }
+
+    private let _search: (String) -> Void
+    private let _updateSearchRegion: (CLLocationCoordinate2D, Double) -> Void
+    private let _clearResults: () -> Void
+    private let _getCoordinate: (LocationSearchResult) async throws -> (CLLocationCoordinate2D, String)
+    private let _getSearchResults: () -> [LocationSearchResult]
+    private let _getIsSearching: () -> Bool
+    private var cancellables = Set<AnyCancellable>()
+
+    init<S: LocationSearchService>(_ service: S) {
+        self._search = service.search
+        self._updateSearchRegion = service.updateSearchRegion
+        self._clearResults = service.clearResults
+        self._getCoordinate = service.getCoordinate
+        self._getSearchResults = { service.searchResults }
+        self._getIsSearching = { service.isSearching }
+
+        // Forward objectWillChange notifications from the wrapped service
+        service.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+    }
+
+    func search(query: String) {
+        _search(query)
+    }
+
+    func updateSearchRegion(center: CLLocationCoordinate2D, radiusMiles: Double) {
+        _updateSearchRegion(center, radiusMiles)
+    }
+
+    func clearResults() {
+        _clearResults()
+    }
+
+    func getCoordinate(for result: LocationSearchResult) async throws -> (CLLocationCoordinate2D, String) {
+        try await _getCoordinate(result)
+    }
+}
+
 // MARK: - Geocoding Service
 
 /// Protocol for geocoding services (address ↔ coordinates)
@@ -76,7 +128,7 @@ protocol RouteCalculationService {
 /// Enum to specify which map provider to use
 enum MapProvider {
     case apple
-    case google // Future implementation
+    case google
 }
 
 /// Configuration for map services
@@ -84,7 +136,20 @@ struct MapServiceConfiguration {
     let provider: MapProvider
     let apiKey: String? // For Google Maps
 
-    static let `default` = MapServiceConfiguration(provider: .apple, apiKey: nil)
+    /// Apple Maps configuration (no API key required)
+    static let apple = MapServiceConfiguration(provider: .apple, apiKey: nil)
+
+    /// Google Maps configuration with API key
+    /// API key is loaded securely from Secrets.plist (gitignored)
+    /// See Secrets.example.plist for setup instructions
+    static let google = MapServiceConfiguration(
+        provider: .google,
+        apiKey: SecretsManager.googleMapsAPIKey
+    )
+
+    /// Default configuration - now uses Google Maps
+    /// Switch to .apple if you prefer Apple Maps
+    static let `default` = google
 }
 
 // MARK: - Map Service Factory
@@ -111,8 +176,10 @@ class MapServiceFactory {
         case .apple:
             return AppleLocationSearchService()
         case .google:
-            fatalError("Google Maps not yet implemented. Coming soon!")
-            // return GoogleLocationSearchService(apiKey: configuration.apiKey!)
+            guard let apiKey = configuration.apiKey else {
+                fatalError("Google Maps API key is required. Please configure MapServiceConfiguration with a valid API key.")
+            }
+            return GoogleLocationSearchService(apiKey: apiKey)
         }
     }
 
@@ -122,8 +189,10 @@ class MapServiceFactory {
         case .apple:
             return AppleGeocodingService()
         case .google:
-            fatalError("Google Maps not yet implemented. Coming soon!")
-            // return GoogleGeocodingService(apiKey: configuration.apiKey!)
+            guard let apiKey = configuration.apiKey else {
+                fatalError("Google Maps API key is required. Please configure MapServiceConfiguration with a valid API key.")
+            }
+            return GoogleGeocodingService(apiKey: apiKey)
         }
     }
 
@@ -133,8 +202,10 @@ class MapServiceFactory {
         case .apple:
             return AppleRouteCalculationService()
         case .google:
-            fatalError("Google Maps not yet implemented. Coming soon!")
-            // return GoogleRouteCalculationService(apiKey: configuration.apiKey!)
+            guard let apiKey = configuration.apiKey else {
+                fatalError("Google Maps API key is required. Please configure MapServiceConfiguration with a valid API key.")
+            }
+            return GoogleRouteCalculationService(apiKey: apiKey)
         }
     }
 }
