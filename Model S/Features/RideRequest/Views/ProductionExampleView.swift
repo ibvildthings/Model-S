@@ -78,10 +78,16 @@ struct RideRequestViewWithViewModel: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             // Map (managed by coordinator) - Full screen hero element
             RideMapView(viewModel: coordinator.mapViewModel, configuration: RideRequestConfiguration.default)
                 .ignoresSafeArea()
+
+            // Map Provider Switcher - TOP OF SCREEN
+            MapProviderSwitcher()
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .zIndex(1000)  // Above everything else
 
             VStack(spacing: 0) {
                 // Error Banner - Compact top banner
@@ -524,6 +530,29 @@ struct RideRequestViewWithViewModel: View {
     private func formatDistance(_ meters: Double) -> String {
         let miles = meters / 1609.34
         return String(format: "%.1f mi", miles)
+    }
+}
+
+// MARK: - Map Provider Switcher
+
+/// Simple segmented control to switch between Apple Maps and Google Maps
+struct MapProviderSwitcher: View {
+    @StateObject private var providerPreference = MapProviderPreference.shared
+
+    var body: some View {
+        Picker("Map Provider", selection: $providerPreference.selectedProvider) {
+            ForEach(MapProvider.allCases, id: \.self) { provider in
+                Text(provider == .apple ? "Apple" : "Google")
+                    .tag(provider)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 4)
+        )
     }
 }
 

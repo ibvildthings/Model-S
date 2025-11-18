@@ -58,25 +58,13 @@ struct RideRequestView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {  // CRITICAL: Align to top!
+        ZStack(alignment: .top) {
             // Map Background
             RideMapView(viewModel: mapViewModel, configuration: configuration)
                 .ignoresSafeArea()
 
-            // Overlays
-            VStack(spacing: 0) {
-                // Map provider switcher at the very top
-                MapProviderSwitcher()
-                    .frame(height: 60)  // EXPLICIT HEIGHT
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .background(Color.yellow.opacity(0.5)) // DEBUG: Yellow background to see the container
-                    .zIndex(999)  // Force on top of everything
-
-                Spacer()
-                    .frame(height: 12)
-
-                // Location Card
+            // Location Card Overlay (Top)
+            VStack(spacing: 12) {
                 RideLocationCard(
                     pickupText: $pickupText,
                     destinationText: $destinationText,
@@ -107,6 +95,7 @@ struct RideRequestView: View {
 
                 Spacer()
             }
+            .padding(.top, 60)
 
             // Confirm Slider (Bottom)
             if showSlider && rideState == .routeReady {
@@ -155,46 +144,6 @@ struct RideRequestView: View {
         withAnimation(.easeInOut(duration: 0.4)) {
             showSlider = !pickupText.isEmpty && !destinationText.isEmpty
         }
-    }
-}
-
-// MARK: - Map Provider Switcher
-
-/// Segmented control to switch between Apple Maps and Google Maps
-struct MapProviderSwitcher: View {
-    // Using @StateObject ensures stable observation of the singleton across view updates
-    // This is the correct pattern for observing a singleton in SwiftUI
-    @StateObject private var providerPreference = MapProviderPreference.shared
-
-    var body: some View {
-        VStack(spacing: 4) {
-            // DEBUG: Simple text to verify rendering
-            Text("MAP SWITCHER HERE")
-                .font(.caption)
-                .fontWeight(.black)
-                .foregroundColor(.red)
-                .padding(4)
-                .background(Color.yellow)
-
-            Picker("Map Provider", selection: $providerPreference.selectedProvider) {
-                ForEach(MapProvider.allCases, id: \.self) { provider in
-                    Text(provider == .apple ? "Apple" : "Google")
-                        .tag(provider)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(8)
-            .background(Color.green)  // DEBUG: Green background on picker
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white)
-                .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 6)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.red, lineWidth: 5)  // DEBUG: THICKER red border
-        )
     }
 }
 
