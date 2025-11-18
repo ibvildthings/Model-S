@@ -584,118 +584,245 @@ struct RideStateMachine {
 
 ### Why Use Protocols?
 
-Protocols define **what** a service can do, without specifying **how** it does it:
+Protocols define **what** a service can do, without specifying **how** it does it. This app has been refactored to use a **unified service interface** for all map operations, making it incredibly simple and maintainable.
+
+### The Modern Map Service Architecture
+
+**Before Refactoring:**
+- 3 separate protocols (LocationSearchService, GeocodingService, RouteCalculationService)
+- 2 state managers (confusing!)
+- Complex factory pattern
+
+**After Refactoring:**
+- 1 unified `MapService` protocol (simple!)
+- 1 state manager (`MapProviderService`)
+- Clean composition pattern
+
+### 8.1 The Unified MapService Protocol
+
+All map operations now go through a single, elegant interface:
 
 ```swift
-protocol GeocodingService {
-    func geocode(address: String) async throws -> (CLLocationCoordinate2D, String)
-}
-
-// Apple implementation
-class AppleGeocodingService: GeocodingService {
-    func geocode(address: String) async throws -> (CLLocationCoordinate2D, String) {
-        // Uses CLGeocoder (Apple's API)
-    }
-}
-
-// Google implementation (you could add this!)
-class GoogleGeocodingService: GeocodingService {
-    func geocode(address: String) async throws -> (CLLocationCoordinate2D, String) {
-        // Uses Google Places API
-    }
-}
-```
-
-**Benefits:**
-- Easy to swap implementations (Apple Maps ↔ Google Maps)
-- Easy to mock for testing
-- Rest of app doesn't care which implementation is used
-
-### Key Service Protocols
-
-#### 8.1 LocationSearchService
-
-**Purpose:** Autocomplete for addresses
-
-```swift
-protocol LocationSearchService: ObservableObject {
+@MainActor
+protocol MapService: ObservableObject {
+    // Search operations
     var searchResults: [LocationSearchResult] { get }
     var isSearching: Bool { get }
-
     func search(query: String)
     func getCoordinate(for result: LocationSearchResult) async throws -> (CLLocationCoordinate2D, String)
-}
-```
 
-**Usage:**
-```swift
-// In the coordinator
-searchService.search(query: "Star")
-// searchResults automatically updates with ["Starbucks", "Starlight Theater", ...]
-
-// User taps a result
-let (coordinate, name) = try await searchService.getCoordinate(for: result)
-```
-
-#### 8.2 GeocodingService
-
-**Purpose:** Convert address ↔ coordinates
-
-```swift
-protocol GeocodingService {
-    // Address → Coordinates
+    // Geocoding operations
     func geocode(address: String) async throws -> (CLLocationCoordinate2D, String)
-
-    // Coordinates → Address
     func reverseGeocode(coordinate: CLLocationCoordinate2D) async throws -> String
+
+    // Routing operations
+    func calculateRoute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteResult
+
+    // Provider info
+    var provider: MapProvider { get }
 }
 ```
 
-**Usage:**
-```swift
-// User typed "123 Main St"
-let (coord, name) = try await geocodingService.geocode(address: "123 Main St")
-// Returns: (37.7749, -122.4194), "123 Main Street, San Francisco, CA"
+**Why is this better?**
+- **Simpler:** Learn one interface instead of three
+- **Extensible:** Add new map providers by implementing just this one protocol
+- **Consistent:** All operations use the same error handling
+- **Testable:** Easy to create mock services
 
-// User tapped map at coordinates
-let address = try await geocodingService.reverseGeocode(coordinate: tappedCoord)
-// Returns: "456 Market St, San Francisco, CA"
+### 8.2 Using the Map Service
+
+**Get the current map service:**
+```swift
+// The easy way - always use the current provider
+let mapService = MapProviderService.shared.currentService
+
+// Now use it for any map operation!
+mapService.search(query: "Coffee shops")
+let (coord, name) = try await mapService.geocode(address: "123 Main St")
+let route = try await mapService.calculateRoute(from: pickup, to: destination)
 ```
 
-#### 8.3 RouteCalculationService
+**All operations in one place!** No more juggling multiple services.
 
-**Purpose:** Calculate route between two points
+### 8.3 Map Provider Management
+
+The `MapProviderService` is your single source of truth for managing map providers:
 
 ```swift
-protocol RouteCalculationService {
-    func calculateRoute(
-        from: CLLocationCoordinate2D,
-        to: CLLocationCoordinate2D
-    ) async throws -> RouteResult
+@MainActor
+class MapProviderService: ObservableObject {
+    static let shared = MapProviderService()
+
+    // Current provider (Apple or Google)
+    @Published private(set) var currentProvider: MapProvider
+
+    // Current service instance (auto-updates when provider changes!)
+    @Published private(set) var currentService: AnyMapService
+
+    // Check what's available
+    var isAppleMapsAvailable: Bool { true }  // Always available
+    var isGoogleMapsAvailable: Bool { /* checks API key */ }
+    var availableProviders: [MapProvider] { /* returns available ones */ }
+
+    // Switch providers
+    func useAppleMaps() -> Result<Void, MapServiceError>
+    func useGoogleMaps() -> Result<Void, MapServiceError>
+    func toggleProvider()
+}
+```
+
+**Key features:**
+- Automatically saves your choice to UserDefaults
+- Validates that provider is available before switching
+- Updates `currentService` automatically when you switch
+- Returns `Result` for proper error handling (no crashes!)
+
+**Example - Switching providers:**
+```swift
+// Try to use Google Maps
+let result = MapProviderService.shared.useGoogleMaps()
+
+switch result {
+case .success:
+    print("✅ Now using Google Maps")
+case .failure(let error):
+    print("❌ Can't use Google Maps: \(error.localizedDescription)")
+    // Maybe show alert: "Google Maps requires an API key"
+}
+```
+
+### 8.4 Complete Usage Examples
+
+#### Example 1: Search for Locations
+
+```swift
+// Get the service
+let mapService = MapProviderService.shared.currentService
+
+// Start searching (results update automatically via @Published)
+mapService.search(query: "Starbucks")
+
+// Display results in your view
+List(mapService.searchResults) { result in
+    Text(result.title)  // "Starbucks"
+    Text(result.subtitle)  // "123 Main St, San Francisco"
 }
 
-struct RouteResult {
-    let route: MKRoute              // MapKit route object
-    let distance: Double            // Meters
-    let expectedTravelTime: TimeInterval  // Seconds
-    let polyline: MKPolyline        // For drawing on map
+// User selects a result
+let (coordinate, name) = try await mapService.getCoordinate(for: result)
+// You now have the exact location!
+```
+
+#### Example 2: Geocode an Address
+
+```swift
+// User typed an address
+let userAddress = "1 Apple Park Way, Cupertino, CA"
+
+do {
+    let (coord, formattedAddress) = try await mapService.geocode(address: userAddress)
+    print("Found: \(formattedAddress)")
+    print("At: \(coord.latitude), \(coord.longitude)")
+    // Show pin on map at this coordinate
+} catch {
+    print("Couldn't find that address: \(error)")
+    // Show error to user
 }
 ```
 
-**Usage:**
-```swift
-let result = try await routeService.calculateRoute(
-    from: pickupCoord,
-    to: destinationCoord
-)
+#### Example 3: Calculate a Route
 
-print("Distance: \(result.distance / 1609.34) miles")  // Convert meters to miles
-print("ETA: \(result.expectedTravelTime / 60) minutes")  // Convert seconds to minutes
+```swift
+let pickupCoord = CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194)
+let destinationCoord = CLLocationCoordinate2D(latitude: 37.7849, longitude: -122.4094)
+
+do {
+    let route = try await mapService.calculateRoute(from: pickupCoord, to: destinationCoord)
+
+    // Show route info
+    let miles = route.distance / 1609.34
+    let minutes = route.expectedTravelTime / 60
+    print("Route: \(miles) miles, \(minutes) minutes")
+
+    // Draw route on map
+    mapViewModel.routePolyline = route.coordinates  // Provider-agnostic!
+} catch {
+    print("Couldn't calculate route: \(error)")
+}
 ```
 
-#### 8.4 RideRequestService
+### 8.5 Map Service Implementations
 
-**Purpose:** Communicate with ride backend
+Behind the scenes, there are two implementations:
+
+**AppleMapService:**
+```swift
+@MainActor
+class AppleMapService: MapService {
+    let provider: MapProvider = .apple
+
+    // Composes existing Apple services
+    private let searchService: AppleLocationSearchService
+    private let geocodingService: AppleGeocodingService
+    private let routeService: AppleRouteCalculationService
+
+    // Implements all MapService methods by delegating
+}
+```
+
+**GoogleMapService:**
+```swift
+@MainActor
+class GoogleMapService: MapService {
+    let provider: MapProvider = .google
+
+    // Composes existing Google services
+    private let searchService: GoogleLocationSearchService
+    private let geocodingService: GoogleGeocodingService
+    private let routeService: GoogleRouteCalculationService
+
+    // Implements all MapService methods by delegating
+}
+```
+
+**You don't create these directly!** Always use `MapProviderService.shared.currentService`.
+
+### 8.6 Error Handling
+
+The new architecture has proper error types:
+
+```swift
+enum MapServiceError: Error {
+    case apiKeyMissing(provider: MapProvider)
+    case networkError(underlying: Error)
+    case invalidResponse
+    case noResultsFound
+    case geocodingFailed
+    case routeCalculationFailed
+
+    var localizedDescription: String {
+        // User-friendly error messages
+    }
+}
+```
+
+**Handle errors gracefully:**
+```swift
+do {
+    let route = try await mapService.calculateRoute(from: pickup, to: destination)
+    // Success!
+} catch let error as MapServiceError {
+    // Specific map error
+    showAlert(title: "Map Error", message: error.localizedDescription)
+} catch {
+    // Unexpected error
+    showAlert(title: "Error", message: "Something went wrong")
+}
+```
+
+### 8.7 RideRequestService
+
+**Purpose:** Communicate with ride backend (unchanged from refactoring)
 
 ```swift
 protocol RideRequestService {
@@ -730,22 +857,32 @@ class RealRideRequestService: RideRequestService {
 }
 ```
 
-### Service Factories
+### Quick Reference
 
-Services are created by factories:
-
+**Old way (before refactoring):**
 ```swift
-// Get geocoding service (Apple by default)
+// Had to juggle multiple services
+let searchService = MapServiceFactory.shared.createLocationSearchService()
 let geocodingService = MapServiceFactory.shared.createGeocodingService()
+let routeService = MapServiceFactory.shared.createRouteCalculationService()
 
-// Get ride service (mock by default)
-let rideService = RideRequestServiceFactory.shared.createRideRequestService(useMock: true)
+// Use different services for different operations
+searchService.search(query: "Coffee")
+let (coord, name) = try await geocodingService.geocode(address: "Main St")
+let route = try await routeService.calculateRoute(from: pickup, to: destination)
 ```
 
-**To switch providers:**
+**New way (after refactoring):**
 ```swift
-MapServiceFactory.shared.configure(with: .google)  // Use Google instead of Apple
+// One service does everything!
+let mapService = MapProviderService.shared.currentService
+
+mapService.search(query: "Coffee")
+let (coord, name) = try await mapService.geocode(address: "Main St")
+let route = try await mapService.calculateRoute(from: pickup, to: destination)
 ```
+
+**Much simpler!** 🎉
 
 ---
 
@@ -1940,12 +2077,25 @@ State definitions                     Features/RideRequest/Models/RideState.swif
 State transition rules                Features/RideRequest/Models/RideStateMachine.swift
 Map display logic                     Features/RideRequest/ViewModels/MapViewModel.swift
 Main ride UI                          Features/RideRequest/Views/RideRequestView.swift
-Map wrapper                           Features/RideRequest/Views/MapViewWrapper.swift
+Map wrapper (Apple)                   Features/RideRequest/Views/MapViewWrapper.swift
+Map wrapper (Google)                  Features/RideRequest/Views/GoogleMapViewWrapper.swift
+Map provider switcher                 Features/RideRequest/Views/MapProviderSwitcher.swift
 Location input UI                     Features/RideRequest/Views/RideLocationCardWithSearch.swift
 Confirm slider                        Features/RideRequest/Views/RideConfirmSlider.swift
 Error display                         Features/RideRequest/Views/ErrorBannerView.swift
-Service protocols                     Core/Services/Map/MapServiceProtocols.swift
-Apple Maps implementation             Core/Services/Map/AppleMapServices.swift
+
+MAP SERVICES (NEW REFACTORED ARCHITECTURE):
+Unified map service protocol          Core/Services/Map/MapService.swift
+Map provider state management         Core/Services/Map/MapProviderService.swift
+Apple Maps unified service            Core/Services/Map/AppleMapService.swift
+Google Maps unified service           Core/Services/Map/GoogleMapService.swift
+
+MAP SERVICES (LEGACY - STILL USED INTERNALLY):
+Old service protocols                 Core/Services/Map/MapServiceProtocols.swift
+Apple Maps implementations            Core/Services/Map/AppleMapServices.swift
+Google Maps implementations           Core/Services/Map/GoogleMapServices.swift
+
+OTHER SERVICES:
 Ride backend service                  Core/Services/RideRequest/RideRequestService.swift
 Ride history storage                  Core/Services/Storage/RideHistoryStore.swift
 Data models                           Core/Models/
@@ -1989,10 +2139,27 @@ class MyViewModel: ObservableObject {
 }
 ```
 
-**Create and use a service:**
+**Create and use map service (modern way):**
 ```swift
-let service = MapServiceFactory.shared.createGeocodingService()
-let result = try await service.geocode(address: "123 Main St")
+// Get current map service (works with any provider!)
+let mapService = MapProviderService.shared.currentService
+
+// Use it for any operation
+mapService.search(query: "Coffee")
+let (coord, name) = try await mapService.geocode(address: "123 Main St")
+let route = try await mapService.calculateRoute(from: pickup, to: destination)
+```
+
+**Switch map providers:**
+```swift
+// Switch to Google Maps
+MapProviderService.shared.useGoogleMaps()
+
+// Switch to Apple Maps
+MapProviderService.shared.useAppleMaps()
+
+// Toggle between providers
+MapProviderService.shared.toggleProvider()
 ```
 
 ---
