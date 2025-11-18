@@ -129,7 +129,7 @@ let dependencies = DependencyContainer.shared
 // Core Services
 dependencies.stateStore          // AppStateStore
 dependencies.locationService     // LocationService
-dependencies.mapService          // AnyMapService (Apple/Google)
+dependencies.mapService          // AnyMapService (uses MapProviderService)
 dependencies.rideRequestService  // RideRequestService (Mock/Real)
 
 // Utility Services

@@ -29,7 +29,6 @@ class DependencyContainer {
 
     // MARK: - Service Configuration
 
-    private let mapServiceConfig: MapServiceConfiguration
     private let rideServiceConfig: RideServiceConfiguration
 
     // MARK: - Lazy Service Instances
@@ -39,15 +38,9 @@ class DependencyContainer {
         createLocationService()
     }()
 
-    /// Map service (recreated when provider changes)
-    private var _mapService: AnyMapService?
+    /// Map service (uses MapProviderService)
     var mapService: AnyMapService {
-        if let existing = _mapService {
-            return existing
-        }
-        let service = createMapService()
-        _mapService = service
-        return service
+        MapProviderService.shared.currentService
     }
 
     /// Ride request service (singleton)
@@ -74,11 +67,9 @@ class DependencyContainer {
 
     init(
         stateStore: AppStateStore = .shared,
-        mapServiceConfig: MapServiceConfiguration = .default,
         rideServiceConfig: RideServiceConfiguration = .default
     ) {
         self.stateStore = stateStore
-        self.mapServiceConfig = mapServiceConfig
         self.rideServiceConfig = rideServiceConfig
 
         print("🔧 DependencyContainer initialized")
@@ -90,22 +81,6 @@ class DependencyContainer {
     private func createLocationService() -> LocationService {
         print("🔧 Creating LocationService")
         return CoreLocationService(stateStore: stateStore)
-    }
-
-    /// Create map service instance
-    private func createMapService() -> AnyMapService {
-        let provider = stateStore.mapProvider
-        print("🔧 Creating MapService for provider: \(provider)")
-
-        switch provider {
-        case .apple:
-            return AnyMapService(AppleMapService())
-        case .google:
-            guard let apiKey = mapServiceConfig.apiKey else {
-                fatalError("Google Maps API key required but not configured")
-            }
-            return AnyMapService(GoogleMapService(apiKey: apiKey))
-        }
     }
 
     /// Create ride request service instance
@@ -137,15 +112,6 @@ class DependencyContainer {
         return ConsoleLoggingService()
     }
 
-    // MARK: - Service Management
-
-    /// Recreate map service when provider changes
-    func refreshMapService() {
-        print("🔧 Refreshing MapService")
-        _mapService = nil
-        _ = mapService // Recreate
-    }
-
     // MARK: - Testing Support
 
     /// Create a mock container for testing
@@ -158,7 +124,6 @@ class DependencyContainer {
             baseURL: "http://mock"
         )
         return DependencyContainer(
-            mapServiceConfig: .apple,
             rideServiceConfig: config
         )
     }
@@ -396,30 +361,3 @@ class ConsoleLoggingService: LoggingService {
         }
     }
 }
-
-// MARK: - Type-Erased Map Service
-
-/// Type-erased wrapper for map services
-class AnyMapService {
-    private let _calculateRoute: (CLLocationCoordinate2D, CLLocationCoordinate2D) async throws -> RouteResult
-
-    init<S: MapService>(_ service: S) {
-        self._calculateRoute = service.calculateRoute
-    }
-
-    func calculateRoute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteResult {
-        try await _calculateRoute(from, to)
-    }
-}
-
-// MARK: - Unified Map Service Protocol
-
-/// Unified protocol for map services (combines all map-related functionality)
-protocol MapService {
-    /// Calculate route between two points
-    func calculateRoute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteResult
-}
-
-// Make existing services conform to unified protocol
-extension AppleMapService: MapService {}
-extension GoogleMapService: MapService {}
