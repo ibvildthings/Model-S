@@ -58,7 +58,7 @@ struct RideRequestView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {
             // Map Background
             RideMapView(viewModel: mapViewModel, configuration: configuration)
                 .ignoresSafeArea()
@@ -67,7 +67,6 @@ struct RideRequestView: View {
             VStack(spacing: 12) {
                 // Map provider switcher
                 MapProviderSwitcher()
-                    .padding(.top, 60)
                     .padding(.horizontal, 16)
 
                 RideLocationCard(
@@ -100,6 +99,7 @@ struct RideRequestView: View {
 
                 Spacer()
             }
+            .padding(.top, 60)
 
             // Confirm Slider (Bottom)
             if showSlider && rideState == .routeReady {
