@@ -6,7 +6,9 @@
       "Bash(git add:*)",
       "Bash(git log:*)",
       "Bash(git stash:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(gh auth:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []
