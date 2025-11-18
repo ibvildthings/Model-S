@@ -83,12 +83,6 @@ struct RideRequestViewWithViewModel: View {
             RideMapView(viewModel: coordinator.mapViewModel, configuration: RideRequestConfiguration.default)
                 .ignoresSafeArea()
 
-            // Map Provider Switcher - TOP OF SCREEN
-            MapProviderSwitcher()
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .zIndex(1000)  // Above everything else
-
             VStack(spacing: 0) {
                 // Error Banner - Compact top banner
                 if let error = coordinator.flowController.currentError {
@@ -304,6 +298,18 @@ struct RideRequestViewWithViewModel: View {
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
+
+            // Map Provider Switcher - Floating button in top-right
+            VStack {
+                HStack {
+                    Spacer()
+                    MapProviderSwitcher()
+                        .padding(.top, 8)
+                        .padding(.trailing, 16)
+                }
+                Spacer()
+            }
+            .zIndex(999)
 
             // Loading Overlay
             if coordinator.flowController.isLoading {
@@ -535,24 +541,67 @@ struct RideRequestViewWithViewModel: View {
 
 // MARK: - Map Provider Switcher
 
-/// Simple segmented control to switch between Apple Maps and Google Maps
+/// Compact floating button to switch between Apple Maps and Google Maps
 struct MapProviderSwitcher: View {
     @StateObject private var providerPreference = MapProviderPreference.shared
+    @State private var showingOptions = false
 
     var body: some View {
-        Picker("Map Provider", selection: $providerPreference.selectedProvider) {
-            ForEach(MapProvider.allCases, id: \.self) { provider in
-                Text(provider == .apple ? "Apple" : "Google")
-                    .tag(provider)
+        Menu {
+            // Menu options
+            Button(action: {
+                withAnimation(.spring(response: 0.3)) {
+                    providerPreference.selectedProvider = .apple
+                }
+                triggerHaptic()
+            }) {
+                Label("Apple Maps", systemImage: "map.fill")
+                if providerPreference.selectedProvider == .apple {
+                    Image(systemName: "checkmark")
+                }
             }
+
+            Button(action: {
+                withAnimation(.spring(response: 0.3)) {
+                    providerPreference.selectedProvider = .google
+                }
+                triggerHaptic()
+            }) {
+                Label("Google Maps", systemImage: "globe")
+                if providerPreference.selectedProvider == .google {
+                    Image(systemName: "checkmark")
+                }
+            }
+        } label: {
+            // Compact button showing current provider
+            HStack(spacing: 6) {
+                Image(systemName: currentProviderIcon)
+                    .font(.system(size: 14, weight: .medium))
+                Text(currentProviderName)
+                    .font(.system(size: 13, weight: .medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial)
+            .cornerRadius(20)
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
         }
-        .pickerStyle(.segmented)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.3), radius: 10, x: 0, y: 4)
-        )
+    }
+
+    private var currentProviderName: String {
+        providerPreference.selectedProvider == .apple ? "Apple" : "Google"
+    }
+
+    private var currentProviderIcon: String {
+        providerPreference.selectedProvider == .apple ? "map.fill" : "globe"
+    }
+
+    private func triggerHaptic() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
     }
 }
 
