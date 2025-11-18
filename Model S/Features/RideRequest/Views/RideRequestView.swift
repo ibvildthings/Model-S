@@ -67,9 +67,11 @@ struct RideRequestView: View {
             VStack(spacing: 0) {
                 // Map provider switcher at the very top
                 MapProviderSwitcher()
+                    .frame(height: 60)  // EXPLICIT HEIGHT
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
-                    .background(Color.clear) // Ensure it's not transparent/invisible
+                    .background(Color.yellow.opacity(0.5)) // DEBUG: Yellow background to see the container
+                    .zIndex(999)  // Force on top of everything
 
                 Spacer()
                     .frame(height: 12)
@@ -165,14 +167,25 @@ struct MapProviderSwitcher: View {
     @StateObject private var providerPreference = MapProviderPreference.shared
 
     var body: some View {
-        Picker("Map Provider", selection: $providerPreference.selectedProvider) {
-            ForEach(MapProvider.allCases, id: \.self) { provider in
-                Text(provider == .apple ? "Apple" : "Google")
-                    .tag(provider)
+        VStack(spacing: 4) {
+            // DEBUG: Simple text to verify rendering
+            Text("MAP SWITCHER HERE")
+                .font(.caption)
+                .fontWeight(.black)
+                .foregroundColor(.red)
+                .padding(4)
+                .background(Color.yellow)
+
+            Picker("Map Provider", selection: $providerPreference.selectedProvider) {
+                ForEach(MapProvider.allCases, id: \.self) { provider in
+                    Text(provider == .apple ? "Apple" : "Google")
+                        .tag(provider)
+                }
             }
+            .pickerStyle(.segmented)
+            .padding(8)
+            .background(Color.green)  // DEBUG: Green background on picker
         }
-        .pickerStyle(.segmented)
-        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color.white)
@@ -180,7 +193,7 @@ struct MapProviderSwitcher: View {
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.red, lineWidth: 3)  // DEBUG: Bright red border so we can see it
+                .stroke(Color.red, lineWidth: 5)  // DEBUG: THICKER red border
         )
     }
 }
