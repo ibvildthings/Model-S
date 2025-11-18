@@ -216,7 +216,7 @@ struct DriverMapView: View {
     let currentRide: ActiveRide
     let isHeadingToPickup: Bool
 
-    @State private var region: MKCoordinateRegion
+    @State private var region: MapRegion
     @State private var annotations: [DriverMapMarker] = []
 
     init(currentRide: ActiveRide, isHeadingToPickup: Bool) {
@@ -234,12 +234,10 @@ struct DriverMapView: View {
         let latDelta = abs(currentRide.currentDriverLocation.coordinate.latitude - targetLocation.coordinate.latitude) * 2.5
         let lngDelta = abs(currentRide.currentDriverLocation.coordinate.longitude - targetLocation.coordinate.longitude) * 2.5
 
-        _region = State(initialValue: MKCoordinateRegion(
+        _region = State(initialValue: MapRegion(
             center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
-            span: MKCoordinateSpan(
-                latitudeDelta: max(latDelta, 0.01),
-                longitudeDelta: max(lngDelta, 0.01)
-            )
+            latitudeDelta: max(latDelta, 0.01),
+            longitudeDelta: max(lngDelta, 0.01)
         ))
 
         // Initialize annotations

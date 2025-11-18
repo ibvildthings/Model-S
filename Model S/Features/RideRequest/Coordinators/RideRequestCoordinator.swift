@@ -14,6 +14,17 @@ import MapKit
 import CoreLocation
 import Combine
 
+// MARK: - MKPolyline Extension
+
+extension MKPolyline {
+    /// Extract coordinates from MKPolyline to provider-agnostic array
+    func coordinates() -> [CLLocationCoordinate2D] {
+        var coords = [CLLocationCoordinate2D](repeating: kCLLocationCoordinate2DInvalid, count: pointCount)
+        getCoordinates(&coords, range: NSRange(location: 0, length: pointCount))
+        return coords
+    }
+}
+
 /// Coordinates the entire ride request flow
 /// Now uses RideFlowController for clean state management
 @MainActor
@@ -313,14 +324,14 @@ class RideRequestCoordinator: ObservableObject {
         let latDelta = abs(driver.latitude - target.latitude) * paddingMultiplier
         let lonDelta = abs(driver.longitude - target.longitude) * paddingMultiplier
 
-        let span = MKCoordinateSpan(
+        let span = MapCoordinateSpan(
             latitudeDelta: max(latDelta, 0.002), // Minimum span for very close proximity
             longitudeDelta: max(lonDelta, 0.002)
         )
 
         // Update viewport smoothly
         withAnimation(.easeInOut(duration: 0.5)) {
-            mapViewModel.region = MKCoordinateRegion(center: center, span: span)
+            mapViewModel.region = MapRegion(center: center, span: span)
         }
     }
 
@@ -343,27 +354,14 @@ class RideRequestCoordinator: ObservableObject {
             print("🔄 Handling .routeReady")
             // Update map with the calculated route
             if let mkRoute = flowController.currentMKRoute {
-                // Apple Maps: Use MKRoute
+                // Apple Maps: Use MKRoute (converts to coordinates internally)
                 print("📍 Updating map with calculated route (Apple Maps)")
                 mapViewModel.updateRouteFromMKRoute(mkRoute)
             } else if let polyline = flowController.currentPolyline {
-                // Google Maps: Use MKPolyline (match Apple Maps behavior exactly)
+                // Google Maps: Convert polyline to coordinates
                 print("📍 Updating map with calculated route (Google Maps)")
-                mapViewModel.routePolyline = polyline
-
-                // Center map on route with generous padding (matches Apple Maps 5000m padding)
-                let padding: Double = 5000
-                let rect = polyline.boundingMapRect
-                let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
-                let newRegion = MKCoordinateRegion(paddedRect)
-
-                print("📍 Zooming to show route: center=\(newRegion.center), span=\(newRegion.span)")
-
-                Task { @MainActor in
-                    withAnimation(.easeInOut(duration: TimingConstants.mapAnimationDuration)) {
-                        mapViewModel.region = newRegion
-                    }
-                }
+                let coordinates = polyline.coordinates()
+                mapViewModel.updateRoute(coordinates)
             } else {
                 print("⚠️ No route available to display")
             }
@@ -398,23 +396,10 @@ class RideRequestCoordinator: ObservableObject {
                         lastRouteCalculationPosition = driverLocation
                         print("✅ Driver route displayed")
                     } else if let polyline = flowController.currentDriverPolyline {
-                        // Google Maps
+                        // Google Maps - convert to coordinates
                         print("📍 Updating map with driver route (Google Maps)")
-                        mapViewModel.driverRoutePolyline = polyline
-
-                        // Center map on driver route with padding (matches Apple Maps behavior)
-                        let padding: Double = 5000
-                        let rect = polyline.boundingMapRect
-                        let paddedRect = rect.insetBy(dx: -padding, dy: -padding)
-                        let newRegion = MKCoordinateRegion(paddedRect)
-
-                        print("🚗 Zooming to show driver route: center=\(newRegion.center), span=\(newRegion.span)")
-
-                        await MainActor.run {
-                            withAnimation(.easeInOut(duration: TimingConstants.mapAnimationDuration)) {
-                                mapViewModel.region = newRegion
-                            }
-                        }
+                        let coordinates = polyline.coordinates()
+                        mapViewModel.updateDriverRouteCoordinates(coordinates)
                         lastRouteCalculationPosition = driverLocation
                         print("✅ Driver route displayed")
                     }
@@ -498,12 +483,12 @@ class RideRequestCoordinator: ObservableObject {
                         let latDelta = abs(driverCoord.latitude - destCoord.latitude) * paddingMultiplier
                         let lonDelta = abs(driverCoord.longitude - destCoord.longitude) * paddingMultiplier
 
-                        let span = MKCoordinateSpan(
+                        let span = MapCoordinateSpan(
                             latitudeDelta: max(latDelta, 0.01),
                             longitudeDelta: max(lonDelta, 0.01)
                         )
 
-                        let newRegion = MKCoordinateRegion(center: center, span: span)
+                        let newRegion = MapRegion(center: center, span: span)
 
                         print("🚗 Zooming to show driver and destination: center=\(center), span=\(span), distance=\(Int(distance))m")
 

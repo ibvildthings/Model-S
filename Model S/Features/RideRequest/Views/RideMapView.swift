@@ -55,8 +55,8 @@ struct RideMapView: View {
             pickupLocation: viewModel.pickupLocation?.coordinate,
             destinationLocation: viewModel.destinationLocation?.coordinate,
             driverLocation: viewModel.driverLocation,
-            route: viewModel.routePolyline as? MKPolyline,
-            driverRoute: viewModel.driverRoutePolyline as? MKPolyline,
+            route: viewModel.routePolyline,  // Now provider-agnostic [CLLocationCoordinate2D]
+            driverRoute: viewModel.driverRoutePolyline,  // Now provider-agnostic [CLLocationCoordinate2D]
             routeDisplayMode: viewModel.routeDisplayMode,
             showsUserLocation: true,
             routeLineColor: configuration.routeLineColor,
@@ -72,8 +72,8 @@ struct RideMapView: View {
             pickupLocation: viewModel.pickupLocation?.coordinate,
             destinationLocation: viewModel.destinationLocation?.coordinate,
             driverLocation: viewModel.driverLocation,
-            route: viewModel.routePolyline, // Google uses [CLLocationCoordinate2D]
-            driverRoute: viewModel.driverRoutePolyline,
+            route: viewModel.routePolyline,  // Provider-agnostic [CLLocationCoordinate2D]
+            driverRoute: viewModel.driverRoutePolyline,  // Provider-agnostic [CLLocationCoordinate2D]
             routeDisplayMode: viewModel.routeDisplayMode,
             showsUserLocation: true,
             routeLineColor: configuration.routeLineColor,

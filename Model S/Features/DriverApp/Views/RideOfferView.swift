@@ -216,7 +216,7 @@ struct RideOfferView: View {
 struct RideOfferMapView: View {
     let request: RideRequest
 
-    @State private var region: MKCoordinateRegion
+    @State private var region: MapRegion
     @State private var annotations: [RideOfferAnnotation] = []
 
     init(request: RideRequest) {
@@ -229,12 +229,10 @@ struct RideOfferMapView: View {
         let latDelta = abs(request.pickup.coordinate.latitude - request.destination.coordinate.latitude) * 2.5
         let lngDelta = abs(request.pickup.coordinate.longitude - request.destination.coordinate.longitude) * 2.5
 
-        _region = State(initialValue: MKCoordinateRegion(
+        _region = State(initialValue: MapRegion(
             center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLng),
-            span: MKCoordinateSpan(
-                latitudeDelta: max(latDelta, 0.02),
-                longitudeDelta: max(lngDelta, 0.02)
-            )
+            latitudeDelta: max(latDelta, 0.02),
+            longitudeDelta: max(lngDelta, 0.02)
         ))
 
         // Create annotations
