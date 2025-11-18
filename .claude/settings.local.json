@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(xcodebuild:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git add:*)",
+      "Bash(git log:*)",
+      "Bash(git stash:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
