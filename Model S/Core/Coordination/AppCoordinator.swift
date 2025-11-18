@@ -93,6 +93,12 @@ class AppCoordinator: ObservableObject, Coordinator {
         mainCoordinator?.start()
     }
 
+    // MARK: - Public Accessors
+
+    var activeMainCoordinator: MainCoordinator? {
+        mainCoordinator
+    }
+
     // MARK: - State Observation
 
     private func setupObservers() {
@@ -181,6 +187,14 @@ class MainCoordinator: Coordinator {
 
     private let stateStore: AppStateStore
     private let dependencies: DependencyContainer
+
+    // Child coordinators
+    private var riderCoordinator: RiderCoordinator?
+    private var driverCoordinator: DriverCoordinator?
+
+    // Current mode
+    @Published var currentMode: AppMode = .rider
+
     private var cancellables = Set<AnyCancellable>()
 
     init(stateStore: AppStateStore, dependencies: DependencyContainer) {
@@ -191,24 +205,67 @@ class MainCoordinator: Coordinator {
     func start() {
         print("🏠 MainCoordinator starting")
         setupObservers()
+
+        // Start with appropriate mode
+        if stateStore.isDriverMode {
+            showDriverMode()
+        } else {
+            showRiderMode()
+        }
     }
 
     func stop() {
         print("🏠 MainCoordinator stopping")
+        riderCoordinator?.stop()
+        driverCoordinator?.stop()
         cancellables.removeAll()
     }
 
+    private func showRiderMode() {
+        print("🏠 Switching to rider mode")
+        currentMode = .rider
+
+        // Stop driver coordinator if running
+        driverCoordinator?.stop()
+        driverCoordinator = nil
+
+        // Start rider coordinator
+        if riderCoordinator == nil {
+            riderCoordinator = RiderCoordinator(
+                stateStore: stateStore,
+                dependencies: dependencies
+            )
+        }
+        riderCoordinator?.start()
+    }
+
+    private func showDriverMode() {
+        print("🏠 Switching to driver mode")
+        currentMode = .driver
+
+        // Stop rider coordinator if running
+        riderCoordinator?.stop()
+        riderCoordinator = nil
+
+        // Start driver coordinator
+        if driverCoordinator == nil {
+            driverCoordinator = DriverCoordinator(
+                stateStore: stateStore,
+                dependencies: dependencies
+            )
+        }
+        driverCoordinator?.start()
+    }
+
     private func setupObservers() {
-        // Observe driver mode to switch UI
+        // Observe driver mode to switch coordinators
         stateStore.$isDriverMode
             .removeDuplicates()
-            .sink { isDriverMode in
+            .sink { [weak self] isDriverMode in
                 if isDriverMode {
-                    print("🏠 Switching to driver UI")
-                    // TODO: Show driver interface
+                    self?.showDriverMode()
                 } else {
-                    print("🏠 Switching to rider UI")
-                    // TODO: Show rider interface
+                    self?.showRiderMode()
                 }
             }
             .store(in: &cancellables)
@@ -270,6 +327,23 @@ class MainCoordinator: Coordinator {
         case .error: return "error"
         }
     }
+
+    // Expose coordinators for views
+    var activeRiderCoordinator: RiderCoordinator? {
+        riderCoordinator
+    }
+
+    var activeDriverCoordinator: DriverCoordinator? {
+        driverCoordinator
+    }
+}
+
+// MARK: - App Mode Enum
+
+/// Represents the current app mode (rider or driver)
+enum AppMode {
+    case rider
+    case driver
 }
 
 // MARK: - SwiftUI Integration
@@ -292,8 +366,12 @@ struct CoordinatedAppView: View {
                     }
 
             case .main:
-                // Use existing HomeView as main screen
-                HomeView()
+                // Show rider or driver interface based on coordinator's mode
+                if let mainCoordinator = coordinator.activeMainCoordinator {
+                    MainAppView(coordinator: mainCoordinator)
+                } else {
+                    HomeView()
+                }
             }
         }
         .onAppear {
@@ -301,6 +379,31 @@ struct CoordinatedAppView: View {
         }
         .onDisappear {
             coordinator.stop()
+        }
+    }
+}
+
+/// Main app view that switches between rider and driver modes
+struct MainAppView: View {
+    @ObservedObject var coordinator: MainCoordinator
+
+    var body: some View {
+        Group {
+            switch coordinator.currentMode {
+            case .rider:
+                if let riderCoordinator = coordinator.activeRiderCoordinator {
+                    RiderCoordinatedView(coordinator: riderCoordinator)
+                } else {
+                    HomeView()
+                }
+
+            case .driver:
+                if let driverCoordinator = coordinator.activeDriverCoordinator {
+                    DriverCoordinatedView(coordinator: driverCoordinator)
+                } else {
+                    LoadingView(message: "Loading driver mode...")
+                }
+            }
         }
     }
 }
