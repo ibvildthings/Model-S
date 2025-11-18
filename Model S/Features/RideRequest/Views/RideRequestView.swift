@@ -58,7 +58,7 @@ struct RideRequestView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .top) {  // CRITICAL: Align to top!
             // Map Background
             RideMapView(viewModel: mapViewModel, configuration: configuration)
                 .ignoresSafeArea()
