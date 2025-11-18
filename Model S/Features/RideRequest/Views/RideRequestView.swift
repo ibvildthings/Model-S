@@ -155,21 +155,26 @@ struct RideRequestView: View {
 
 /// Segmented control to switch between Apple Maps and Google Maps
 struct MapProviderSwitcher: View {
-    @ObservedObject private var providerPreference = MapProviderPreference.shared
+    // Using @StateObject ensures stable observation of the singleton across view updates
+    // This is the correct pattern for observing a singleton in SwiftUI
+    @StateObject private var providerPreference = MapProviderPreference.shared
 
     var body: some View {
-        Picker("Map Provider", selection: $providerPreference.selectedProvider) {
-            ForEach(MapProvider.allCases, id: \.self) { provider in
-                Text(provider == .apple ? "Apple" : "Google")
-                    .tag(provider)
+        VStack(spacing: 0) {
+            Picker("Map Provider", selection: $providerPreference.selectedProvider) {
+                ForEach(MapProvider.allCases, id: \.self) { provider in
+                    Text(provider == .apple ? "Apple" : "Google")
+                        .tag(provider)
+                }
             }
+            .pickerStyle(.segmented)
+            .frame(height: 32)  // Explicit height for segmented control
         }
-        .pickerStyle(.segmented)
-        .padding(8)
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 4)
         )
     }
 }

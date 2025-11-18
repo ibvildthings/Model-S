@@ -16,7 +16,8 @@ struct RideMapView: View {
     var configuration: RideRequestConfiguration = .default
 
     // Observe map provider preference for dynamic switching
-    @ObservedObject private var providerPreference = MapProviderPreference.shared
+    // Using @StateObject ensures stable observation of the singleton across view updates
+    @StateObject private var providerPreference = MapProviderPreference.shared
 
     var body: some View {
         // Map view
