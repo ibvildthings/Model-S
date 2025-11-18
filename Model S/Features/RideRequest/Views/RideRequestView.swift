@@ -64,7 +64,12 @@ struct RideRequestView: View {
                 .ignoresSafeArea()
 
             // Location Card Overlay (Top)
-            VStack {
+            VStack(spacing: 12) {
+                // Map provider switcher
+                MapProviderSwitcher()
+                    .padding(.top, 60)
+                    .padding(.horizontal, 16)
+
                 RideLocationCard(
                     pickupText: $pickupText,
                     destinationText: $destinationText,
@@ -79,7 +84,6 @@ struct RideRequestView: View {
                         rideState = .selectingDestination
                     }
                 )
-                .padding(.top, 60)
                 .onChange(of: pickupText) { newValue in
                     onPickupSelected?(newValue)
                     updateSliderVisibility()
@@ -144,6 +148,29 @@ struct RideRequestView: View {
         withAnimation(.easeInOut(duration: 0.4)) {
             showSlider = !pickupText.isEmpty && !destinationText.isEmpty
         }
+    }
+}
+
+// MARK: - Map Provider Switcher
+
+/// Segmented control to switch between Apple Maps and Google Maps
+struct MapProviderSwitcher: View {
+    @ObservedObject private var providerPreference = MapProviderPreference.shared
+
+    var body: some View {
+        Picker("Map Provider", selection: $providerPreference.selectedProvider) {
+            ForEach(MapProvider.allCases, id: \.self) { provider in
+                Text(provider == .apple ? "Apple" : "Google")
+                    .tag(provider)
+            }
+        }
+        .pickerStyle(.segmented)
+        .frame(maxWidth: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+        )
     }
 }
 

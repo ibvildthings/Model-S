@@ -19,56 +19,31 @@ struct RideMapView: View {
     @ObservedObject private var providerPreference = MapProviderPreference.shared
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            // Map view
-            Group {
-                switch providerPreference.selectedProvider {
-                case .apple:
-                    appleMapView
-                case .google:
-                    googleMapView
-                }
-            }
-            .onChange(of: viewModel.pickupLocation) { _ in
-                if viewModel.pickupLocation != nil {
-                    hapticFeedback()
-                }
-            }
-            .onChange(of: viewModel.destinationLocation) { _ in
-                if viewModel.destinationLocation != nil {
-                    hapticFeedback()
-                }
-            }
-            .onChange(of: viewModel.driverLocation) { _ in
-                if viewModel.driverLocation != nil {
-                    hapticFeedback()
-                }
-            }
-            .accessibilityLabel("Ride request map - \(providerPreference.selectedProvider == .apple ? "Apple Maps" : "Google Maps")")
-
-            // Map provider switcher control
-            mapProviderSwitcher
-                .padding(.top, 50) // Below status bar
-                .padding(.trailing, 16)
-        }
-    }
-
-    // MARK: - Map Provider Switcher
-
-    private var mapProviderSwitcher: some View {
-        Picker("Map Provider", selection: $providerPreference.selectedProvider) {
-            ForEach(MapProvider.allCases, id: \.self) { provider in
-                Text(provider == .apple ? "Apple" : "Google")
-                    .tag(provider)
+        // Map view
+        Group {
+            switch providerPreference.selectedProvider {
+            case .apple:
+                appleMapView
+            case .google:
+                googleMapView
             }
         }
-        .pickerStyle(.segmented)
-        .frame(width: 160)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
-        )
+        .onChange(of: viewModel.pickupLocation) { _ in
+            if viewModel.pickupLocation != nil {
+                hapticFeedback()
+            }
+        }
+        .onChange(of: viewModel.destinationLocation) { _ in
+            if viewModel.destinationLocation != nil {
+                hapticFeedback()
+            }
+        }
+        .onChange(of: viewModel.driverLocation) { _ in
+            if viewModel.driverLocation != nil {
+                hapticFeedback()
+            }
+        }
+        .accessibilityLabel("Ride request map - \(providerPreference.selectedProvider == .apple ? "Apple Maps" : "Google Maps")")
     }
 
     // MARK: - Apple Maps View
