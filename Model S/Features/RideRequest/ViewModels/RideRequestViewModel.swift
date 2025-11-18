@@ -43,14 +43,16 @@ class RideRequestViewModel: ObservableObject {
         MapProviderPreference.shared.$selectedProvider
             .dropFirst() // Skip initial value
             .sink { [weak self] (newProvider: MapProvider) in
-                Task { @MainActor in
-                    guard let self = self else { return }
-                    print("📍 Provider changed to \(newProvider.displayName), recreating services...")
-                    // Recreate services with new provider
-                    self.geocodingService = MapServiceFactory.shared.createGeocodingService()
-                    self.routeService = MapServiceFactory.shared.createRouteCalculationService()
+                guard let self = self else { return }
+                Task {
+                    await MainActor.run {
+                        print("📍 Provider changed to \(newProvider.displayName), recreating services...")
+                        // Recreate services with new provider
+                        self.geocodingService = MapServiceFactory.shared.createGeocodingService()
+                        self.routeService = MapServiceFactory.shared.createRouteCalculationService()
+                    }
                     // Recalculate route if both locations are set
-                    if self.pickupLocation != nil && self.destinationLocation != nil {
+                    if await MainActor.run(body: { self.pickupLocation != nil && self.destinationLocation != nil }) {
                         await self.calculateRoute()
                     }
                 }
