@@ -36,26 +36,40 @@ struct ActiveRideView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            VStack(spacing: 0) {
-                // Map View - Takes up 60% of screen for better visibility
-                if let ride = currentRide {
-                    DriverMapView(
-                        currentRide: ride,
-                        isHeadingToPickup: isHeadingToPickup
-                    )
-                    .frame(height: geometry.size.height * 0.6)
-                } else {
-                    MapPlaceholder()
+            ZStack {
+                VStack(spacing: 0) {
+                    // Map View - Takes up 60% of screen for better visibility
+                    if let ride = currentRide {
+                        DriverMapView(
+                            currentRide: ride,
+                            isHeadingToPickup: isHeadingToPickup
+                        )
                         .frame(height: geometry.size.height * 0.6)
+                    } else {
+                        MapPlaceholder()
+                            .frame(height: geometry.size.height * 0.6)
+                    }
+
+                    // Ride Info Card - Compact bottom sheet
+                    rideInfoCard
+                        .background(Color(UIColor.systemBackground))
+                        .cornerRadius(20, corners: [.topLeft, .topRight])
+                        .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: -5)
+
+                    Spacer(minLength: 0)
                 }
 
-                // Ride Info Card - Compact bottom sheet
-                rideInfoCard
-                    .background(Color(UIColor.systemBackground))
-                    .cornerRadius(20, corners: [.topLeft, .topRight])
-                    .shadow(color: .black.opacity(0.15), radius: 20, x: 0, y: -5)
-
-                Spacer(minLength: 0)
+                // Map Provider Switcher - Floating button in top-right
+                VStack {
+                    HStack {
+                        Spacer()
+                        MapProviderSwitcher()
+                            .padding(.top, 8)
+                            .padding(.trailing, 16)
+                    }
+                    Spacer()
+                }
+                .zIndex(999)
             }
             .background(Color(UIColor.systemGray6))
         }
@@ -216,6 +230,7 @@ struct DriverMapView: View {
     let currentRide: ActiveRide
     let isHeadingToPickup: Bool
 
+    @StateObject private var providerPreference = MapProviderPreference.shared
     @State private var region: MapRegion
     @State private var annotations: [DriverMapMarker] = []
 
@@ -272,6 +287,20 @@ struct DriverMapView: View {
     }
 
     var body: some View {
+        // Switch between Apple Maps and Google Maps based on preference
+        Group {
+            switch providerPreference.selectedProvider {
+            case .apple:
+                appleMapView
+            case .google:
+                googleMapView
+            }
+        }
+    }
+
+    // MARK: - Apple Maps View
+
+    private var appleMapView: some View {
         Map(coordinateRegion: Binding(
             get: { region.toMKCoordinateRegion },
             set: { region = MapRegion(mkRegion: $0) }
@@ -280,6 +309,61 @@ struct DriverMapView: View {
                 DriverAnnotationView(marker: marker)
             }
         }
+    }
+
+    // MARK: - Google Maps View
+
+    private var googleMapView: some View {
+        DriverGoogleMapView(
+            region: $region,
+            annotations: annotations
+        )
+    }
+}
+
+// MARK: - Driver Google Map View
+
+struct DriverGoogleMapView: View {
+    @Binding var region: MapRegion
+    let annotations: [DriverMapMarker]
+
+    var body: some View {
+        GoogleMapViewWrapper(
+            region: $region,
+            pickupLocation: pickupCoordinate,
+            destinationLocation: destinationCoordinate,
+            driverLocation: driverCoordinate,
+            route: nil,
+            driverRoute: nil,
+            routeDisplayMode: .none,
+            showsUserLocation: false,
+            routeLineColor: .blue,
+            routeLineWidth: 4
+        )
+        .overlay(
+            // Add custom markers on top of Google Map
+            ForEach(annotations) { marker in
+                GeometryReader { geometry in
+                    DriverAnnotationView(marker: marker)
+                        .position(
+                            x: geometry.size.width / 2,
+                            y: geometry.size.height / 2
+                        )
+                }
+            }
+        )
+    }
+
+    private var driverCoordinate: CLLocationCoordinate2D? {
+        annotations.first(where: { $0.type == .driver })?.coordinate
+    }
+
+    private var pickupCoordinate: CLLocationCoordinate2D? {
+        annotations.first(where: { $0.type == .pickup })?.coordinate
+    }
+
+    private var destinationCoordinate: CLLocationCoordinate2D? {
+        annotations.first(where: { $0.type == .destination })?.coordinate
     }
 }
 
@@ -401,6 +485,71 @@ struct MapPlaceholder: View {
     }
 }
 
+
+// MARK: - Map Provider Switcher
+
+/// Compact floating button to switch between Apple Maps and Google Maps
+struct MapProviderSwitcher: View {
+    @StateObject private var providerPreference = MapProviderPreference.shared
+
+    var body: some View {
+        Menu {
+            // Menu options
+            Button(action: {
+                withAnimation(.spring(response: 0.3)) {
+                    providerPreference.selectedProvider = .apple
+                }
+                triggerHaptic()
+            }) {
+                Label("Apple Maps", systemImage: "map.fill")
+                if providerPreference.selectedProvider == .apple {
+                    Image(systemName: "checkmark")
+                }
+            }
+
+            Button(action: {
+                withAnimation(.spring(response: 0.3)) {
+                    providerPreference.selectedProvider = .google
+                }
+                triggerHaptic()
+            }) {
+                Label("Google Maps", systemImage: "globe")
+                if providerPreference.selectedProvider == .google {
+                    Image(systemName: "checkmark")
+                }
+            }
+        } label: {
+            // Compact button showing current provider
+            HStack(spacing: 6) {
+                Image(systemName: currentProviderIcon)
+                    .font(.system(size: 14, weight: .medium))
+                Text(currentProviderName)
+                    .font(.system(size: 13, weight: .medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+            }
+            .foregroundColor(.primary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(.ultraThinMaterial)
+            .cornerRadius(20)
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
+        }
+    }
+
+    private var currentProviderName: String {
+        providerPreference.selectedProvider == .apple ? "Apple" : "Google"
+    }
+
+    private var currentProviderIcon: String {
+        providerPreference.selectedProvider == .apple ? "map.fill" : "globe"
+    }
+
+    private func triggerHaptic() {
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+    }
+}
 
 // MARK: - Preview
 
