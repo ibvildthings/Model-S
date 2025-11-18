@@ -58,18 +58,23 @@ struct RideRequestView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .top) {
+        ZStack {
             // Map Background
             RideMapView(viewModel: mapViewModel, configuration: configuration)
                 .ignoresSafeArea()
 
-            // Location Card Overlay (Top)
-            VStack(spacing: 12) {
-                // Map provider switcher - positioned at top of safe area
+            // Overlays
+            VStack(spacing: 0) {
+                // Map provider switcher at the very top
                 MapProviderSwitcher()
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)  // Small padding from safe area top
+                    .padding(.top, 8)
+                    .background(Color.clear) // Ensure it's not transparent/invisible
 
+                Spacer()
+                    .frame(height: 12)
+
+                // Location Card
                 RideLocationCard(
                     pickupText: $pickupText,
                     destinationText: $destinationText,
@@ -160,21 +165,22 @@ struct MapProviderSwitcher: View {
     @StateObject private var providerPreference = MapProviderPreference.shared
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("Map Provider", selection: $providerPreference.selectedProvider) {
-                ForEach(MapProvider.allCases, id: \.self) { provider in
-                    Text(provider == .apple ? "Apple" : "Google")
-                        .tag(provider)
-                }
+        Picker("Map Provider", selection: $providerPreference.selectedProvider) {
+            ForEach(MapProvider.allCases, id: \.self) { provider in
+                Text(provider == .apple ? "Apple" : "Google")
+                    .tag(provider)
             }
-            .pickerStyle(.segmented)
-            .frame(height: 32)  // Explicit height for segmented control
         }
+        .pickerStyle(.segmented)
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 4)
+                .fill(Color.white)
+                .shadow(color: .black.opacity(0.4), radius: 12, x: 0, y: 6)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.red, lineWidth: 3)  // DEBUG: Bright red border so we can see it
         )
     }
 }
