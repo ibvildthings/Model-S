@@ -146,8 +146,10 @@ class MapViewModel: NSObject, ObservableObject {
     private func checkLocationAuthorization() {
         switch locationManager.authorizationStatus {
         case .authorizedWhenInUse, .authorizedAlways:
-            // Start updating - if location services are disabled, didFailWithError will be called
-            locationManager.startUpdatingLocation()
+            // Dispatch async to avoid blocking main thread
+            DispatchQueue.main.async { [weak self] in
+                self?.locationManager.startUpdatingLocation()
+            }
         case .denied, .restricted:
             locationError = .locationPermissionDenied
         case .notDetermined:
@@ -581,9 +583,11 @@ extension MapViewModel: CLLocationManagerDelegate {
             switch status {
             case .authorizedWhenInUse, .authorizedAlways:
                 print("📍 Location authorized, starting location updates")
-                // Start updating - if location services are disabled, didFailWithError will be called
-                locationManager.startUpdatingLocation()
                 locationError = nil
+                // Dispatch async to avoid blocking main thread
+                DispatchQueue.main.async { [weak self] in
+                    self?.locationManager.startUpdatingLocation()
+                }
             case .denied, .restricted:
                 print("❌ Location permission denied or restricted")
                 locationError = .locationPermissionDenied
