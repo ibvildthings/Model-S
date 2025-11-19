@@ -27,6 +27,18 @@ class Ride {
     this.updatedAt = new Date();
   }
 
+  /**
+   * Update estimated arrival time based on remaining distance
+   * @param {number} distanceMeters - Remaining distance in meters
+   */
+  updateETA(distanceMeters) {
+    // Calculate ETA: distance / speed
+    // Average city speed: 40 km/h = 11.11 m/s
+    const averageSpeedMs = 40 * 1000 / 3600;
+    this.estimatedArrival = Math.round(distanceMeters / averageSpeedMs);
+    this.updatedAt = new Date();
+  }
+
   toJSON() {
     return {
       rideId: this.id,  // Changed from "id" to "rideId" for iOS compatibility

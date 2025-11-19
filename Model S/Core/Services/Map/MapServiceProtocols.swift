@@ -40,12 +40,17 @@ struct MapCoordinateSpan: Equatable, Codable {
     let latitudeDelta: Double
     let longitudeDelta: Double
 
-    /// Google Maps zoom level (0-21), computed from latitude delta
-    /// This prevents lossy conversions between span and zoom
+    /// Google Maps zoom level (0-21), computed from coordinate deltas
+    /// Uses the most constrained dimension to ensure both fit in view
     var zoomLevel: Float {
-        // Convert latitude delta to zoom level
-        // Formula: zoom = log2(360° / latitudeDelta)
-        let zoom = log2(360.0 / latitudeDelta)
+        // Convert deltas to zoom levels
+        // Formula: zoom = log2(360° / delta)
+        let latZoom = log2(360.0 / latitudeDelta)
+        let lonZoom = log2(360.0 / longitudeDelta)
+
+        // Use the smaller zoom (most constrained dimension)
+        // This ensures both the latitude and longitude extents fit in the view
+        let zoom = min(latZoom, lonZoom)
         return Float(max(0, min(21, zoom)))
     }
 

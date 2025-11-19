@@ -37,6 +37,9 @@ class DriverSimulator {
 
     console.log(`   Distance to pickup: ${Math.round(distanceToPickup)}m`);
 
+    // Set initial ETA based on distance to pickup
+    ride.updateETA(distanceToPickup);
+
     // Generate route polyline from driver to pickup
     const routeToPickup = generateRoutePolyline(driverStartLocation, ride.pickup, 30);
 
@@ -142,6 +145,9 @@ class DriverSimulator {
             simulation.end = { ...ride.destination };
             simulation.route = routeToDestination;
 
+            // Update ETA for destination phase
+            ride.updateETA(distanceToDestination);
+
             // Send route update
             onUpdate({
               rideId: ride.id,
@@ -215,6 +221,9 @@ class DriverSimulator {
             onStateChange('approachingDestination');
           }
         }
+
+        // Update ride's ETA based on remaining distance
+        ride.updateETA(distanceRemaining);
 
         // Send position update
         onUpdate({
