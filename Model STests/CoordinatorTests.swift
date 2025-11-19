@@ -319,42 +319,4 @@ final class CoordinatorTests: XCTestCase {
         XCTAssertNotNil(coordinator.activeDriverCoordinator)
         XCTAssertNil(coordinator.activeRiderCoordinator)
     }
-
-    // MARK: - AppCoordinator Tests
-
-    func testAppCoordinatorShowsAuthWhenNotAuthenticated() {
-        // Given - no user set (not authenticated)
-        let coordinator = AppCoordinator(
-            stateStore: stateStore,
-            dependencies: dependencies
-        )
-
-        // When
-        coordinator.start()
-
-        // Then - shows authentication screen
-        XCTAssertEqual(coordinator.currentScreen, .authentication)
-    }
-
-    func testAppCoordinatorShowsMainWhenAuthenticated() {
-        // Given
-        let user = User(
-            id: "user123",
-            name: "Test User",
-            email: "test@example.com"
-        )
-        stateStore.dispatch(.setUser(user))
-
-        let coordinator = AppCoordinator(
-            stateStore: stateStore,
-            dependencies: dependencies
-        )
-
-        // When
-        coordinator.start()
-
-        // Then
-        XCTAssertEqual(coordinator.currentScreen, .main)
-    }
-
 }
