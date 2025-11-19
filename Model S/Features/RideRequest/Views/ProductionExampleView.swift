@@ -83,15 +83,22 @@ struct RideRequestViewWithViewModel: View {
             RideMapView(viewModel: coordinator.mapViewModel, configuration: RideRequestConfiguration.default)
                 .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                // Error Banner - Compact top banner
+            VStack(spacing: 8) {
+                // Map Provider Switcher
+                HStack {
+                    MapProviderSwitcher()
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+
+                // Error Banner - Below switcher
                 if let error = coordinator.flowController.currentError {
                     ErrorBannerView(error: error, onDismiss: {
                         DispatchQueue.main.async {
                             coordinator.flowController.clearError()
                         }
                     })
-                    .padding(.top, 8)
                     .padding(.horizontal, 16)
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
@@ -204,7 +211,15 @@ struct RideRequestViewWithViewModel: View {
 
             // Compact Status Banner at Top
             if shouldShowStatusBanner {
-                VStack(spacing: 0) {
+                VStack(spacing: 8) {
+                    // Map Provider Switcher - Also shown during status banner
+                    HStack {
+                        MapProviderSwitcher()
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+
                     HStack(spacing: 12) {
                         // Status Icon
                         Group {
@@ -292,24 +307,12 @@ struct RideRequestViewWithViewModel: View {
                     .cornerRadius(16)
                     .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 2)
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
 
                     Spacer()
                 }
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
 
-            // Map Provider Switcher - Floating button in top-right
-            VStack {
-                HStack {
-                    Spacer()
-                    MapProviderSwitcher()
-                        .padding(.top, 8)
-                        .padding(.trailing, 16)
-                }
-                Spacer()
-            }
-            .zIndex(999)
 
             // Loading Overlay
             if coordinator.flowController.isLoading {

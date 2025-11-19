@@ -59,15 +59,15 @@ struct ActiveRideView: View {
                     Spacer(minLength: 0)
                 }
 
-                // Map Provider Switcher - Floating button in top-right
+                // Map Provider Switcher - Floating button in bottom-left (avoids notifications)
                 VStack {
-                    HStack {
-                        Spacer()
-                        MapProviderSwitcher()
-                            .padding(.top, 8)
-                            .padding(.trailing, 16)
-                    }
                     Spacer()
+                    HStack {
+                        MapProviderSwitcher()
+                            .padding(.leading, 16)
+                            .padding(.bottom, 16)
+                        Spacer()
+                    }
                 }
                 .zIndex(999)
             }
