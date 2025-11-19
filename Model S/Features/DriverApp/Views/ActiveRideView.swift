@@ -134,7 +134,7 @@ struct ActiveRideView: View {
                 Spacer()
 
                 // Call Button - Compact
-                if let phone = currentRide?.passenger.phoneNumber {
+                if currentRide?.passenger.phoneNumber != nil {
                     Button(action: {
                         // Call passenger
                     }) {

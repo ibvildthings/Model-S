@@ -156,6 +156,7 @@ struct RideServiceConfiguration {
 
 /// Protocol for location services
 /// Abstracts CLLocationManager for easier testing and mock implementations
+@MainActor
 protocol LocationService {
     /// Current user location
     var currentLocation: CLLocationCoordinate2D? { get }

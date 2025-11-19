@@ -146,8 +146,8 @@ class DriverFlowController: NSObject, ObservableObject {
 
     /// Toggle driver availability
     func toggleAvailability() async {
-        guard let driverId = driverId,
-              let stats = currentState.currentStats else {
+        guard driverId != nil,
+              currentState.currentStats != nil else {
             print("⚠️ Cannot toggle availability - not logged in")
             return
         }
@@ -484,7 +484,7 @@ class DriverFlowController: NSObject, ObservableObject {
 
     private func checkForRideOffers() async {
         guard let driverId = driverId,
-              case .online(let stats) = currentState else {
+              case .online = currentState else {
             return
         }
 

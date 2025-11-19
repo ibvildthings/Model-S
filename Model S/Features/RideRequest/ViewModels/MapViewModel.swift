@@ -320,7 +320,9 @@ class MapViewModel: NSObject, ObservableObject {
 
         // Create timer to update driver position every 0.1 seconds
         driverAnimationTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            self?.updateDriverPosition()
+            Task { @MainActor in
+                self?.updateDriverPosition()
+            }
         }
 
         print("🚗 Driver location set to: \(driverLocation?.latitude ?? 0), \(driverLocation?.longitude ?? 0)")
@@ -376,18 +378,15 @@ class MapViewModel: NSObject, ObservableObject {
 
         // Determine target based on current phase
         let targetCoordinate: CLLocationCoordinate2D
-        let targetName: String
 
         switch currentViewportTarget {
         case .pickup:
             guard let pickup = pickupLocation else { return }
             targetCoordinate = pickup.coordinate
-            targetName = "pickup"
 
         case .destination:
             guard let destination = destinationLocation else { return }
             targetCoordinate = destination.coordinate
-            targetName = "destination"
         }
 
         // Calculate distance between driver and target
@@ -547,61 +546,67 @@ class MapViewModel: NSObject, ObservableObject {
 
 extension MapViewModel: CLLocationManagerDelegate {
     /// Called when new location data is available
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
 
-        print("📍 User location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        Task { @MainActor in
+            print("📍 User location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
 
-        let isFirstLocation = userLocation == nil
-        userLocation = location
-        locationError = nil
+            let isFirstLocation = userLocation == nil
+            userLocation = location
+            locationError = nil
 
-        // Update region to user's location on first update only if we don't have pins yet
-        if isFirstLocation && pickupLocation == nil && destinationLocation == nil {
-            print("📍 Centering map on user's location for the first time")
-            withAnimation(.easeInOut(duration: 0.5)) {
-                region = MapRegion(
-                    center: location.coordinate,
-                    span: MapCoordinateSpan(
-                        latitudeDelta: MapConstants.defaultSpan.latitudeDelta,
-                        longitudeDelta: MapConstants.defaultSpan.longitudeDelta
+            // Update region to user's location on first update only if we don't have pins yet
+            if isFirstLocation && pickupLocation == nil && destinationLocation == nil {
+                print("📍 Centering map on user's location for the first time")
+                withAnimation(.easeInOut(duration: 0.5)) {
+                    region = MapRegion(
+                        center: location.coordinate,
+                        span: MapCoordinateSpan(
+                            latitudeDelta: MapConstants.defaultSpan.latitudeDelta,
+                            longitudeDelta: MapConstants.defaultSpan.longitudeDelta
+                        )
                     )
-                )
+                }
             }
-        }
 
-        // Notify coordinator about location update
-        onLocationUpdate?(location)
+            // Notify coordinator about location update
+            onLocationUpdate?(location)
+        }
     }
 
     /// Called when location authorization status changes
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        print("📍 Location authorization changed to: \(status.rawValue)")
-        locationAuthorizationStatus = status
+    nonisolated func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        Task { @MainActor in
+            print("📍 Location authorization changed to: \(status.rawValue)")
+            locationAuthorizationStatus = status
 
-        switch status {
-        case .authorizedWhenInUse, .authorizedAlways:
-            print("📍 Location authorized, starting location updates")
-            if CLLocationManager.locationServicesEnabled() {
-                locationManager.startUpdatingLocation()
-                locationError = nil
-            } else {
-                print("❌ Location services disabled")
-                locationError = .locationServicesDisabled
+            switch status {
+            case .authorizedWhenInUse, .authorizedAlways:
+                print("📍 Location authorized, starting location updates")
+                if CLLocationManager.locationServicesEnabled() {
+                    locationManager.startUpdatingLocation()
+                    locationError = nil
+                } else {
+                    print("❌ Location services disabled")
+                    locationError = .locationServicesDisabled
+                }
+            case .denied, .restricted:
+                print("❌ Location permission denied or restricted")
+                locationError = .locationPermissionDenied
+            case .notDetermined:
+                print("⚠️ Location permission not determined")
+                break
+            @unknown default:
+                break
             }
-        case .denied, .restricted:
-            print("❌ Location permission denied or restricted")
-            locationError = .locationPermissionDenied
-        case .notDetermined:
-            print("⚠️ Location permission not determined")
-            break
-        @unknown default:
-            break
         }
     }
 
     /// Called when location manager fails to get location
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        locationError = .locationUnavailable
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in
+            locationError = .locationUnavailable
+        }
     }
 }

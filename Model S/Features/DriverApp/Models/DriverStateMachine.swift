@@ -92,10 +92,10 @@ struct DriverStateMachine {
         // From error
         case (.error(_, let previousState), _):
             // Can transition to previous state or offline
-            if let previous = previousState, case .offline = new {
+            if previousState != nil, case .offline = new {
                 return true
             }
-            if let previous = previousState, case .online = new {
+            if previousState != nil, case .online = new {
                 return true
             }
             return false

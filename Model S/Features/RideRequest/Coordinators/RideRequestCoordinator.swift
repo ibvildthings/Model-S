@@ -113,7 +113,7 @@ class RideRequestCoordinator: ObservableObject {
         }
 
         // Update map with route if it was calculated
-        if let route = flowController.routeInfo {
+        if flowController.routeInfo != nil {
             // Note: We'll need to update mapViewModel when route is ready
             // For now, the route calculation happens in flowController
         }
@@ -356,7 +356,7 @@ class RideRequestCoordinator: ObservableObject {
                 print("⚠️ No route available to display")
             }
 
-        case .driverEnRoute(_, let driver, let eta, let pickup, _):
+        case .driverEnRoute(_, let driver, _, let pickup, _):
             print("🔄 Handling .driverEnRoute")
 
             // NEW ARCHITECTURE: Backend position updates drive the map (no local animation)
@@ -401,7 +401,7 @@ class RideRequestCoordinator: ObservableObject {
             print("🚗 Driver arriving soon...")
             break
 
-        case .rideInProgress(_, let driver, let eta, let pickup, let destination):
+        case .rideInProgress(_, let driver, _, _, let destination):
             // Driver picked up passenger, now driving to destination
             print("🔄 Handling .rideInProgress")
 

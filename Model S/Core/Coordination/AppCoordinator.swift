@@ -13,6 +13,7 @@ import Combine
 
 /// Base protocol for all coordinators
 /// Coordinators handle ONLY navigation - no business logic or state management
+@MainActor
 protocol Coordinator {
     /// Start the coordinator's flow
     func start()

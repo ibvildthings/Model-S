@@ -205,7 +205,9 @@ struct RideOfferView: View {
             if timeRemaining <= 0 {
                 timer.invalidate()
                 // Auto-reject the offer when timer expires
-                viewModel.handleOfferExpiry()
+                Task { @MainActor in
+                    viewModel.handleOfferExpiry()
+                }
             }
         }
     }

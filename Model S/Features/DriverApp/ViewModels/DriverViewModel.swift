@@ -196,7 +196,7 @@ class DriverViewModel: ObservableObject {
         errorMessage = nil
 
         // If in error state, try to recover
-        if case .error(_, let previousState) = driverState {
+        if case .error = driverState {
             // For now, just go offline
             // In production, you might want smarter recovery
             actionTask?.cancel()
