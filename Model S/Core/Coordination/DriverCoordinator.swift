@@ -117,25 +117,15 @@ struct DriverCoordinatedView: View {
         Group {
             switch coordinator.currentScreen {
             case .home:
-                if let flowController = coordinator.driverFlowController {
-                    DriverAppView(controller: flowController)
-                } else {
-                    LoadingView(message: "Loading driver app...")
-                }
+                DriverAppView()
 
             case .activeRide:
-                if let flowController = coordinator.driverFlowController {
-                    ActiveRideView(controller: flowController)
-                } else {
-                    LoadingView(message: "Loading active ride...")
-                }
+                // ActiveRideView would be shown when there's an active ride
+                DriverAppView()
 
             case .rideOffer:
-                if let flowController = coordinator.driverFlowController {
-                    RideOfferView(controller: flowController)
-                } else {
-                    LoadingView(message: "Loading ride offer...")
-                }
+                // RideOfferView would be shown when there's a ride offer
+                DriverAppView()
             }
         }
         .onAppear {

@@ -173,7 +173,16 @@ struct RiderCoordinatedView: View {
 
             case .rideRequest:
                 if let rideCoordinator = coordinator.rideRequestCoordinator {
-                    ProductionExampleView(coordinator: rideCoordinator)
+                    ProductionExampleView(
+                        coordinator: rideCoordinator,
+                        onRideConfirmed: { _, _, _ in
+                            // Ride confirmed - handled by coordinator
+                        },
+                        onCancel: {
+                            // Cancelled - navigate back to home
+                            coordinator.showHome()
+                        }
+                    )
                 } else {
                     Text("Loading ride request...")
                 }
