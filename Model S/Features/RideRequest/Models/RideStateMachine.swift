@@ -70,8 +70,9 @@ class RideStateMachine {
             ]
 
         case .driverEnRoute:
-            // Can transition to arriving
+            // Can transition to arriving, or stay in same state with updated ETA
             return [
+                .driverEnRoute(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), eta: 0, pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // ETA update
                 .driverArriving(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Placeholder
                 .idle, // Cancel ride
                 .error(.rideRequestFailed, previousState: state)
@@ -86,8 +87,9 @@ class RideStateMachine {
             ]
 
         case .rideInProgress:
-            // Can transition to approaching destination OR directly to completed
+            // Can transition to approaching destination, completed, or stay in same state with updated ETA
             return [
+                .rideInProgress(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), eta: 0, pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // ETA update
                 .approachingDestination(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Placeholder
                 .rideCompleted(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Allow skipping approaching if backend goes directly to completed
                 .idle, // Cancel ride
