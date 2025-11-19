@@ -152,7 +152,7 @@ class MapProviderService: ObservableObject {
 
 /// Environment key for map provider service
 struct MapProviderServiceKey: EnvironmentKey {
-    static let defaultValue: MapProviderService = .shared
+    @MainActor static var defaultValue: MapProviderService { .shared }
 }
 
 extension EnvironmentValues {

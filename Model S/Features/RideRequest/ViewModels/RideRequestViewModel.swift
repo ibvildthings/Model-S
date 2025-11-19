@@ -143,8 +143,8 @@ class RideRequestViewModel: ObservableObject {
 
             // Extract route object if available (MKRoute for Apple Maps only)
             // Google Maps returns [CLLocationCoordinate2D], so route will be nil
-            if let mkRoute = routeResult.polyline as? MKRoute {
-                self.route = mkRoute
+            if routeResult.polyline is MKRoute {
+                self.route = routeResult.polyline as? MKRoute
             } else {
                 self.route = nil
             }
