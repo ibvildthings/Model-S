@@ -141,8 +141,13 @@ class RideRequestViewModel: ObservableObject {
                 to: destination.coordinate
             )
 
-            // Extract route object (MKRoute for Apple, GMSRoute for Google in future)
-            self.route = routeResult.polyline as? MKRoute
+            // Extract route object if available (MKRoute for Apple Maps only)
+            // Google Maps returns [CLLocationCoordinate2D], so route will be nil
+            if let mkRoute = routeResult.polyline as? MKRoute {
+                self.route = mkRoute
+            } else {
+                self.route = nil
+            }
             self.estimatedTravelTime = routeResult.expectedTravelTime
             self.estimatedDistance = routeResult.distance
             self.rideState = .routeReady

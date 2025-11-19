@@ -121,12 +121,9 @@ class RideFlowController: ObservableObject {
                 to: destination.coordinate
             )
 
-            // Handle both Apple Maps (MKRoute) and Google Maps ([CLLocationCoordinate2D])
-            if let mkRoute = result.polyline as? MKRoute {
-                // Apple Maps: Use MKRoute directly
-                currentMKRoute = mkRoute
-                print("📍 Route polyline type: MKRoute (Apple Maps)")
-            } else if let coordinates = result.polyline as? [CLLocationCoordinate2D] {
+            // Handle both Google Maps ([CLLocationCoordinate2D]) and Apple Maps (MKRoute)
+            // Check array first since it's the more common case
+            if let coordinates = result.polyline as? [CLLocationCoordinate2D] {
                 // Google Maps: Convert coordinate array to MKPolyline wrapped in MKRoute-like structure
                 let polyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
                 // Store as a pseudo-route - MapViewModel expects MKRoute but we can pass MKPolyline
@@ -136,6 +133,10 @@ class RideFlowController: ObservableObject {
 
                 // Store polyline for map display
                 currentPolyline = polyline
+            } else if let mkRoute = result.polyline as? MKRoute {
+                // Apple Maps: Use MKRoute directly
+                currentMKRoute = mkRoute
+                print("📍 Route polyline type: MKRoute (Apple Maps)")
             } else {
                 print("⚠️ Unknown route polyline type: \(type(of: result.polyline))")
             }
@@ -162,13 +163,9 @@ class RideFlowController: ObservableObject {
                 to: pickup
             )
 
-            // Handle both Apple Maps and Google Maps
-            if let mkRoute = result.polyline as? MKRoute {
-                // Apple Maps: Store and return MKRoute
-                print("📍 Driver route type: MKRoute (Apple Maps)")
-                currentDriverMKRoute = mkRoute
-                return mkRoute
-            } else if let coordinates = result.polyline as? [CLLocationCoordinate2D] {
+            // Handle both Google Maps ([CLLocationCoordinate2D]) and Apple Maps (MKRoute)
+            // Check array first since it's the more common case
+            if let coordinates = result.polyline as? [CLLocationCoordinate2D] {
                 // Google Maps: Store as MKPolyline for consistent handling
                 print("📍 Driver route type: [CLLocationCoordinate2D] (Google Maps)")
                 print("   Driver route coordinates: \(coordinates.count)")
@@ -179,6 +176,11 @@ class RideFlowController: ObservableObject {
                 // Create a pseudo MKRoute for compatibility
                 // Note: We can't create a real MKRoute, but we can use MKPolyline
                 return nil  // Coordinator will check currentDriverPolyline instead
+            } else if let mkRoute = result.polyline as? MKRoute {
+                // Apple Maps: Store and return MKRoute
+                print("📍 Driver route type: MKRoute (Apple Maps)")
+                currentDriverMKRoute = mkRoute
+                return mkRoute
             }
 
             return nil

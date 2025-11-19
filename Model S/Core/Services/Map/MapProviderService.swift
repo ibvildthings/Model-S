@@ -24,7 +24,7 @@ import Combine
 class MapProviderService: ObservableObject {
     // MARK: - Singleton
 
-    static let shared = MapProviderService()
+    nonisolated(unsafe) static let shared = MapProviderService()
 
     // MARK: - Published Properties
 

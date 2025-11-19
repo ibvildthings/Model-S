@@ -17,7 +17,7 @@ struct MapProviderSwitcher: View {
             // Menu options - show only available providers
             ForEach(providerService.availableProviders, id: \.self) { provider in
                 Button(action: {
-                    withAnimation(.spring(response: 0.3)) {
+                    _ = withAnimation(.spring(response: 0.3)) {
                         providerService.switchTo(provider: provider)
                     }
                     triggerHaptic()

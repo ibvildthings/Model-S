@@ -20,7 +20,7 @@ class DependencyContainer {
     // MARK: - Shared Instance
 
     /// Shared container for app-wide access
-    static let shared = DependencyContainer()
+    nonisolated(unsafe) static let shared = DependencyContainer()
 
     // MARK: - State Store
 
