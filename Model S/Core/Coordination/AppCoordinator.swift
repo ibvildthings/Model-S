@@ -48,11 +48,11 @@ class AppCoordinator: ObservableObject, Coordinator {
     // MARK: - Initialization
 
     init(
-        stateStore: AppStateStore = .shared,
-        dependencies: DependencyContainer = .shared
+        stateStore: AppStateStore? = nil,
+        dependencies: DependencyContainer? = nil
     ) {
-        self.stateStore = stateStore
-        self.dependencies = dependencies
+        self.stateStore = stateStore ?? .shared
+        self.dependencies = dependencies ?? .shared
 
         print("🎯 AppCoordinator initialized")
         setupObservers()

@@ -21,7 +21,7 @@ class AppStateStore: ObservableObject {
 
     /// Shared instance for global access
     /// Use dependency injection when possible, but this ensures a single source of truth
-    nonisolated(unsafe) static let shared = AppStateStore()
+    static let shared = AppStateStore()
 
     // MARK: - User State
 

@@ -20,7 +20,7 @@ class DependencyContainer {
     // MARK: - Shared Instance
 
     /// Shared container for app-wide access
-    nonisolated(unsafe) static let shared = DependencyContainer()
+    static let shared = DependencyContainer()
 
     // MARK: - State Store
 
@@ -66,10 +66,10 @@ class DependencyContainer {
     // MARK: - Initialization
 
     init(
-        stateStore: AppStateStore = .shared,
+        stateStore: AppStateStore? = nil,
         rideServiceConfig: RideServiceConfiguration = .default
     ) {
-        self.stateStore = stateStore
+        self.stateStore = stateStore ?? .shared
         self.rideServiceConfig = rideServiceConfig
 
         print("🔧 DependencyContainer initialized")
