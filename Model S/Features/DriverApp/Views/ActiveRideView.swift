@@ -230,7 +230,7 @@ struct DriverMapView: View {
     let currentRide: ActiveRide
     let isHeadingToPickup: Bool
 
-    @StateObject private var providerPreference = MapProviderPreference.shared
+    @ObservedObject private var providerService = MapProviderService.shared
     @State private var region: MapRegion
     @State private var annotations: [DriverMapMarker] = []
 
@@ -289,7 +289,7 @@ struct DriverMapView: View {
     var body: some View {
         // Switch between Apple Maps and Google Maps based on preference
         Group {
-            switch providerPreference.selectedProvider {
+            switch providerService.currentProvider {
             case .apple:
                 appleMapView
             case .google:

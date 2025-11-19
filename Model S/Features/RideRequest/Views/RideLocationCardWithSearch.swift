@@ -13,7 +13,7 @@ struct RideLocationCardWithSearch: View {
     @Binding var pickupText: String
     @Binding var destinationText: String
     @FocusState.Binding var focusedField: RideLocationCard.LocationField?
-    @StateObject private var providerService = MapProviderService.shared
+    @ObservedObject private var providerService = MapProviderService.shared
 
     var configuration: RideRequestConfiguration = .default
     var userLocation: CLLocationCoordinate2D?

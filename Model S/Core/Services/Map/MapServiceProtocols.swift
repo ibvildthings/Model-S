@@ -325,7 +325,7 @@ protocol RouteCalculationService {
 // MARK: - Map Service Provider
 
 /// Enum to specify which map provider to use
-enum MapProvider: CaseIterable, Hashable {
+enum MapProvider: String, CaseIterable, Hashable {
     case apple
     case google
 }

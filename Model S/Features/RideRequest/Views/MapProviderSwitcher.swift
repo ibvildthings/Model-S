@@ -10,7 +10,7 @@ import SwiftUI
 
 /// Compact floating button to switch between Apple Maps and Google Maps
 struct MapProviderSwitcher: View {
-    @StateObject private var providerService = MapProviderService.shared
+    @ObservedObject private var providerService = MapProviderService.shared
 
     var body: some View {
         Menu {

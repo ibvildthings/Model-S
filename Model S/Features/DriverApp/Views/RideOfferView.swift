@@ -218,6 +218,7 @@ struct RideOfferView: View {
 struct RideOfferMapView: View {
     let request: RideRequest
 
+    @ObservedObject private var providerService = MapProviderService.shared
     @State private var region: MapRegion
     @State private var annotations: [RideOfferAnnotation] = []
 
@@ -251,23 +252,53 @@ struct RideOfferMapView: View {
     }
 
     var body: some View {
+        Group {
+            switch providerService.currentProvider {
+            case .apple:
+                appleMapView
+            case .google:
+                googleMapView
+            }
+        }
+    }
+
+    private var appleMapView: some View {
         Map(position: .constant(.region(region.toMKCoordinateRegion))) {
             ForEach(annotations) { annotation in
                 Annotation("", coordinate: annotation.coordinate) {
-                    ZStack {
-                        Circle()
-                            .fill(annotation.type == .pickup ? Color.green : Color.red)
-                            .frame(width: 30, height: 30)
-                            .shadow(radius: 2)
-
-                        Image(systemName: annotation.type == .pickup ? "figure.stand" : "mappin.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(.white)
-                    }
+                    annotationView(for: annotation)
                 }
             }
         }
-        .disabled(true) // Disable interaction
+        .disabled(true)
+    }
+
+    private var googleMapView: some View {
+        GoogleMapViewWrapper(
+            region: $region,
+            pickupLocation: request.pickup.coordinate,
+            destinationLocation: request.destination.coordinate,
+            driverLocation: nil,
+            route: nil,
+            driverRoute: nil,
+            routeDisplayMode: .activeRide,
+            showsUserLocation: false,
+            routeLineColor: .blue,
+            routeLineWidth: 4
+        )
+    }
+
+    private func annotationView(for annotation: RideOfferAnnotation) -> some View {
+        ZStack {
+            Circle()
+                .fill(annotation.type == .pickup ? Color.green : Color.red)
+                .frame(width: 30, height: 30)
+                .shadow(radius: 2)
+
+            Image(systemName: annotation.type == .pickup ? "figure.stand" : "mappin.circle.fill")
+                .font(.system(size: 16))
+                .foregroundColor(.white)
+        }
     }
 }
 

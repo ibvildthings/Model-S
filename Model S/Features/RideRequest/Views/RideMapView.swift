@@ -17,7 +17,7 @@ struct RideMapView: View {
     var configuration: RideRequestConfiguration = .default
 
     // Observe map provider service for dynamic switching
-    @StateObject private var providerService = MapProviderService.shared
+    @ObservedObject private var providerService = MapProviderService.shared
 
     var body: some View {
         // Map view - switches based on current provider
