@@ -322,15 +322,18 @@ final class CoordinatorTests: XCTestCase {
 
     // MARK: - AppCoordinator Tests
 
-    func testAppCoordinatorStartsWithLoadingScreen() {
-        // Given
+    func testAppCoordinatorShowsAuthWhenNotAuthenticated() {
+        // Given - no user set (not authenticated)
         let coordinator = AppCoordinator(
             stateStore: stateStore,
             dependencies: dependencies
         )
 
-        // Then - default is loading
-        XCTAssertEqual(coordinator.currentScreen, .loading)
+        // When
+        coordinator.start()
+
+        // Then - shows authentication screen
+        XCTAssertEqual(coordinator.currentScreen, .authentication)
     }
 
     func testAppCoordinatorShowsMainWhenAuthenticated() {
@@ -354,17 +357,4 @@ final class CoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.currentScreen, .main)
     }
 
-    func testAppCoordinatorShowsAuthWhenNotAuthenticated() {
-        // Given - no user set
-        let coordinator = AppCoordinator(
-            stateStore: stateStore,
-            dependencies: dependencies
-        )
-
-        // When
-        coordinator.start()
-
-        // Then
-        XCTAssertEqual(coordinator.currentScreen, .authentication)
-    }
 }
