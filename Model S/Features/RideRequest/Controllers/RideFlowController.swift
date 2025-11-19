@@ -24,6 +24,10 @@ class RideFlowController: ObservableObject {
     /// This is separate from state to avoid creating new states on every position update
     @Published private(set) var realTimeDriverLocation: CLLocationCoordinate2D?
 
+    /// Real-time ETA from backend (updated every poll)
+    /// This is separate from state to avoid triggering map re-renders on every ETA update
+    @Published private(set) var realTimeETA: TimeInterval?
+
     // MARK: - Dependencies
 
     private let stateMachine: RideStateMachine
@@ -261,6 +265,7 @@ class RideFlowController: ObservableObject {
         stopPollingRideStatus()
         currentMKRoute = nil
         realTimeDriverLocation = nil // Clear backend driver position
+        realTimeETA = nil // Clear backend ETA
         transition(to: .idle)
     }
 
@@ -313,6 +318,11 @@ class RideFlowController: ObservableObject {
                 print("📍 Backend position update: \(String(format: "%.4f", driverLocation.latitude)), \(String(format: "%.4f", driverLocation.longitude))")
             }
 
+            // Update real-time ETA without triggering state changes (avoids map re-renders)
+            if let eta = statusResult.estimatedArrival {
+                realTimeETA = eta
+            }
+
             // Map backend status to frontend state
             switch statusResult.status {
             case .driverFound:
@@ -336,16 +346,8 @@ class RideFlowController: ObservableObject {
                         pickup: pickup,
                         destination: destination
                     ))
-                } else if case .driverEnRoute = currentState {
-                    // Update ETA while driver is moving (same state, new ETA)
-                    transition(to: .driverEnRoute(
-                        rideId: rideId,
-                        driver: driver,
-                        eta: statusResult.estimatedArrival ?? 0,
-                        pickup: pickup,
-                        destination: destination
-                    ))
                 }
+                // ETA updates are handled via realTimeETA property (no state transition needed)
 
             case .driverArriving:
                 // Driver is arriving at pickup (< 1 min away)
@@ -380,16 +382,8 @@ class RideFlowController: ObservableObject {
                         pickup: pickup,
                         destination: destination
                     ))
-                } else if case .rideInProgress = currentState {
-                    // Update ETA while heading to destination (same state, new ETA)
-                    transition(to: .rideInProgress(
-                        rideId: rideId,
-                        driver: driver,
-                        eta: statusResult.estimatedArrival ?? 0,
-                        pickup: pickup,
-                        destination: destination
-                    ))
                 }
+                // ETA updates are handled via realTimeETA property (no state transition needed)
 
             case .approachingDestination:
                 // Approaching destination
@@ -456,9 +450,9 @@ class RideFlowController: ObservableObject {
         currentState.driver
     }
 
-    /// Estimated arrival time
+    /// Estimated arrival time (prefers real-time ETA over state ETA)
     var estimatedArrival: TimeInterval? {
-        currentState.estimatedArrival
+        realTimeETA ?? currentState.estimatedArrival
     }
 
     /// Pickup location
