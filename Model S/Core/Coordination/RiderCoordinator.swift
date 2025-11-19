@@ -30,7 +30,7 @@ class RiderCoordinator: Coordinator, ObservableObject {
 
     // MARK: - Child Coordinators
 
-    private var rideRequestCoordinator: RideRequestCoordinator?
+    private(set) var rideRequestCoordinator: RideRequestCoordinator?
 
     private var cancellables = Set<AnyCancellable>()
 
@@ -54,7 +54,6 @@ class RiderCoordinator: Coordinator, ObservableObject {
 
     func stop() {
         print("🚗 RiderCoordinator stopping")
-        rideRequestCoordinator?.stop()
         cancellables.removeAll()
     }
 
@@ -69,8 +68,15 @@ class RiderCoordinator: Coordinator, ObservableObject {
 
         // Create ride request coordinator if needed
         if rideRequestCoordinator == nil {
+            // Use production configuration
+            var config = RideRequestConfiguration.default
+            config.enableGeocoding = true
+            config.enableRouteCalculation = true
+            config.enableValidation = true
+            config.showRouteInfo = true
+
             rideRequestCoordinator = RideRequestCoordinator(
-                configuration: productionConfig
+                configuration: config
             )
         }
     }

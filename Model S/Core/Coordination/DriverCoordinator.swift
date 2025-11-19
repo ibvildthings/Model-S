@@ -30,7 +30,7 @@ class DriverCoordinator: Coordinator, ObservableObject {
 
     // MARK: - Child Controllers
 
-    private var driverFlowController: DriverFlowController?
+    private(set) var driverFlowController: DriverFlowController?
 
     private var cancellables = Set<AnyCancellable>()
 
