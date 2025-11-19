@@ -16,10 +16,11 @@ import UIKit
 
 /// Constants for map display and behavior
 enum MapConstants {
-    /// Default map center (San Francisco, CA)
+    /// Default map center (San Francisco, CA - Union Square)
+    /// Matches backend geoConfig center for consistency
     static let defaultCenter = CLLocationCoordinate2D(
-        latitude: 37.7749,
-        longitude: -122.4194
+        latitude: 37.7879,
+        longitude: -122.4074
     )
 
     /// Default map zoom level (latitude/longitude delta)

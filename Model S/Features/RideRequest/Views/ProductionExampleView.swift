@@ -342,57 +342,58 @@ struct RideRequestViewWithViewModel: View {
 
     // TEMPORARY: Quick test locations - Remove before production
     private func fillTestLocations() {
-        // Define 10 different test location pairs in Cupertino/San Jose area
+        // Define 10 different test location pairs in San Francisco
+        // Matches backend geoConfig locations for consistent testing
         let testLocationPairs: [(pickup: (coord: CLLocationCoordinate2D, name: String), destination: (coord: CLLocationCoordinate2D, name: String))] = [
-            // Pair 1: Apple Park to Izumi Matcha
+            // Pair 1: Mission to Financial District (Morning commute pattern)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.3323, longitude: -122.0312), "Apple Park Visitor Center"),
-                destination: (CLLocationCoordinate2D(latitude: 37.3218, longitude: -122.0182), "Izumi Matcha")
+                pickup: (CLLocationCoordinate2D(latitude: 37.7599, longitude: -122.4148), "Mission Dolores"),
+                destination: (CLLocationCoordinate2D(latitude: 37.7952, longitude: -122.4028), "Transamerica Pyramid")
             ),
-            // Pair 2: De Anza College to Valley Fair Mall
+            // Pair 2: Haight to Union Square (Morning commute pattern)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.3197, longitude: -122.0450), "De Anza College"),
-                destination: (CLLocationCoordinate2D(latitude: 37.3238, longitude: -121.9950), "Westfield Valley Fair")
+                pickup: (CLLocationCoordinate2D(latitude: 37.7692, longitude: -122.4481), "Haight-Ashbury"),
+                destination: (CLLocationCoordinate2D(latitude: 37.7879, longitude: -122.4074), "Union Square")
             ),
-            // Pair 3: Cupertino Library to Main Street Cupertino
+            // Pair 3: Salesforce Tower to Castro (Evening commute pattern)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.3230, longitude: -122.0416), "Cupertino Library"),
-                destination: (CLLocationCoordinate2D(latitude: 37.3226, longitude: -122.0310), "Main Street Cupertino")
+                pickup: (CLLocationCoordinate2D(latitude: 37.7897, longitude: -122.3969), "Salesforce Tower"),
+                destination: (CLLocationCoordinate2D(latitude: 37.7609, longitude: -122.4350), "Castro District")
             ),
-            // Pair 4: Santana Row to San Jose Airport
+            // Pair 4: Residential to SFO Airport (Airport dropoff pattern)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.3213, longitude: -121.9488), "Santana Row"),
-                destination: (CLLocationCoordinate2D(latitude: 37.3639, longitude: -121.9289), "San Jose Airport")
+                pickup: (CLLocationCoordinate2D(latitude: 37.7763, longitude: -122.4351), "Alamo Square"),
+                destination: (CLLocationCoordinate2D(latitude: 37.6213, longitude: -122.3790), "San Francisco International Airport")
             ),
-            // Pair 5: Stevens Creek Trail to Whole Foods
+            // Pair 5: Ferry Building to BART (Transit pattern)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.3234, longitude: -122.0086), "Stevens Creek Trail"),
-                destination: (CLLocationCoordinate2D(latitude: 37.3315, longitude: -122.0297), "Whole Foods Cupertino")
+                pickup: (CLLocationCoordinate2D(latitude: 37.7955, longitude: -122.3937), "Ferry Building"),
+                destination: (CLLocationCoordinate2D(latitude: 37.7764, longitude: -122.4168), "Civic Center BART")
             ),
-            // Pair 6: Sunnyvale Caltrain to Murphy Avenue
+            // Pair 6: Fisherman's Wharf to Golden Gate Bridge (Tourist pattern)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.3782, longitude: -122.0306), "Sunnyvale Caltrain Station"),
-                destination: (CLLocationCoordinate2D(latitude: 37.3876, longitude: -122.0309), "Murphy Avenue")
+                pickup: (CLLocationCoordinate2D(latitude: 37.8080, longitude: -122.4177), "Fisherman's Wharf"),
+                destination: (CLLocationCoordinate2D(latitude: 37.8199, longitude: -122.4783), "Golden Gate Bridge")
             ),
-            // Pair 7: San Jose State to SAP Center
+            // Pair 7: North Beach to Pier 39 (Tourist pattern)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.3352, longitude: -121.8811), "San Jose State University"),
-                destination: (CLLocationCoordinate2D(latitude: 37.3329, longitude: -121.9010), "SAP Center")
+                pickup: (CLLocationCoordinate2D(latitude: 37.7989, longitude: -122.4117), "North Beach"),
+                destination: (CLLocationCoordinate2D(latitude: 37.8024, longitude: -122.4058), "Pier 39")
             ),
-            // Pair 8: Los Gatos Creek Trail to Downtown Los Gatos
+            // Pair 8: Entertainment to Residential (Nightlife pattern)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.2358, longitude: -121.9623), "Los Gatos Creek Trail"),
-                destination: (CLLocationCoordinate2D(latitude: 37.2271, longitude: -121.9752), "Downtown Los Gatos")
+                pickup: (CLLocationCoordinate2D(latitude: 37.8085, longitude: -122.4180), "Ghirardelli Square"),
+                destination: (CLLocationCoordinate2D(latitude: 37.7544, longitude: -122.4477), "Twin Peaks")
             ),
-            // Pair 9: Rancho San Antonio to Foothill College
+            // Pair 9: Oracle Park to Chase Center (Sports venues)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.3237, longitude: -122.0799), "Rancho San Antonio Preserve"),
-                destination: (CLLocationCoordinate2D(latitude: 37.3606, longitude: -122.1262), "Foothill College")
+                pickup: (CLLocationCoordinate2D(latitude: 37.7786, longitude: -122.3893), "Oracle Park"),
+                destination: (CLLocationCoordinate2D(latitude: 37.7680, longitude: -122.3875), "Chase Center")
             ),
-            // Pair 10: Campbell Park to The Pruneyard
+            // Pair 10: Chinatown to Palace of Fine Arts (Cultural tour)
             (
-                pickup: (CLLocationCoordinate2D(latitude: 37.2871, longitude: -121.9500), "Campbell Park"),
-                destination: (CLLocationCoordinate2D(latitude: 37.2931, longitude: -121.9751), "The Pruneyard Shopping Center")
+                pickup: (CLLocationCoordinate2D(latitude: 37.7941, longitude: -122.4078), "Chinatown"),
+                destination: (CLLocationCoordinate2D(latitude: 37.8025, longitude: -122.4382), "Palace of Fine Arts")
             )
         ]
 

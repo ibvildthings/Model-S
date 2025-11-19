@@ -54,31 +54,40 @@ function calculateETA(distanceMeters) {
 
 /**
  * Generate random location within radius of a point
+ * Uses latitude-corrected conversion for accurate distances
  * @param {number} lat - Center latitude
  * @param {number} lng - Center longitude
  * @param {number} radiusMeters - Radius in meters
  * @returns {object} Random point {lat, lng}
  */
 function randomLocationInRadius(lat, lng, radiusMeters) {
-  // Convert radius from meters to degrees (rough approximation)
-  const radiusDegrees = radiusMeters / 111320; // 1 degree ≈ 111.32 km
+  // Convert radius from meters to degrees with latitude correction
+  // At the equator: 1 degree ≈ 111.32 km
+  // At latitude φ: 1 degree longitude ≈ 111.32 * cos(φ) km
+  const latRadians = lat * Math.PI / 180;
+  const metersPerDegreeLat = 111320;
+  const metersPerDegreeLng = 111320 * Math.cos(latRadians);
 
   // Random angle
   const angle = Math.random() * 2 * Math.PI;
 
-  // Random distance within radius
-  const distance = Math.random() * radiusDegrees;
+  // Random distance within radius (using sqrt for uniform distribution)
+  const distance = Math.sqrt(Math.random()) * radiusMeters;
 
-  // Calculate new position
-  const newLat = lat + distance * Math.cos(angle);
-  const newLng = lng + distance * Math.sin(angle);
+  // Calculate offset in degrees
+  const latOffset = (distance * Math.cos(angle)) / metersPerDegreeLat;
+  const lngOffset = (distance * Math.sin(angle)) / metersPerDegreeLng;
 
-  return { lat: newLat, lng: newLng };
+  return {
+    lat: lat + latOffset,
+    lng: lng + lngOffset
+  };
 }
 
 /**
  * Generate random location in a donut-shaped area (between minRadius and maxRadius)
  * This ensures drivers spawn at a realistic distance, not too close or too far
+ * Uses latitude-corrected conversion for accurate distances
  * @param {number} lat - Center latitude
  * @param {number} lng - Center longitude
  * @param {number} minRadiusMeters - Minimum distance from center in meters
@@ -86,21 +95,28 @@ function randomLocationInRadius(lat, lng, radiusMeters) {
  * @returns {object} Random point {lat, lng}
  */
 function randomLocationInDonut(lat, lng, minRadiusMeters, maxRadiusMeters) {
-  // Convert radius from meters to degrees
-  const minRadiusDegrees = minRadiusMeters / 111320;
-  const maxRadiusDegrees = maxRadiusMeters / 111320;
+  // Latitude correction for accurate distance calculation
+  const latRadians = lat * Math.PI / 180;
+  const metersPerDegreeLat = 111320;
+  const metersPerDegreeLng = 111320 * Math.cos(latRadians);
 
   // Random angle (0 to 360 degrees)
   const angle = Math.random() * 2 * Math.PI;
 
   // Random distance between min and max radius
-  const distance = minRadiusDegrees + Math.random() * (maxRadiusDegrees - minRadiusDegrees);
+  // Use sqrt for uniform distribution in the donut area
+  const minRadiusSq = minRadiusMeters * minRadiusMeters;
+  const maxRadiusSq = maxRadiusMeters * maxRadiusMeters;
+  const distance = Math.sqrt(minRadiusSq + Math.random() * (maxRadiusSq - minRadiusSq));
 
-  // Calculate new position
-  const newLat = lat + distance * Math.cos(angle);
-  const newLng = lng + distance * Math.sin(angle);
+  // Calculate offset in degrees with latitude correction
+  const latOffset = (distance * Math.cos(angle)) / metersPerDegreeLat;
+  const lngOffset = (distance * Math.sin(angle)) / metersPerDegreeLng;
 
-  return { lat: newLat, lng: newLng };
+  return {
+    lat: lat + latOffset,
+    lng: lng + lngOffset
+  };
 }
 
 /**

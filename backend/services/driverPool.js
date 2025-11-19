@@ -1,10 +1,12 @@
 /**
  * Driver Pool Service
  * Manages a pool of simulated drivers
+ * Uses centralized geoConfig for consistent locations across the system
  */
 
 const Driver = require('../models/Driver');
-const { randomLocationInDonut } = require('../utils/geoUtils');
+const { randomLocationInDonut, randomLocationInRadius } = require('../utils/geoUtils');
+const geoConfig = require('../config/geoConfig');
 
 class DriverPool {
   constructor() {
@@ -15,18 +17,14 @@ class DriverPool {
   /**
    * Initialize a pool of simulated drivers
    * Creates drivers at random locations around San Francisco
-   * Drivers spawn in a donut shape (1-5km from center) to ensure
-   * they're always a realistic distance away from typical pickup locations
+   * Uses zone-based distribution for realistic coverage
    */
   initializeDrivers() {
-    // San Francisco center (near Union Square/Financial District)
-    // This matches the SF landmark locations in the ride simulator
-    this.center = { lat: 37.7879, lng: -122.4074 };
-
-    // Spawn drivers in a donut shape: 1-5 km from center
-    // Good coverage for SF's compact urban area
-    this.minRadiusMeters = 1000;  // 1 km minimum
-    this.maxRadiusMeters = 5000;  // 5 km maximum
+    // Get configuration from centralized geoConfig
+    const region = geoConfig.getActiveRegion();
+    this.center = region.center;
+    this.minRadiusMeters = region.driverSpawn.minRadius;
+    this.maxRadiusMeters = region.driverSpawn.maxRadius;
 
     const driverNames = [
       // Diverse set of drivers reflecting SF's multicultural community
@@ -55,12 +53,12 @@ class DriverPool {
     const vehicleTypes = ['Standard', 'Standard', 'Standard', 'Standard', 'Premium', 'Premium', 'XL'];
 
     for (let i = 0; i < driverNames.length; i++) {
-      // Spawn driver in donut-shaped area
-      const location = randomLocationInDonut(
-        this.center.lat,
-        this.center.lng,
-        this.minRadiusMeters,
-        this.maxRadiusMeters
+      // Use zone-based distribution for realistic coverage
+      const zone = geoConfig.selectDriverZone();
+      const location = randomLocationInRadius(
+        zone.center.lat,
+        zone.center.lng,
+        zone.radius
       );
 
       const rating = 4.5 + Math.random() * 0.5; // Rating between 4.5 and 5.0
@@ -77,10 +75,10 @@ class DriverPool {
 
       this.drivers.push(driver);
 
-      console.log(`   ${driver.name}: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`);
+      console.log(`   ${driver.name} (${zone.name}): ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`);
     }
 
-    console.log(`✅ Initialized ${this.drivers.length} simulated drivers in San Francisco area (1-5km radius)`);
+    console.log(`✅ Initialized ${this.drivers.length} simulated drivers across SF zones`);
   }
 
   /**
@@ -141,20 +139,21 @@ class DriverPool {
 
   /**
    * Randomize a driver's location (for testing variety)
-   * Spawns driver at a new random location in the donut area
+   * Spawns driver at a new random location in a weighted zone
    */
   randomizeDriverLocation(driverId) {
     const driver = this.getDriverById(driverId);
     if (driver) {
-      const newLocation = randomLocationInDonut(
-        this.center.lat,
-        this.center.lng,
-        this.minRadiusMeters,
-        this.maxRadiusMeters
+      // Use zone-based distribution for realistic relocation
+      const zone = geoConfig.selectDriverZone();
+      const newLocation = randomLocationInRadius(
+        zone.center.lat,
+        zone.center.lng,
+        zone.radius
       );
 
       driver.updateLocation(newLocation.lat, newLocation.lng);
-      console.log(`🎲 ${driver.name} relocated to: ${newLocation.lat.toFixed(4)}, ${newLocation.lng.toFixed(4)}`);
+      console.log(`🎲 ${driver.name} relocated to ${zone.name}: ${newLocation.lat.toFixed(4)}, ${newLocation.lng.toFixed(4)}`);
     }
   }
 }
