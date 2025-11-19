@@ -14,34 +14,45 @@ class DriverPool {
 
   /**
    * Initialize a pool of simulated drivers
-   * Creates drivers at random locations around Cupertino/San Jose
-   * Drivers spawn in a donut shape (2-6km from center) to ensure
+   * Creates drivers at random locations around San Francisco
+   * Drivers spawn in a donut shape (1-8km from center) to ensure
    * they're always a realistic distance away from typical pickup locations
    */
   initializeDrivers() {
-    // Cupertino/San Jose area center (Apple Park vicinity)
-    // This matches the test locations in the iOS app
-    this.center = { lat: 37.3323, lng: -122.0312 };
+    // San Francisco center (Union Square area)
+    // This provides good coverage of SF landmarks and neighborhoods
+    this.center = { lat: 37.7879, lng: -122.4074 };
 
-    // Spawn drivers in a donut shape: 2-6 km from center
-    // Smaller radius than SF since we're testing in a more concentrated area
-    this.minRadiusMeters = 2000;  // 2 km minimum
-    this.maxRadiusMeters = 6000;  // 6 km maximum
+    // Spawn drivers in a donut shape: 1-8 km from center
+    // Covers most of SF from the Marina to the Mission
+    this.minRadiusMeters = 1000;  // 1 km minimum
+    this.maxRadiusMeters = 8000;  // 8 km maximum
 
     const driverNames = [
+      // Diverse drivers reflecting SF's multicultural population
       'Michael Chen',
       'Sarah Johnson',
       'David Martinez',
-      'Emily Rodriguez',
+      'Priya Sharma',
       'James Wilson',
       'Maria Garcia',
-      'Robert Taylor',
+      'Wei Zhang',
       'Jennifer Lee',
-      'William Brown',
-      'Lisa Anderson'
+      'Carlos Ramirez',
+      'Aisha Patel',
+      'Robert Taylor',
+      'Fatima Al-Hassan',
+      'Kevin O\'Brien',
+      'Yuki Tanaka',
+      'Luis Fernandez',
+      'Elena Volkov',
+      'Ahmad Hassan',
+      'Rosa Santos',
+      'Daniel Kim',
+      'Olga Petrov'
     ];
 
-    const vehicleTypes = ['Standard', 'Standard', 'Standard', 'Premium', 'XL'];
+    const vehicleTypes = ['Standard', 'Standard', 'Standard', 'Premium', 'XL', 'Green'];
 
     for (let i = 0; i < driverNames.length; i++) {
       // Spawn driver in donut-shaped area
@@ -69,7 +80,7 @@ class DriverPool {
       console.log(`   ${driver.name}: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`);
     }
 
-    console.log(`✅ Initialized ${this.drivers.length} simulated drivers in Cupertino area (2-6km radius)`);
+    console.log(`✅ Initialized ${this.drivers.length} simulated drivers in San Francisco area (1-8km radius)`);
   }
 
   /**
