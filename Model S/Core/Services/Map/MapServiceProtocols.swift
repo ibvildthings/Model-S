@@ -373,7 +373,8 @@ class MapServiceFactory {
             return AppleLocationSearchService()
         case .google:
             guard let apiKey = configuration.apiKey else {
-                fatalError("Google Maps API key is required. Please configure MapServiceConfiguration with a valid API key.")
+                print("⚠️ Google Maps API key not configured. Falling back to Apple services.")
+                return AppleLocationSearchService()
             }
             return GoogleLocationSearchService(apiKey: apiKey)
         }
@@ -388,7 +389,8 @@ class MapServiceFactory {
             return AppleGeocodingService()
         case .google:
             guard let apiKey = configuration.apiKey else {
-                fatalError("Google Maps API key is required. Please configure MapServiceConfiguration with a valid API key.")
+                print("⚠️ Google Maps API key not configured. Falling back to Apple services.")
+                return AppleGeocodingService()
             }
             return GoogleGeocodingService(apiKey: apiKey)
         }
@@ -403,7 +405,8 @@ class MapServiceFactory {
             return AppleRouteCalculationService()
         case .google:
             guard let apiKey = configuration.apiKey else {
-                fatalError("Google Maps API key is required. Please configure MapServiceConfiguration with a valid API key.")
+                print("⚠️ Google Maps API key not configured. Falling back to Apple services.")
+                return AppleRouteCalculationService()
             }
             return GoogleRouteCalculationService(apiKey: apiKey)
         }
