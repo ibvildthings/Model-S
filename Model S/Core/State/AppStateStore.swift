@@ -60,7 +60,7 @@ class AppStateStore: ObservableObject {
 
     // MARK: - Initialization
 
-    private init() {
+    init() {
         // Load persisted state if needed
         loadPersistedState()
     }
