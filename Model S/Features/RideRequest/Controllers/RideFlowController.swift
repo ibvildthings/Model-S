@@ -336,6 +336,15 @@ class RideFlowController: ObservableObject {
                         pickup: pickup,
                         destination: destination
                     ))
+                } else if case .driverEnRoute = currentState {
+                    // Update ETA while driver is moving (same state, new ETA)
+                    transition(to: .driverEnRoute(
+                        rideId: rideId,
+                        driver: driver,
+                        eta: statusResult.estimatedArrival ?? 0,
+                        pickup: pickup,
+                        destination: destination
+                    ))
                 }
 
             case .driverArriving:
@@ -364,6 +373,15 @@ class RideFlowController: ObservableObject {
                 } else if case .driverEnRoute = currentState {
                     // Sometimes we might skip arriving state if it's too fast
                     print("🚗 Backend says ride is in progress (skipped arriving)")
+                    transition(to: .rideInProgress(
+                        rideId: rideId,
+                        driver: driver,
+                        eta: statusResult.estimatedArrival ?? 0,
+                        pickup: pickup,
+                        destination: destination
+                    ))
+                } else if case .rideInProgress = currentState {
+                    // Update ETA while heading to destination (same state, new ETA)
                     transition(to: .rideInProgress(
                         rideId: rideId,
                         driver: driver,
