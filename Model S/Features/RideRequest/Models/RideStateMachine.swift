@@ -15,8 +15,23 @@ class RideStateMachine {
 
     /// Check if a transition from one state to another is valid
     func canTransition(from current: RideState, to next: RideState) -> Bool {
+        // Allow self-transitions for states that support ETA/data updates
+        if statesMatch(current, next) && allowsSelfTransition(current) {
+            return true
+        }
+
         let validNext = validNextStates(from: current)
         return validNext.contains(where: { statesMatch($0, next) })
+    }
+
+    /// Check if a state allows transitioning to itself (for ETA updates, etc.)
+    private func allowsSelfTransition(_ state: RideState) -> Bool {
+        switch state {
+        case .selectingLocations, .driverEnRoute, .rideInProgress:
+            return true
+        default:
+            return false
+        }
     }
 
     /// Get all valid next states from the current state
@@ -30,9 +45,8 @@ class RideStateMachine {
             ]
 
         case .selectingLocations:
-            // Can update locations, calculate route, or error
+            // Can update locations (self-transition handled by allowsSelfTransition), calculate route, or error
             return [
-                .selectingLocations(pickup: nil, destination: nil), // Update selection
                 .routeReady(pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil), route: RouteInfo(distance: 0, estimatedTravelTime: 0, polyline: "")), // Placeholder
                 .idle, // Reset
                 .error(.geocodingFailed, previousState: state)
@@ -70,7 +84,7 @@ class RideStateMachine {
             ]
 
         case .driverEnRoute:
-            // Can transition to arriving
+            // Can transition to arriving (self-transition for ETA updates handled by allowsSelfTransition)
             return [
                 .driverArriving(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Placeholder
                 .idle, // Cancel ride
@@ -86,7 +100,7 @@ class RideStateMachine {
             ]
 
         case .rideInProgress:
-            // Can transition to approaching destination OR directly to completed
+            // Can transition to approaching destination or completed (self-transition for ETA updates handled by allowsSelfTransition)
             return [
                 .approachingDestination(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Placeholder
                 .rideCompleted(rideId: "", driver: DriverInfo(id: "", name: "", rating: 0, vehicleMake: "", vehicleModel: "", vehicleColor: "", licensePlate: "", photoURL: nil, phoneNumber: nil, currentLocation: nil, estimatedArrivalTime: nil), pickup: LocationPoint(coordinate: .init(), name: nil), destination: LocationPoint(coordinate: .init(), name: nil)), // Allow skipping approaching if backend goes directly to completed
