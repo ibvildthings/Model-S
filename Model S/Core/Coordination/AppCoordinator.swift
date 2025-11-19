@@ -183,7 +183,7 @@ class AuthCoordinator: Coordinator {
 
 /// Handles main app flow (rider/driver modes, features)
 @MainActor
-class MainCoordinator: Coordinator {
+class MainCoordinator: Coordinator, ObservableObject {
 
     private let stateStore: AppStateStore
     private let dependencies: DependencyContainer
