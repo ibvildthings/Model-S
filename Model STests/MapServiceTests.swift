@@ -343,19 +343,23 @@ final class MapServiceTests: XCTestCase {
         // Given: Route parameters
         let distance = 5000.0 // meters
         let travelTime = 600.0 // seconds
-        let polyline = "encoded_polyline_string"
+        let coordinates = [
+            CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+            CLLocationCoordinate2D(latitude: 37.8049, longitude: -122.3994)
+        ]
 
         // When: Creating route result
         let route = RouteResult(
             distance: distance,
             expectedTravelTime: travelTime,
-            polyline: polyline
+            coordinates: coordinates
         )
 
         // Then: Should have correct values
         XCTAssertEqual(route.distance, distance)
         XCTAssertEqual(route.expectedTravelTime, travelTime)
-        XCTAssertNotNil(route.polyline)
+        XCTAssertEqual(route.coordinates.count, 2)
+        XCTAssertEqual(route.polyline.count, 2) // polyline is computed property
     }
 
     // MARK: - Configuration Presets Tests
