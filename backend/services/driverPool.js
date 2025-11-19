@@ -14,21 +14,22 @@ class DriverPool {
 
   /**
    * Initialize a pool of simulated drivers
-   * Creates drivers at random locations around Cupertino/San Jose
-   * Drivers spawn in a donut shape (2-6km from center) to ensure
+   * Creates drivers at random locations around San Francisco
+   * Drivers spawn in a donut shape (1-5km from center) to ensure
    * they're always a realistic distance away from typical pickup locations
    */
   initializeDrivers() {
-    // Cupertino/San Jose area center (Apple Park vicinity)
-    // This matches the test locations in the iOS app
-    this.center = { lat: 37.3323, lng: -122.0312 };
+    // San Francisco center (near Union Square/Financial District)
+    // This matches the SF landmark locations in the ride simulator
+    this.center = { lat: 37.7879, lng: -122.4074 };
 
-    // Spawn drivers in a donut shape: 2-6 km from center
-    // Smaller radius than SF since we're testing in a more concentrated area
-    this.minRadiusMeters = 2000;  // 2 km minimum
-    this.maxRadiusMeters = 6000;  // 6 km maximum
+    // Spawn drivers in a donut shape: 1-5 km from center
+    // Good coverage for SF's compact urban area
+    this.minRadiusMeters = 1000;  // 1 km minimum
+    this.maxRadiusMeters = 5000;  // 5 km maximum
 
     const driverNames = [
+      // Diverse set of drivers reflecting SF's multicultural community
       'Michael Chen',
       'Sarah Johnson',
       'David Martinez',
@@ -38,10 +39,20 @@ class DriverPool {
       'Robert Taylor',
       'Jennifer Lee',
       'William Brown',
-      'Lisa Anderson'
+      'Lisa Anderson',
+      'Kevin Nguyen',
+      'Priya Patel',
+      'Carlos Santos',
+      'Yuki Tanaka',
+      'Omar Hassan',
+      'Sofia Kowalski',
+      'Andre Jackson',
+      'Mei Lin Wong',
+      'Diego Fernandez',
+      'Aisha Mohammed'
     ];
 
-    const vehicleTypes = ['Standard', 'Standard', 'Standard', 'Premium', 'XL'];
+    const vehicleTypes = ['Standard', 'Standard', 'Standard', 'Standard', 'Premium', 'Premium', 'XL'];
 
     for (let i = 0; i < driverNames.length; i++) {
       // Spawn driver in donut-shaped area
@@ -69,7 +80,7 @@ class DriverPool {
       console.log(`   ${driver.name}: ${location.lat.toFixed(4)}, ${location.lng.toFixed(4)}`);
     }
 
-    console.log(`✅ Initialized ${this.drivers.length} simulated drivers in Cupertino area (2-6km radius)`);
+    console.log(`✅ Initialized ${this.drivers.length} simulated drivers in San Francisco area (1-5km radius)`);
   }
 
   /**
