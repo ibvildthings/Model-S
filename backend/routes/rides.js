@@ -138,7 +138,7 @@ router.post('/request', async (req, res) => {
       // Set ride status to searching (waiting for driver acceptance)
       ride.updateStatus('searching');
 
-      // Reduced timeout: 5 seconds instead of 30 for development
+      // Timeout matches frontend timer (30 seconds)
       setTimeout(() => {
         const offer = pendingRideOffers.get(ride.id);
         if (offer && ride.status === 'searching') {
@@ -148,7 +148,7 @@ router.post('/request', async (req, res) => {
           // Fall back to simulated driver
           useSimulatedDriver(ride);
         }
-      }, 5000);
+      }, 30000);
 
       return; // Wait for driver to accept
     }
