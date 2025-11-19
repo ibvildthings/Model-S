@@ -8,7 +8,9 @@
       "Bash(git stash:*)",
       "Bash(cat:*)",
       "Bash(gh auth:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git branch:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

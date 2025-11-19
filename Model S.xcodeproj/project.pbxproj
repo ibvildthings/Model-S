@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		7BD6A0F82ECB60CE0066E681 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = 7BD6A0F72ECB60CE0066E681 /* GoogleMaps */; };
+		7B715FCB2ECD7B2000B49738 /* GoogleMaps in Frameworks */ = {isa = PBXBuildFile; productRef = 7B715FCA2ECD7B2000B49738 /* GoogleMaps */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,7 +43,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				7BD6A0F82ECB60CE0066E681 /* GoogleMaps in Frameworks */,
+				7B715FCB2ECD7B2000B49738 /* GoogleMaps in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -62,6 +62,7 @@
 			children = (
 				7B25F29E2EC4DD9E0012FF84 /* Model S */,
 				7B3900592ECB14F4003DAE99 /* Model STests */,
+				7B7DCE532ECD75E200815FA0 /* Frameworks */,
 				7B25F29D2EC4DD9E0012FF84 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -73,6 +74,13 @@
 				7B3900582ECB14F4003DAE99 /* Model STests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		7B7DCE532ECD75E200815FA0 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -95,7 +103,7 @@
 			);
 			name = "Model S";
 			packageProductDependencies = (
-				7BD6A0F72ECB60CE0066E681 /* GoogleMaps */,
+				7B715FCA2ECD7B2000B49738 /* GoogleMaps */,
 			);
 			productName = "Model S";
 			productReference = 7B25F29C2EC4DD9E0012FF84 /* Model S.app */;
@@ -118,8 +126,6 @@
 				7B3900592ECB14F4003DAE99 /* Model STests */,
 			);
 			name = "Model STests";
-			packageProductDependencies = (
-			);
 			productName = "Model STests";
 			productReference = 7B3900582ECB14F4003DAE99 /* Model STests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
@@ -468,7 +474,7 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		7BD6A0F72ECB60CE0066E681 /* GoogleMaps */ = {
+		7B715FCA2ECD7B2000B49738 /* GoogleMaps */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 7BD6A0F62ECB60CE0066E681 /* XCRemoteSwiftPackageReference "ios-maps-sdk" */;
 			productName = GoogleMaps;
