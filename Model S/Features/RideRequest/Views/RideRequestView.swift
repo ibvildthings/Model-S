@@ -79,11 +79,11 @@ struct RideRequestView: View {
                         rideState = .selectingDestination
                     }
                 )
-                .onChange(of: pickupText) { newValue in
+                .onChange(of: pickupText) { _, newValue in
                     onPickupSelected?(newValue)
                     updateSliderVisibility()
                 }
-                .onChange(of: destinationText) { newValue in
+                .onChange(of: destinationText) { _, newValue in
                     onDestinationSelected?(newValue)
                     updateSliderVisibility()
 

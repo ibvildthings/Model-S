@@ -77,7 +77,7 @@ struct RideLocationCardWithSearch: View {
                         .font(.body)
                         .accessibilityLabel("Pickup location")
                         .accessibilityHint("Enter your pickup address")
-                        .onChange(of: pickupText) { newValue in
+                        .onChange(of: pickupText) { _, newValue in
                             if focusedField == .pickup {
                                 mapService.search(query: newValue)
                             }
@@ -141,7 +141,7 @@ struct RideLocationCardWithSearch: View {
                         .font(.body)
                         .accessibilityLabel("Destination")
                         .accessibilityHint("Enter your destination address")
-                        .onChange(of: destinationText) { newValue in
+                        .onChange(of: destinationText) { _, newValue in
                             if focusedField == .destination {
                                 mapService.search(query: newValue)
                             }
@@ -174,12 +174,12 @@ struct RideLocationCardWithSearch: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .onChange(of: focusedField) { newValue in
+        .onChange(of: focusedField) { _, newValue in
             if newValue == nil {
                 mapService.clearResults()
             }
         }
-        .onChange(of: userLocation) { newLocation in
+        .onChange(of: userLocation) { _, newLocation in
             if let location = newLocation {
                 mapService.updateSearchRegion(center: location, radiusMiles: 50.0)
             }

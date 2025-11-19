@@ -251,20 +251,19 @@ struct RideOfferMapView: View {
     }
 
     var body: some View {
-        Map(coordinateRegion: Binding(
-            get: { region.toMKCoordinateRegion },
-            set: { region = MapRegion(mkRegion: $0) }
-        ), annotationItems: annotations) { annotation in
-            MapAnnotation(coordinate: annotation.coordinate) {
-                ZStack {
-                    Circle()
-                        .fill(annotation.type == .pickup ? Color.green : Color.red)
-                        .frame(width: 30, height: 30)
-                        .shadow(radius: 2)
+        Map(position: .constant(.region(region.toMKCoordinateRegion))) {
+            ForEach(annotations) { annotation in
+                Annotation("", coordinate: annotation.coordinate) {
+                    ZStack {
+                        Circle()
+                            .fill(annotation.type == .pickup ? Color.green : Color.red)
+                            .frame(width: 30, height: 30)
+                            .shadow(radius: 2)
 
-                    Image(systemName: annotation.type == .pickup ? "figure.stand" : "mappin.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundColor(.white)
+                        Image(systemName: annotation.type == .pickup ? "figure.stand" : "mappin.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundColor(.white)
+                    }
                 }
             }
         }

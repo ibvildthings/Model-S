@@ -58,9 +58,11 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
             zoom: region.span.zoomLevel
         )
 
-        // Create Google Maps view using modern initializer
-        let mapView = GMSMapView(frame: .zero)
-        mapView.camera = camera
+        // Create Google Maps view using options initializer
+        let options = GMSMapViewOptions()
+        options.camera = camera
+        options.frame = .zero
+        let mapView = GMSMapView(options: options)
         mapView.delegate = context.coordinator
 
         // Explicitly set map type to ensure tiles load

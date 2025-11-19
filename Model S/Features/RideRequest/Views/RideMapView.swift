@@ -29,17 +29,17 @@ struct RideMapView: View {
                 googleMapView
             }
         }
-        .onChange(of: viewModel.pickupLocation) { _ in
+        .onChange(of: viewModel.pickupLocation) {
             if viewModel.pickupLocation != nil {
                 hapticFeedback()
             }
         }
-        .onChange(of: viewModel.destinationLocation) { _ in
+        .onChange(of: viewModel.destinationLocation) {
             if viewModel.destinationLocation != nil {
                 hapticFeedback()
             }
         }
-        .onChange(of: viewModel.driverLocation) { _ in
+        .onChange(of: viewModel.driverLocation) {
             if viewModel.driverLocation != nil {
                 hapticFeedback()
             }

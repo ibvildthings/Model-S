@@ -301,12 +301,11 @@ struct DriverMapView: View {
     // MARK: - Apple Maps View
 
     private var appleMapView: some View {
-        Map(coordinateRegion: Binding(
-            get: { region.toMKCoordinateRegion },
-            set: { region = MapRegion(mkRegion: $0) }
-        ), annotationItems: annotations) { marker in
-            MapAnnotation(coordinate: marker.coordinate) {
-                DriverAnnotationView(marker: marker)
+        Map(position: .constant(.region(region.toMKCoordinateRegion))) {
+            ForEach(annotations) { marker in
+                Annotation("", coordinate: marker.coordinate) {
+                    DriverAnnotationView(marker: marker)
+                }
             }
         }
     }
