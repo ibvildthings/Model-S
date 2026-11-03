@@ -18,7 +18,7 @@ class RideAPIClient: RideRequestService {
 
     // MARK: - Initialization
 
-    init(baseURL: String = "http://localhost:3000") {
+    init(baseURL: String = BackendConfiguration.baseURL) {
         self.baseURL = baseURL
 
         let configuration = URLSessionConfiguration.default
@@ -26,7 +26,7 @@ class RideAPIClient: RideRequestService {
         configuration.timeoutIntervalForResource = 60
         self.session = URLSession(configuration: configuration)
 
-        print("🌐 RideAPIClient initialized with baseURL: \(baseURL)")
+        AppLog.debug("🌐 RideAPIClient initialized with baseURL: \(baseURL)")
     }
 
     deinit {
@@ -36,9 +36,9 @@ class RideAPIClient: RideRequestService {
     // MARK: - RideRequestService Protocol
 
     func requestRide(pickup: LocationPoint, destination: LocationPoint) async throws -> RideRequestResult {
-        print("📤 Requesting ride from backend...")
-        print("   Pickup: \(pickup.coordinate.latitude), \(pickup.coordinate.longitude)")
-        print("   Destination: \(destination.coordinate.latitude), \(destination.coordinate.longitude)")
+        AppLog.debug("📤 Requesting ride from backend...")
+        AppLog.debug("   Pickup: \(pickup.coordinate.latitude), \(pickup.coordinate.longitude)")
+        AppLog.debug("   Destination: \(destination.coordinate.latitude), \(destination.coordinate.longitude)")
 
         // Prepare request
         let url = URL(string: "\(baseURL)/api/rides/request")!
@@ -64,42 +64,42 @@ class RideAPIClient: RideRequestService {
             throw RideRequestError.networkUnavailable
         }
 
-        print("📥 Response status: \(httpResponse.statusCode)")
+        AppLog.debug("📥 Response status: \(httpResponse.statusCode)")
 
         guard httpResponse.statusCode == 201 || httpResponse.statusCode == 200 else {
             // Try to decode error message
             if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
-                print("❌ Backend error: \(errorResponse.message)")
+                AppLog.error("❌ Backend error: \(errorResponse.message)")
                 throw RideRequestError.rideRequestFailed
             }
-            print("❌ Unexpected status code: \(httpResponse.statusCode)")
+            AppLog.error("❌ Unexpected status code: \(httpResponse.statusCode)")
             throw RideRequestError.rideRequestFailed
         }
 
         // Debug: Print raw response
         if let responseString = String(data: data, encoding: .utf8) {
-            print("📦 Raw response: \(responseString)")
+            AppLog.debug("📦 Raw response: \(responseString)")
         }
 
         // Decode response
         do {
             let rideResponse = try JSONDecoder().decode(RideResponse.self, from: data)
-            print("✅ Ride created: \(rideResponse.rideId)")
-            print("   Status: \(rideResponse.status)")
+            AppLog.debug("✅ Ride created: \(rideResponse.rideId)")
+            AppLog.debug("   Status: \(rideResponse.status)")
         } catch {
-            print("❌ JSON Decoding Error: \(error)")
+            AppLog.error("❌ JSON Decoding Error: \(error)")
             if let decodingError = error as? DecodingError {
                 switch decodingError {
                 case .keyNotFound(let key, let context):
-                    print("   Missing key: \(key.stringValue) - \(context.debugDescription)")
+                    AppLog.debug("   Missing key: \(key.stringValue) - \(context.debugDescription)")
                 case .typeMismatch(let type, let context):
-                    print("   Type mismatch: \(type) - \(context.debugDescription)")
+                    AppLog.debug("   Type mismatch: \(type) - \(context.debugDescription)")
                 case .valueNotFound(let type, let context):
-                    print("   Value not found: \(type) - \(context.debugDescription)")
+                    AppLog.debug("   Value not found: \(type) - \(context.debugDescription)")
                 case .dataCorrupted(let context):
-                    print("   Data corrupted: \(context.debugDescription)")
+                    AppLog.debug("   Data corrupted: \(context.debugDescription)")
                 @unknown default:
-                    print("   Unknown decoding error")
+                    AppLog.debug("   Unknown decoding error")
                 }
             }
             throw RideRequestError.rideRequestFailed
@@ -107,8 +107,8 @@ class RideAPIClient: RideRequestService {
 
         // Decode response
         let rideResponse = try JSONDecoder().decode(RideResponse.self, from: data)
-        print("✅ Ride created: \(rideResponse.rideId)")
-        print("   Status: \(rideResponse.status)")
+        AppLog.debug("✅ Ride created: \(rideResponse.rideId)")
+        AppLog.debug("   Status: \(rideResponse.status)")
 
         // Note: Polling for driver assignment is now handled by RideFlowController
         // to properly communicate state changes to the UI
@@ -144,10 +144,10 @@ class RideAPIClient: RideRequestService {
         }
 
         if let driver = driver {
-            print("🚗 Driver info received:")
-            print("   Name: \(driver.name)")
-            print("   Location: \(driver.currentLocation?.latitude ?? 0), \(driver.currentLocation?.longitude ?? 0)")
-            print("   ETA: \(driver.estimatedArrivalTime ?? 0)s")
+            AppLog.debug("🚗 Driver info received:")
+            AppLog.debug("   Name: \(driver.name)")
+            AppLog.debug("   Location: \(driver.currentLocation?.latitude ?? 0), \(driver.currentLocation?.longitude ?? 0)")
+            AppLog.debug("   ETA: \(driver.estimatedArrivalTime ?? 0)s")
         }
 
         return RideRequestResult(
@@ -159,7 +159,7 @@ class RideAPIClient: RideRequestService {
     }
 
     func cancelRide(rideId: String) async throws {
-        print("🚫 Cancelling ride: \(rideId)")
+        AppLog.debug("🚫 Cancelling ride: \(rideId)")
 
         let url = URL(string: "\(baseURL)/api/rides/\(rideId)/cancel")!
         var request = URLRequest(url: url)
@@ -178,7 +178,7 @@ class RideAPIClient: RideRequestService {
         // Stop polling
         pollingTask?.cancel()
 
-        print("✅ Ride cancelled successfully")
+        AppLog.debug("✅ Ride cancelled successfully")
     }
 
     // MARK: - Polling
@@ -187,7 +187,7 @@ class RideAPIClient: RideRequestService {
         // Cancel any existing polling
         pollingTask?.cancel()
 
-        print("🔄 Starting to poll for driver assignment...")
+        AppLog.debug("🔄 Starting to poll for driver assignment...")
 
         pollingTask = Task { @MainActor [weak self] in
             guard let self = self else { return }
@@ -207,7 +207,7 @@ class RideAPIClient: RideRequestService {
 
                     // Check if driver has been assigned
                     if status.driver != nil {
-                        print("✅ Driver assigned after \(attempts) attempts!")
+                        AppLog.debug("✅ Driver assigned after \(attempts) attempts!")
                         // Polling will continue to get status updates
                         // but at a slower rate now
 
@@ -219,16 +219,16 @@ class RideAPIClient: RideRequestService {
 
                         break
                     } else {
-                        print("⏳ Waiting for driver... (attempt \(attempts))")
+                        AppLog.debug("⏳ Waiting for driver... (attempt \(attempts))")
                     }
                 } catch {
-                    print("❌ Polling error: \(error)")
+                    AppLog.error("❌ Polling error: \(error)")
                     break
                 }
             }
 
             if attempts >= maxAttempts {
-                print("⚠️ No driver assigned after \(maxAttempts) seconds")
+                AppLog.warning("⚠️ No driver assigned after \(maxAttempts) seconds")
             }
         }
     }
@@ -259,7 +259,7 @@ class RideAPIClient: RideRequestService {
 
                 // Success! Log if this was a retry
                 if attempt > 0 {
-                    print("✅ Request succeeded after \(attempt) retries")
+                    AppLog.debug("✅ Request succeeded after \(attempt) retries")
                 }
 
                 return result
@@ -273,9 +273,9 @@ class RideAPIClient: RideRequestService {
                 // Don't retry on last attempt or non-retryable errors
                 if attempt >= maxRetries || !shouldRetry {
                     if !shouldRetry {
-                        print("❌ Non-retryable error encountered: \(error)")
+                        AppLog.error("❌ Non-retryable error encountered: \(error)")
                     } else {
-                        print("❌ Max retries (\(maxRetries)) exceeded")
+                        AppLog.error("❌ Max retries (\(maxRetries)) exceeded")
                     }
                     throw error
                 }
@@ -284,8 +284,8 @@ class RideAPIClient: RideRequestService {
                 let baseDelay: TimeInterval = 0.5
                 let delay = baseDelay * pow(2.0, Double(attempt))
 
-                print("⚠️ Request failed (attempt \(attempt + 1)/\(maxRetries + 1)): \(error)")
-                print("🔄 Retrying in \(delay)s...")
+                AppLog.warning("⚠️ Request failed (attempt \(attempt + 1)/\(maxRetries + 1)): \(error)")
+                AppLog.debug("🔄 Retrying in \(delay)s...")
 
                 // Wait before retrying
                 try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
@@ -343,7 +343,7 @@ class RideAPIClient: RideRequestService {
         case "completed":
             return .rideCompleted
         default:
-            print("⚠️ Unknown backend status: \(status), defaulting to searchingForDriver")
+            AppLog.warning("⚠️ Unknown backend status: \(status), defaulting to searchingForDriver")
             return .searchingForDriver
         }
     }

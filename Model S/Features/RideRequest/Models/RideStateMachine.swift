@@ -128,11 +128,11 @@ class RideStateMachine {
     /// - Returns: The new state if transition is valid, or an error state if invalid
     func transition(from current: RideState, to next: RideState) -> RideState {
         guard canTransition(from: current, to: next) else {
-            print("❌ Invalid transition from \(current) to \(next)")
+            AppLog.error("❌ Invalid transition from \(current) to \(next)")
             return .error(.unknown(NSError(domain: "RideStateMachine", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid state transition"])), previousState: current)
         }
 
-        print("✅ Transitioning: \(stateDescription(current)) → \(stateDescription(next))")
+        AppLog.debug("✅ Transitioning: \(stateDescription(current)) → \(stateDescription(next))")
         return next
     }
 

@@ -168,23 +168,3 @@ class MockRideRequestService: RideRequestService {
         )
     }
 }
-
-// MARK: - Ride Request Service Factory
-
-/// Factory to create ride request service instances
-class RideRequestServiceFactory {
-    static let shared = RideRequestServiceFactory()
-
-    private init() {}
-
-    /// Create a ride request service instance
-    /// - Parameter useMock: If true, returns mock service. If false, returns real API service
-    /// - Parameter baseURL: The backend server URL (default: http://localhost:3000)
-    func createRideRequestService(useMock: Bool = true, baseURL: String = "http://localhost:3000") -> RideRequestService {
-        if useMock {
-            return MockRideRequestService()
-        } else {
-            return RideAPIClient(baseURL: baseURL)
-        }
-    }
-}

@@ -11,10 +11,11 @@ struct HomeView: View {
     @State private var showRideRequest = false
     @State private var showDrive = false
     @State private var showRideHistory = false
+    @State private var showSettings = false
 
     // PERSISTENT STATE: Coordinator survives view navigation
     // This ensures ride state is preserved when navigating away and back
-    @StateObject private var rideCoordinator = RideRequestCoordinator(configuration: productionConfig)
+    @StateObject private var rideCoordinator = RideRequestCoordinator()
 
     var body: some View {
         NavigationStack {
@@ -102,23 +103,24 @@ struct HomeView: View {
                     Spacer()
                 }
             }
-            .navigationDestination(isPresented: $showRideRequest) {
-                ProductionExampleView(
-                    coordinator: rideCoordinator,
-                    onRideConfirmed: { pickup, destination, route in
-                        print("Ride confirmed!")
-                        print("Pickup: \(pickup.name ?? "Unknown"), \(pickup.coordinate)")
-                        print("Destination: \(destination.name ?? "Unknown"), \(destination.coordinate)")
-                        if let route = route {
-                            let minutes = Int(route.estimatedTravelTime / 60)
-                            let miles = route.distance / 1609.34
-                            print("ETA: \(minutes) min, Distance: \(String(format: "%.1f mi", miles))")
-                        }
-                    },
-                    onCancel: {
-                        showRideRequest = false
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape.fill")
+                            .foregroundColor(.white)
                     }
-                )
+                    .accessibilityLabel("Map settings")
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                NavigationStack {
+                    MapProviderSettingsView()
+                }
+            }
+            .navigationDestination(isPresented: $showRideRequest) {
+                RideRequestScreen(coordinator: rideCoordinator)
                     .navigationBarBackButtonHidden(true)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
@@ -153,18 +155,6 @@ struct HomeView: View {
                 RideHistoryView()
             }
         }
-    }
-
-    // MARK: - Configuration
-
-    private static var productionConfig: RideRequestConfiguration {
-        var config = RideRequestConfiguration.default
-        config.enableGeocoding = true
-        config.enableRouteCalculation = true
-        config.enableValidation = true
-        config.showRouteInfo = true
-        config.showErrorBanner = true
-        return config
     }
 }
 

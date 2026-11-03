@@ -15,11 +15,11 @@ struct DriverStateMachine {
     static func transition(from currentState: DriverState, to newState: DriverState) -> DriverState? {
         // Validate transition
         guard isValidTransition(from: currentState, to: newState) else {
-            print("⚠️ Invalid state transition: \(currentState.statusDescription) -> \(newState.statusDescription)")
+            AppLog.warning("⚠️ Invalid state transition: \(currentState.statusDescription) -> \(newState.statusDescription)")
             return nil
         }
 
-        print("✅ State transition: \(currentState.statusDescription) -> \(newState.statusDescription)")
+        AppLog.debug("✅ State transition: \(currentState.statusDescription) -> \(newState.statusDescription)")
         return newState
     }
 

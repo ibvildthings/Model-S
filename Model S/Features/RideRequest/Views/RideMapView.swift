@@ -39,11 +39,6 @@ struct RideMapView: View {
                 hapticFeedback()
             }
         }
-        .onChange(of: viewModel.driverLocation) {
-            if viewModel.driverLocation != nil {
-                hapticFeedback()
-            }
-        }
         .accessibilityLabel("Ride request map - \(providerService.currentProvider.displayName)")
     }
 
@@ -88,11 +83,6 @@ struct RideMapView: View {
 }
 
 // MARK: - Preview
-#Preview("Apple Maps") {
+#Preview {
     RideMapView(viewModel: MapViewModel())
-}
-
-#Preview("Google Maps") {
-    let _ = MapServiceFactory.shared.configure(with: .google)
-    return RideMapView(viewModel: MapViewModel())
 }

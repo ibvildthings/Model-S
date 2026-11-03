@@ -96,3 +96,6 @@ test_output.log
 # Secrets and API Keys
 # IMPORTANT: Never commit API keys or secrets to git!
 Model S/Core/Configuration/Secrets.plist
+
+# Local, per-user tool settings
+.claude/settings.local.json

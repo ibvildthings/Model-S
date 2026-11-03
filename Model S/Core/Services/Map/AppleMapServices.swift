@@ -117,7 +117,7 @@ extension AppleLocationSearchService: MKLocalSearchCompleterDelegate {
         Task { @MainActor in
             self.searchResults = []
             self.isSearching = false
-            print("Apple search completer error: \(error.localizedDescription)")
+            AppLog.debug("Apple search completer error: \(error.localizedDescription)")
         }
     }
 }

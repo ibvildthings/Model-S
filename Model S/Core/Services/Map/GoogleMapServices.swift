@@ -59,7 +59,7 @@ class GoogleLocationSearchService: LocationSearchService, ObservableObject {
                 await MainActor.run {
                     self.searchResults = []
                     self.isSearching = false
-                    print("Google Places Autocomplete error: \(error.localizedDescription)")
+                    AppLog.debug("Google Places Autocomplete error: \(error.localizedDescription)")
                 }
             }
         }
@@ -121,7 +121,7 @@ class GoogleLocationSearchService: LocationSearchService, ObservableObject {
         let json = try JSONDecoder().decode(PlacesAutocompleteResponse.self, from: data)
 
         guard json.status == "OK" || json.status == "ZERO_RESULTS" else {
-            print("Google Places API error: \(json.status)")
+            AppLog.debug("Google Places API error: \(json.status)")
             throw RideRequestError.geocodingFailed
         }
 
@@ -156,7 +156,7 @@ class GoogleLocationSearchService: LocationSearchService, ObservableObject {
 
         guard json.status == "OK",
               let result = json.result else {
-            print("Google Place Details API error: \(json.status)")
+            AppLog.debug("Google Place Details API error: \(json.status)")
             throw RideRequestError.geocodingFailed
         }
 
@@ -203,7 +203,7 @@ class GoogleGeocodingService: GeocodingService {
 
         guard json.status == "OK",
               let result = json.results.first else {
-            print("Google Geocoding API error: \(json.status)")
+            AppLog.debug("Google Geocoding API error: \(json.status)")
             throw RideRequestError.geocodingFailed
         }
 
@@ -234,7 +234,7 @@ class GoogleGeocodingService: GeocodingService {
 
         guard json.status == "OK",
               let result = json.results.first else {
-            print("Google Reverse Geocoding API error: \(json.status)")
+            AppLog.debug("Google Reverse Geocoding API error: \(json.status)")
             throw RideRequestError.geocodingFailed
         }
 
@@ -262,52 +262,52 @@ class GoogleRouteCalculationService: RouteCalculationService {
             URLQueryItem(name: "key", value: apiKey)
         ]
 
-        print("🚗 Google Directions API request:")
-        print("   From: \(from.latitude), \(from.longitude)")
-        print("   To: \(to.latitude), \(to.longitude)")
+        AppLog.debug("🚗 Google Directions API request:")
+        AppLog.debug("   From: \(from.latitude), \(from.longitude)")
+        AppLog.debug("   To: \(to.latitude), \(to.longitude)")
 
         let (data, response) = try await URLSession.shared.data(from: urlComponents.url!)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            print("❌ Invalid HTTP response")
+            AppLog.error("❌ Invalid HTTP response")
             throw RideRequestError.routeCalculationFailed
         }
 
-        print("   HTTP Status: \(httpResponse.statusCode)")
+        AppLog.debug("   HTTP Status: \(httpResponse.statusCode)")
 
         guard httpResponse.statusCode == 200 else {
-            print("❌ HTTP error: \(httpResponse.statusCode)")
+            AppLog.error("❌ HTTP error: \(httpResponse.statusCode)")
             if let responseString = String(data: data, encoding: .utf8) {
-                print("   Response: \(responseString)")
+                AppLog.debug("   Response: \(responseString)")
             }
             throw RideRequestError.routeCalculationFailed
         }
 
         let json = try JSONDecoder().decode(DirectionsResponse.self, from: data)
-        print("   API Status: \(json.status)")
+        AppLog.debug("   API Status: \(json.status)")
 
         guard json.status == "OK" else {
-            print("")
-            print("❌ Google Directions API Error: \(json.status)")
+            AppLog.debug("")
+            AppLog.error("❌ Google Directions API Error: \(json.status)")
 
             // Provide specific error messages
             switch json.status {
             case "REQUEST_DENIED":
-                print("   🔧 Solution: Enable 'Directions API' in Google Cloud Console")
-                print("   https://console.cloud.google.com/apis/library/directions-backend.googleapis.com")
+                AppLog.debug("   🔧 Solution: Enable 'Directions API' in Google Cloud Console")
+                AppLog.debug("   https://console.cloud.google.com/apis/library/directions-backend.googleapis.com")
             case "OVER_QUERY_LIMIT":
-                print("   🔧 You've exceeded your API quota")
+                AppLog.debug("   🔧 You've exceeded your API quota")
             case "ZERO_RESULTS":
-                print("   🔧 No route found between these locations")
+                AppLog.debug("   🔧 No route found between these locations")
             case "NOT_FOUND":
-                print("   🔧 One of the locations could not be geocoded")
+                AppLog.debug("   🔧 One of the locations could not be geocoded")
             default:
-                print("   🔧 Unknown error - check API key and billing")
+                AppLog.debug("   🔧 Unknown error - check API key and billing")
             }
-            print("")
+            AppLog.debug("")
 
             if let errorMessage = json.errorMessage {
-                print("   Error message: \(errorMessage)")
+                AppLog.debug("   Error message: \(errorMessage)")
             }
 
             throw RideRequestError.routeCalculationFailed
@@ -315,14 +315,14 @@ class GoogleRouteCalculationService: RouteCalculationService {
 
         guard let route = json.routes.first,
               let leg = route.legs.first else {
-            print("❌ No routes found in response")
+            AppLog.error("❌ No routes found in response")
             throw RideRequestError.routeCalculationFailed
         }
 
         // Decode polyline into coordinates for visualization
         let coordinates = decodePolyline(route.overviewPolyline.points)
 
-        print("✅ Route calculated: \(leg.distance.value)m, \(leg.duration.value)s")
+        AppLog.debug("✅ Route calculated: \(leg.distance.value)m, \(leg.duration.value)s")
 
         return RouteResult(
             distance: leg.distance.value,

@@ -149,7 +149,7 @@ struct RideConfirmSlider: View {
             Spacer()
 
             RideConfirmSlider(onConfirmRide: {
-                print("Ride confirmed!")
+                AppLog.debug("Ride confirmed!")
             })
             .padding(.horizontal, 24)
             .padding(.bottom, 40)

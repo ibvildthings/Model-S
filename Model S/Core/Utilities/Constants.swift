@@ -58,8 +58,6 @@ enum MapConstants {
 
 /// Constants for debouncing, delays, and timeouts
 enum TimingConstants {
-    /// Delay before geocoding address input (prevents API spam while typing)
-    static let geocodingDebounceDelay: TimeInterval = 1.0
 
     /// Animation duration for map transitions
     static let mapAnimationDuration: TimeInterval = 0.4

@@ -2,8 +2,13 @@
 //  RideRequestCoordinator.swift
 //  Model S
 //
-//  Coordinator that orchestrates ride request business logic.
-//  Simplifies views by centralizing all complex state management and service coordination.
+//  Glue between the ride business logic (RideFlowController, the single source
+//  of truth for ride state) and the map presentation state (MapViewModel).
+//
+//  Data flows one way:  RideFlowController.currentState ──▶ MapViewModel
+//  Views never write pickup/destination to the map directly; they call
+//  `selectLocation`, the flow controller transitions, and the map is
+//  re-projected from the new state.
 //
 //  Created by Pritesh Desai on 11/13/25.
 //
@@ -14,215 +19,118 @@ import MapKit
 import CoreLocation
 import Combine
 
-/// Coordinates the entire ride request flow
-/// Now uses RideFlowController for clean state management
 @MainActor
 class RideRequestCoordinator: ObservableObject {
-    // MARK: - Published State
+    // MARK: - Owned State
 
     /// Ride flow controller - single source of truth for ride state
-    @Published private(set) var flowController: RideFlowController
+    let flowController: RideFlowController
 
-    /// Map display state (published for view observation)
-    @Published private(set) var mapViewModel: MapViewModel
+    /// Map display state, derived from `flowController`
+    let mapViewModel: MapViewModel
 
-    /// Whether a route is currently being calculated (for loading indicators)
-    @Published private(set) var isCalculatingRoute = false
-
-    // MARK: - Private Dependencies
+    // MARK: - Private
 
     private let configuration: RideRequestConfiguration
-    private let mapService: AnyMapService
-    private let geocodingDebouncer: Debouncer
+
+    /// Explicitly injected map service (tests). When nil, the provider's
+    /// *current* service is used so a provider switch takes effect immediately.
+    private let injectedMapService: AnyMapService?
+
+    private var mapService: AnyMapService {
+        injectedMapService ?? MapProviderService.shared.currentService
+    }
+
     private var cancellables = Set<AnyCancellable>()
-    private var autoResetTimer: Timer?
+    private var autoResetTask: Task<Void, Never>?
 
     /// Last driver position where we calculated a route (to avoid excessive recalculations)
     private var lastRouteCalculationPosition: CLLocationCoordinate2D?
 
-    /// Current route calculation task (to cancel when new position arrives)
+    /// Current route calculation task (cancelled when a newer position arrives)
     private var routeCalculationTask: Task<Void, Never>?
 
     // MARK: - Initialization
 
-    /// Creates a coordinator with the given configuration
-    /// - Parameter configuration: UI and feature configuration
-    init(configuration: RideRequestConfiguration = .default) {
+    init(
+        configuration: RideRequestConfiguration = .default,
+        flowController: RideFlowController? = nil,
+        mapService: AnyMapService? = nil
+    ) {
         self.configuration = configuration
-        self.flowController = RideFlowController()
+        self.flowController = flowController ?? RideFlowController(mapService: mapService)
         self.mapViewModel = MapViewModel()
-        // Use unified map service from provider service
-        self.mapService = MapProviderService.shared.currentService
-        self.geocodingDebouncer = Debouncer(delay: TimingConstants.geocodingDebounceDelay)
+        self.injectedMapService = mapService
 
         setupLocationUpdates()
 
-        // Observe state changes (use $currentState to get value AFTER it changes)
-        flowController.$currentState.sink { [weak self] newState in
-            self?.objectWillChange.send()
-            self?.handleStateChange(newState)
-        }.store(in: &cancellables)
-
-        // Observe real-time driver position updates from backend
-        flowController.$realTimeDriverLocation.sink { [weak self] driverLocation in
-            guard let self = self, let location = driverLocation else { return }
-            // Update map with backend's real-time driver position
-            self.mapViewModel.driverLocation = location
-
-            // Adjust viewport to keep driver in frame (every position update)
-            self.adjustViewportForDriver()
-
-            // Dynamically update route from current position (Uber/Lyft style)
-            // Cancel any previous calculation to prevent race conditions
-            self.routeCalculationTask?.cancel()
-            self.routeCalculationTask = Task {
-                await self.updateDynamicRoute(from: location)
+        // NOTE: @Published emits in willSet, so the handler must use the value it
+        // is given rather than reading `flowController.currentState`.
+        self.flowController.$currentState
+            .sink { [weak self] newState in
+                self?.handleStateChange(newState)
             }
-        }.store(in: &cancellables)
+            .store(in: &cancellables)
 
-        // Forward mapViewModel changes to coordinator's objectWillChange
-        mapViewModel.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
+        // Real-time driver position from the backend
+        self.flowController.$realTimeDriverLocation
+            .compactMap { $0 }
+            .sink { [weak self] location in
+                self?.handleDriverPositionUpdate(location)
+            }
+            .store(in: &cancellables)
 
-        // Start the flow
-        flowController.startFlow()
+        // Re-render views observing the coordinator when either child changes
+        self.flowController.objectWillChange
+            .merge(with: mapViewModel.objectWillChange)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        self.flowController.startFlow()
     }
 
-    // MARK: - Location Selection
+    deinit {
+        autoResetTask?.cancel()
+        routeCalculationTask?.cancel()
+    }
 
-    /// Handles when user selects a location from autocomplete or map
-    /// - Parameters:
-    ///   - coordinate: The selected coordinate
-    ///   - name: The location name/address
-    ///   - isPickup: Whether this is pickup (true) or destination (false)
-    func selectLocation(coordinate: CLLocationCoordinate2D, name: String, isPickup: Bool) async {
-        // Cancel any pending geocoding since we have exact coordinates
-        geocodingDebouncer.cancel()
+    // MARK: - Intents (called by views)
 
-        // Create location point
+    /// User picked a location from autocomplete, the map, or "current location"
+    func selectLocation(coordinate: CLLocationCoordinate2D, name: String, isPickup: Bool) {
         let locationPoint = LocationPoint(coordinate: coordinate, name: name)
-
-        // Update flow controller state
         if isPickup {
             flowController.updatePickup(locationPoint)
-            mapViewModel.updatePickupLocation(coordinate, name: name)
         } else {
             flowController.updateDestination(locationPoint)
-            mapViewModel.updateDestinationLocation(coordinate, name: name)
-        }
-
-        // Update map with route if it was calculated
-        if flowController.routeInfo != nil {
-            // Note: We'll need to update mapViewModel when route is ready
-            // For now, the route calculation happens in flowController
         }
     }
 
-    /// Handles when user types in address field (debounced geocoding)
-    /// - Parameters:
-    ///   - address: The address text
-    ///   - isPickup: Whether this is pickup (true) or destination (false)
-    func addressTextChanged(_ address: String, isPickup: Bool) {
-        guard configuration.enableGeocoding else { return }
-        guard !address.isEmpty else {
-            // Clear location if text is empty
-            if isPickup {
-                flowController.updatePickup(nil)
-                mapViewModel.pickupLocation = nil
-            } else {
-                flowController.updateDestination(nil)
-                mapViewModel.destinationLocation = nil
-            }
-            return
-        }
-
-        // Debounce geocoding to avoid excessive API calls while typing
-        geocodingDebouncer.debounce { [weak self] in
-            guard let self = self else { return }
-            await self.geocodeAddress(address, isPickup: isPickup)
-        }
-    }
-
-    // MARK: - Geocoding
-
-    /// Geocodes an address (converts text to coordinates)
-    private func geocodeAddress(_ address: String, isPickup: Bool) async {
-        do {
-            let (coordinate, formattedAddress) = try await mapService.geocode(address: address)
-            let locationPoint = LocationPoint(coordinate: coordinate, name: formattedAddress)
-
-            // Update flow controller
-            if isPickup {
-                flowController.updatePickup(locationPoint)
-                mapViewModel.updatePickupLocation(coordinate, name: formattedAddress)
-            } else {
-                flowController.updateDestination(locationPoint)
-                mapViewModel.updateDestinationLocation(coordinate, name: formattedAddress)
-            }
-        } catch {
-            // Handle geocoding error
-            print("Geocoding failed: \(error)")
-        }
-    }
-
-    // MARK: - Ride Confirmation
-
-    /// Validates and confirms the ride request
-    /// - Returns: Tuple of (pickup, destination) if successful, nil if validation failed
+    /// Validates and returns the confirmed pickup/destination, or nil if incomplete
     func confirmRide() -> (pickup: LocationPoint, destination: LocationPoint)? {
-        // Validate locations exist
-        guard let pickup = flowController.pickupLocation else {
+        guard let pickup = flowController.pickupLocation,
+              let destination = flowController.destinationLocation else {
             return nil
         }
-
-        guard let destination = flowController.destinationLocation else {
-            return nil
-        }
-
         return (pickup, destination)
     }
 
-    /// Start the ride request flow (call this from an async context)
+    /// Start the ride request flow
     func startRideRequest() async {
         await flowController.requestRide()
     }
 
-    /// Cancels the current active ride
-    func cancelCurrentRide() {
-        Task { @MainActor in
-            await flowController.cancelRide()
-        }
-    }
-
-    // MARK: - State Management
-
-    /// Resets all state to initial values
-    func reset() {
-        flowController.reset()
-        mapViewModel.pickupLocation = nil
-        mapViewModel.destinationLocation = nil
-        mapViewModel.routePolyline = nil
-        geocodingDebouncer.cancel()
-    }
-
     /// Cancels the current ride request
     func cancelRideRequest() {
-        // Cancel auto-reset timer if it's running
-        autoResetTimer?.invalidate()
-        autoResetTimer = nil
+        autoResetTask?.cancel()
+        autoResetTask = nil
 
-        Task { @MainActor in
+        Task {
             await flowController.cancelRide()
         }
     }
-
-    deinit {
-        // Clean up timer on deallocation
-        autoResetTimer?.invalidate()
-    }
-
-    // MARK: - Computed Properties
 
     /// Whether confirm slider should be visible
     var shouldShowConfirmSlider: Bool {
@@ -231,394 +139,211 @@ class RideRequestCoordinator: ObservableObject {
 
     // MARK: - Location Updates
 
-    /// Sets up automatic location updates from MapViewModel
+    /// Auto-fill pickup with the user's location the first time we get a fix
     private func setupLocationUpdates() {
         mapViewModel.onLocationUpdate = { [weak self] location in
-            guard let self = self else { return }
+            guard let self,
+                  self.configuration.autoSetPickupLocation,
+                  self.flowController.pickupLocation == nil else { return }
 
-            // Auto-set pickup to current location if enabled and no pickup set yet
-            if self.configuration.autoSetPickupLocation,
-               self.flowController.pickupLocation == nil {
-                Task {
-                    do {
-                        let address = try await self.mapService.reverseGeocode(coordinate: location.coordinate)
-                        let locationPoint = LocationPoint(coordinate: location.coordinate, name: address)
-                        self.flowController.updatePickup(locationPoint)
-                        self.mapViewModel.updatePickupLocation(location.coordinate, name: address)
-                    } catch {
-                        print("Reverse geocoding failed: \(error)")
-                    }
+            Task {
+                do {
+                    let address = try await self.mapService.reverseGeocode(coordinate: location.coordinate)
+                    self.selectLocation(coordinate: location.coordinate, name: address, isPickup: true)
+                } catch {
+                    AppLog.debug("Reverse geocoding failed: \(error)")
                 }
             }
         }
     }
 
-    // MARK: - Focus Management
+    // MARK: - State Projection
 
-    /// Call when pickup field is focused
-    func didFocusPickup() {
-        // State management handled by flowController
-    }
-
-    /// Call when destination field is focused
-    func didFocusDestination() {
-        // State management handled by flowController
-    }
-
-    // MARK: - Viewport Management
-
-    /// Adjusts viewport to keep driver and target (pickup or destination) in frame
-    private func adjustViewportForDriver() {
-        guard let driver = mapViewModel.driverLocation else { return }
-
-        // Determine target based on current state
-        let targetCoordinate: CLLocationCoordinate2D?
-
-        switch flowController.currentState {
-        case .driverEnRoute(_, _, _, let pickup, _), .driverArriving(_, _, let pickup, _):
-            targetCoordinate = pickup.coordinate
-        case .rideInProgress(_, _, _, _, let destination), .approachingDestination(_, _, _, let destination):
-            targetCoordinate = destination.coordinate
-        default:
-            targetCoordinate = nil
+    /// Projects the new ride state onto the map and triggers side effects
+    private func handleStateChange(_ state: RideState) {
+        // Pins always mirror the flow controller's state
+        if case .idle = state {
+            // Keep the last pins on screen after a completed ride resets to idle
+        } else {
+            mapViewModel.pickupLocation = state.pickupLocation
+            mapViewModel.destinationLocation = state.destinationLocation
         }
 
-        guard let target = targetCoordinate else { return }
+        switch state {
+        case .selectingLocations:
+            autoResetTask?.cancel()
+            mapViewModel.clearDriverLocation()
+            mapViewModel.routePolyline = nil
 
-        // Calculate center point between driver and target
-        let center = CLLocationCoordinate2D(
-            latitude: (driver.latitude + target.latitude) / 2,
-            longitude: (driver.longitude + target.longitude) / 2
-        )
-
-        // Calculate distance between driver and target
-        let driverCL = CLLocation(latitude: driver.latitude, longitude: driver.longitude)
-        let targetCL = CLLocation(latitude: target.latitude, longitude: target.longitude)
-        let distance = driverCL.distance(from: targetCL)
-
-        // Dynamic padding based on distance - zooms in as driver gets closer
-        let paddingMultiplier: Double
-        if distance > 5000 { // > 5km
-            paddingMultiplier = 2.5
-        } else if distance > 2000 { // 2-5km
-            paddingMultiplier = 2.2
-        } else if distance > 500 { // 500m-2km
-            paddingMultiplier = 2.0
-        } else if distance > 50 { // 50m-500m
-            paddingMultiplier = 1.8
-        } else { // < 50m - VERY CLOSE, minimal padding
-            paddingMultiplier = 1.5 // Tighter zoom when at destination
-        }
-
-        // Calculate span
-        let latDelta = abs(driver.latitude - target.latitude) * paddingMultiplier
-        let lonDelta = abs(driver.longitude - target.longitude) * paddingMultiplier
-
-        let span = MapCoordinateSpan(
-            latitudeDelta: max(latDelta, 0.002), // Minimum span for very close proximity
-            longitudeDelta: max(lonDelta, 0.002)
-        )
-
-        // Update viewport smoothly
-        withAnimation(.easeInOut(duration: 0.5)) {
-            mapViewModel.region = MapRegion(center: center, span: span)
-        }
-    }
-
-    // MARK: - State Change Handling
-
-    /// Handles state transitions and triggers appropriate actions (like driver animation)
-    private func handleStateChange(_ currentState: RideState) {
-        print("🔄 handleStateChange called with state: \(currentState)")
-
-        // Ensure map always has pickup/destination from current state
-        if let pickup = flowController.pickupLocation {
-            mapViewModel.updatePickupLocation(pickup.coordinate, name: pickup.name)
-        }
-        if let destination = flowController.destinationLocation {
-            mapViewModel.updateDestinationLocation(destination.coordinate, name: destination.name)
-        }
-
-        switch currentState {
         case .routeReady:
-            print("🔄 Handling .routeReady")
-            // Update map with the calculated route
-            if let mkRoute = flowController.currentMKRoute {
-                // Apple Maps: Use MKRoute (converts to coordinates internally)
-                print("📍 Updating map with calculated route (Apple Maps)")
-                mapViewModel.updateRouteFromMKRoute(mkRoute)
-            } else if let polyline = flowController.currentPolyline {
-                // Google Maps: Convert polyline to coordinates
-                print("📍 Updating map with calculated route (Google Maps)")
-                let coordinates = polyline.coordinates()
+            if let coordinates = flowController.routeCoordinates {
                 mapViewModel.updateRoute(coordinates)
             } else {
-                print("⚠️ No route available to display")
+                AppLog.warning("⚠️ No route available to display")
             }
 
         case .driverEnRoute(_, let driver, _, let pickup, _):
-            print("🔄 Handling .driverEnRoute")
-
-            // NEW ARCHITECTURE: Backend position updates drive the map (no local animation)
-            // The flowController's $realTimeDriverLocation publisher will update the map
-            // Every poll (2s) with real GPS data from backend simulation
-
-            // Switch to approach route mode (driver → pickup, blue color)
             mapViewModel.switchToApproachRoute()
-
-            // Reset route calculation tracking for new approach phase
             lastRouteCalculationPosition = nil
 
-            // Initial route calculation from driver's starting position
             if let driverLocation = driver.currentLocation {
                 Task {
-                    print("🚗 Calculating initial driver route from \(driverLocation) to \(pickup.coordinate)")
-                    _ = await flowController.calculateDriverRoute(
+                    guard let coordinates = await flowController.calculateDriverRoute(
                         from: driverLocation,
                         to: pickup.coordinate
-                    )
-
-                    // Update map with driver route (handles both Apple and Google Maps)
-                    if let mkRoute = flowController.currentDriverMKRoute {
-                        // Apple Maps
-                        print("📍 Updating map with driver route (Apple Maps)")
-                        mapViewModel.updateDriverRoute(mkRoute)
-                        lastRouteCalculationPosition = driverLocation
-                        print("✅ Driver route displayed")
-                    } else if let polyline = flowController.currentDriverPolyline {
-                        // Google Maps - convert to coordinates
-                        print("📍 Updating map with driver route (Google Maps)")
-                        let coordinates = polyline.coordinates()
-                        mapViewModel.updateDriverRouteCoordinates(coordinates)
-                        lastRouteCalculationPosition = driverLocation
-                        print("✅ Driver route displayed")
-                    }
+                    ) else { return }
+                    mapViewModel.updateDriverRouteCoordinates(coordinates)
+                    lastRouteCalculationPosition = driverLocation
                 }
             }
-
-        case .driverArriving(_, _, _, _):
-            // Animation continues, waiting for driver to reach pickup
-            print("🚗 Driver arriving soon...")
-            break
 
         case .rideInProgress(_, let driver, _, _, let destination):
-            // Driver picked up passenger, now driving to destination
-            print("🔄 Handling .rideInProgress")
-
-            // NEW ARCHITECTURE: Backend position updates continue to drive the map
-            // No local animation needed - backend sends real-time positions
-
-            // Switch viewport to track driver + destination
-            mapViewModel.switchToDestinationTracking()
-
-            // Switch to active ride route (pickup → destination, purple color)
             mapViewModel.switchToActiveRideRoute()
-
-            // Reset route calculation tracking for new active ride phase
             lastRouteCalculationPosition = nil
 
-            // Calculate initial route from current position to destination
             if let driverLocation = driver.currentLocation {
                 Task {
-                    print("🚗 Calculating remaining route from current position to \(destination.coordinate)")
-                    _ = await flowController.calculateDriverRoute(
+                    guard let coordinates = await flowController.calculateDriverRoute(
                         from: driverLocation,
                         to: destination.coordinate
+                    ) else { return }
+                    mapViewModel.routePolyline = coordinates
+                    mapViewModel.setRegion(
+                        Self.region(containing: driverLocation, and: destination.coordinate, style: .overview)
                     )
-
-                    // Update map with remaining route (handles both Apple and Google Maps)
-                    if let mkRoute = flowController.currentDriverMKRoute {
-                        // Apple Maps
-                        print("📍 Updating map with remaining route (Apple Maps)")
-                        mapViewModel.routePolyline = mkRoute.polyline.coordinates()
-                        lastRouteCalculationPosition = driverLocation
-                        print("✅ Remaining route displayed")
-                    } else if let polyline = flowController.currentDriverPolyline {
-                        // Google Maps - Store in currentPolyline for consistent access
-                        print("📍 Updating map with remaining route (Google Maps)")
-
-                        // IMPORTANT: Update currentPolyline so dynamic updates work correctly
-                        flowController.updateStoredPolyline(polyline)
-                        mapViewModel.routePolyline = polyline.coordinates()
-
-                        // Zoom to show driver AND destination (not just the route)
-                        // This matches Apple Maps bounding box approach
-                        let driverCoord = driverLocation
-                        let destCoord = destination.coordinate
-
-                        // Calculate center point between driver and destination
-                        let center = CLLocationCoordinate2D(
-                            latitude: (driverCoord.latitude + destCoord.latitude) / 2,
-                            longitude: (driverCoord.longitude + destCoord.longitude) / 2
-                        )
-
-                        // Calculate distance for dynamic padding
-                        let driverCL = CLLocation(latitude: driverCoord.latitude, longitude: driverCoord.longitude)
-                        let destCL = CLLocation(latitude: destCoord.latitude, longitude: destCoord.longitude)
-                        let distance = driverCL.distance(from: destCL)
-
-                        // Use same dynamic padding as Apple Maps
-                        let paddingMultiplier: Double
-                        if distance > 5000 {
-                            paddingMultiplier = 1.5
-                        } else if distance > 2000 {
-                            paddingMultiplier = 1.3
-                        } else if distance > 500 {
-                            paddingMultiplier = 1.2
-                        } else {
-                            paddingMultiplier = 1.1
-                        }
-
-                        // Calculate span to include both points with padding
-                        let latDelta = abs(driverCoord.latitude - destCoord.latitude) * paddingMultiplier
-                        let lonDelta = abs(driverCoord.longitude - destCoord.longitude) * paddingMultiplier
-
-                        let span = MapCoordinateSpan(
-                            latitudeDelta: max(latDelta, 0.01),
-                            longitudeDelta: max(lonDelta, 0.01)
-                        )
-
-                        let newRegion = MapRegion(center: center, span: span)
-
-                        print("🚗 Zooming to show driver and destination: center=\(center), span=\(span), distance=\(Int(distance))m")
-
-                        await MainActor.run {
-                            withAnimation(.easeInOut(duration: TimingConstants.mapAnimationDuration)) {
-                                mapViewModel.region = newRegion
-                            }
-                        }
-                        lastRouteCalculationPosition = driverLocation
-                        print("✅ Remaining route displayed with driver and destination visible")
-                    }
+                    lastRouteCalculationPosition = driverLocation
                 }
             }
-            break
-
-        case .approachingDestination(_, _, _, _):
-            // Animation continues toward destination
-            print("🏁 Approaching destination...")
-            break
 
         case .rideCompleted:
-            // Ride finished - keep driver visible at destination for completion UI
-            print("✅ Ride completed - driver stays at destination")
-
-            // DON'T clear driver immediately - they should stay at destination
-            // Driver will be cleared when auto-reset happens (after 2.5 seconds)
-
-            // Auto-reset after 2.5 seconds to allow user to see completion
-            print("⏱️ Scheduling auto-reset in 2.5 seconds...")
-            autoResetTimer?.invalidate()
-            autoResetTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { [weak self] _ in
-                guard let self = self else { return }
-                print("🔄 Auto-resetting to idle state")
-                Task { @MainActor in
-                    self.flowController.reset()
-                }
+            // Keep the driver visible at the destination briefly, then reset
+            autoResetTask?.cancel()
+            autoResetTask = Task { [weak self] in
+                try? await Task.sleep(nanoseconds: 2_500_000_000)
+                guard !Task.isCancelled else { return }
+                self?.flowController.reset()
             }
-            break
 
-        case .idle, .selectingLocations:
-            print("🔄 Handling .idle or .selectingLocations")
-            // Cancel auto-reset timer if it's running
-            autoResetTimer?.invalidate()
-            autoResetTimer = nil
-
-            // Clear driver location and route when going back to initial states
+        case .idle:
+            autoResetTask?.cancel()
             mapViewModel.clearDriverLocation()
             mapViewModel.routePolyline = nil
 
         default:
-            print("🔄 Handling default case (submittingRequest, searchingForDriver, driverAssigned, etc.)")
             break
         }
     }
 
-    // REMOVED: Manual transition methods no longer needed
-    // Backend polling now controls all state transitions
-    // Animation is purely visual and doesn't trigger state changes
+    // MARK: - Driver Tracking
 
-    // MARK: - Dynamic Route Updates
+    private func handleDriverPositionUpdate(_ location: CLLocationCoordinate2D) {
+        mapViewModel.driverLocation = location
 
-    /// Updates the route dynamically from current driver position (Uber/Lyft style)
-    /// Only shows route from current position forward, not the already-traveled path
-    /// - Parameter driverLocation: Current driver position
-    private func updateDynamicRoute(from driverLocation: CLLocationCoordinate2D) async {
-        // Check if we need to recalculate based on distance moved
-        if let lastPosition = lastRouteCalculationPosition {
-            let lastCL = CLLocation(latitude: lastPosition.latitude, longitude: lastPosition.longitude)
-            let currentCL = CLLocation(latitude: driverLocation.latitude, longitude: driverLocation.longitude)
-            let distanceMoved = lastCL.distance(from: currentCL)
-
-            // Only recalculate if driver has moved more than threshold
-            if distanceMoved < MapConstants.dynamicRouteUpdateThreshold {
-                return
-            }
+        // Keep the driver and their current target in frame
+        if let target = currentDriverTarget()?.coordinate {
+            mapViewModel.setRegion(
+                Self.region(containing: location, and: target, style: .tracking),
+                animationDuration: 0.5
+            )
         }
 
-        // Determine target based on current state
-        let targetCoordinate: CLLocationCoordinate2D?
-        let isApproachPhase: Bool
+        // Re-route from the current position (cancel any in-flight calculation)
+        routeCalculationTask?.cancel()
+        routeCalculationTask = Task {
+            await updateDynamicRoute(from: location)
+        }
+    }
 
+    /// Where the driver is currently heading, based on the ride phase
+    private func currentDriverTarget() -> (coordinate: CLLocationCoordinate2D, isApproach: Bool)? {
         switch flowController.currentState {
         case .driverEnRoute(_, _, _, let pickup, _),
              .driverArriving(_, _, let pickup, _):
-            // Approach phase: calculate route from current position → pickup
-            targetCoordinate = pickup.coordinate
-            isApproachPhase = true
-
+            return (pickup.coordinate, true)
         case .rideInProgress(_, _, _, _, let destination),
              .approachingDestination(_, _, _, let destination):
-            // Active ride phase: calculate route from current position → destination
-            targetCoordinate = destination.coordinate
-            isApproachPhase = false
-
+            return (destination.coordinate, false)
         default:
-            // Not in a phase where we need dynamic route updates
+            return nil
+        }
+    }
+
+    /// Recomputes the remaining route from the driver's current position
+    /// (only shows the path ahead, not the part already travelled)
+    private func updateDynamicRoute(from driverLocation: CLLocationCoordinate2D) async {
+        if let lastPosition = lastRouteCalculationPosition,
+           Self.distance(lastPosition, driverLocation) < MapConstants.dynamicRouteUpdateThreshold {
             return
         }
 
-        guard let target = targetCoordinate else { return }
+        guard let target = currentDriverTarget() else { return }
 
-        // Recalculate route from current driver position to target
-        isCalculatingRoute = true
-        print("🛣️ Recalculating route from current position to \(isApproachPhase ? "pickup" : "destination")")
+        guard let coordinates = await flowController.calculateDriverRoute(
+            from: driverLocation,
+            to: target.coordinate
+        ), !Task.isCancelled else { return }
 
-        defer { isCalculatingRoute = false }
-
-        _ = await flowController.calculateDriverRoute(from: driverLocation, to: target)
-
-        // Check if task was cancelled while we were calculating
-        guard !Task.isCancelled else {
-            print("⏭️ Route calculation cancelled (newer position arrived)")
-            return
-        }
-
-        // Update the appropriate route polyline (handles both Apple and Google Maps)
-        if isApproachPhase {
-            // Approach phase: Update driver route
-            if let mkRoute = flowController.currentDriverMKRoute {
-                // Apple Maps
-                mapViewModel.updateDriverRoute(mkRoute)
-            } else if let polyline = flowController.currentDriverPolyline {
-                // Google Maps - just update polyline, don't re-zoom (driver is moving)
-                mapViewModel.driverRoutePolyline = polyline.coordinates()
-            }
+        if target.isApproach {
+            // Update polyline only - no re-zoom while the driver is moving
+            mapViewModel.driverRoutePolyline = coordinates
         } else {
-            // Active ride: Update main route from current position to destination
-            if let mkRoute = flowController.currentDriverMKRoute {
-                // Apple Maps
-                mapViewModel.routePolyline = mkRoute.polyline.coordinates()
-            } else if let polyline = flowController.currentDriverPolyline {
-                // Google Maps - Use the newly calculated route (driver → destination)
-                // Also store it in currentPolyline for consistency
-                flowController.updateStoredPolyline(polyline)
-                mapViewModel.routePolyline = polyline.coordinates()
+            mapViewModel.routePolyline = coordinates
+        }
+        lastRouteCalculationPosition = driverLocation
+    }
+
+    // MARK: - Geometry Helpers
+
+    private enum ZoomStyle {
+        /// Continuous tracking: zooms in tightly as the driver gets close
+        case tracking
+        /// One-off overview when the ride starts
+        case overview
+    }
+
+    private static func distance(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> CLLocationDistance {
+        CLLocation(latitude: a.latitude, longitude: a.longitude)
+            .distance(from: CLLocation(latitude: b.latitude, longitude: b.longitude))
+    }
+
+    /// Region centred between two points, padded according to their distance
+    private static func region(
+        containing a: CLLocationCoordinate2D,
+        and b: CLLocationCoordinate2D,
+        style: ZoomStyle
+    ) -> MapRegion {
+        let separation = distance(a, b)
+
+        let padding: Double
+        let minimumSpan: Double
+        switch style {
+        case .tracking:
+            minimumSpan = 0.002
+            switch separation {
+            case 5000...: padding = 2.5
+            case 2000..<5000: padding = 2.2
+            case 500..<2000: padding = 2.0
+            case 50..<500: padding = 1.8
+            default: padding = 1.5
+            }
+        case .overview:
+            minimumSpan = 0.01
+            switch separation {
+            case 5000...: padding = 1.5
+            case 2000..<5000: padding = 1.3
+            case 500..<2000: padding = 1.2
+            default: padding = 1.1
             }
         }
 
-        // Update last calculation position
-        lastRouteCalculationPosition = driverLocation
-        print("✅ Route updated from current position")
+        let center = CLLocationCoordinate2D(
+            latitude: (a.latitude + b.latitude) / 2,
+            longitude: (a.longitude + b.longitude) / 2
+        )
+        let span = MapCoordinateSpan(
+            latitudeDelta: max(abs(a.latitude - b.latitude) * padding, minimumSpan),
+            longitudeDelta: max(abs(a.longitude - b.longitude) * padding, minimumSpan)
+        )
+        return MapRegion(center: center, span: span)
     }
 }

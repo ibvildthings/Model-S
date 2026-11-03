@@ -2,8 +2,9 @@
 //  MapProviderService.swift
 //  Model S
 //
-//  Consolidated map provider service - single source of truth for provider selection and service creation
-//  This replaces MapProviderManager and MapProviderPreference with a unified, elegant solution
+//  Single source of truth for which map provider is selected, its persistence,
+//  and creation of the matching MapService. Nothing else may read or write the
+//  "selectedMapProvider" preference.
 //
 //  Created by Staff Engineer Refactoring on 11/18/25.
 //
@@ -32,7 +33,7 @@ class MapProviderService: ObservableObject {
     @Published private(set) var currentProvider: MapProvider {
         didSet {
             savePreference()
-            print("🗺️ Map provider switched to: \(currentProvider.displayName)")
+            AppLog.debug("🗺️ Map provider switched to: \(currentProvider.displayName)")
         }
     }
 
@@ -43,8 +44,7 @@ class MapProviderService: ObservableObject {
 
     /// Whether Google Maps is available (has valid API key)
     var isGoogleMapsAvailable: Bool {
-        guard let apiKey = SecretsManager.googleMapsAPIKey else { return false }
-        return apiKey != "YOUR_GOOGLE_MAPS_API_KEY" && !apiKey.isEmpty
+        SecretsManager.googleMapsAPIKey != nil
     }
 
     /// Whether Apple Maps is available (always true)
@@ -67,7 +67,7 @@ class MapProviderService: ObservableObject {
         // Create initial service
         self.currentService = Self.createService(for: savedProvider)
 
-        print("🗺️ Initialized MapProviderService with \(savedProvider.displayName)")
+        AppLog.debug("🗺️ Initialized MapProviderService with \(savedProvider.displayName)")
     }
 
     // MARK: - Public Methods
@@ -80,7 +80,7 @@ class MapProviderService: ObservableObject {
         // Validate provider availability
         guard isProviderAvailable(provider) else {
             let error = MapServiceError.apiKeyMissing(provider: provider)
-            print("⚠️ \(error.localizedDescription)")
+            AppLog.warning("⚠️ \(error.localizedDescription)")
             return .failure(error)
         }
 
@@ -123,12 +123,15 @@ class MapProviderService: ObservableObject {
 
     /// Load saved provider preference from UserDefaults
     private static func loadSavedProvider() -> MapProvider {
+        let hasGoogleKey = SecretsManager.googleMapsAPIKey != nil
+
         if let savedProvider = UserDefaults.standard.string(forKey: "selectedMapProvider"),
            let provider = MapProvider(rawValue: savedProvider) {
-            return provider
+            // A saved Google choice is unusable if the key has since been removed
+            return (provider == .google && !hasGoogleKey) ? .apple : provider
         }
-        // Default to Google Maps if available, otherwise Apple Maps
-        return SecretsManager.googleMapsAPIKey != nil ? .google : .apple
+        // First launch: Google Maps if configured, otherwise Apple Maps
+        return hasGoogleKey ? .google : .apple
     }
 
     /// Save current provider preference to UserDefaults

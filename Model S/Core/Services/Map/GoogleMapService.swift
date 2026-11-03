@@ -71,7 +71,7 @@ class GoogleMapService: MapService {
     func search(query: String) {
         // Check for API key before searching
         guard SecretsManager.googleMapsAPIKey != nil else {
-            print("⚠️ \(MapServiceError.apiKeyMissing(provider: .google).localizedDescription)")
+            AppLog.warning("⚠️ \(MapServiceError.apiKeyMissing(provider: .google).localizedDescription)")
             return
         }
         searchService.search(query: query)

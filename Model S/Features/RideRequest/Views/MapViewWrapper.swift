@@ -145,13 +145,13 @@ struct MapViewWrapper: UIViewRepresentable {
                     annotation.coordinate = driver
                     annotation.title = "Driver"
                     mapView.addAnnotation(annotation)
-                    print("🚗 Added driver annotation at \(driver.latitude), \(driver.longitude)")
+                    AppLog.debug("🚗 Added driver annotation at \(driver.latitude), \(driver.longitude)")
                 }
             } else {
                 // Remove driver annotation if no driver location
                 if let existingDriver = mapView.annotations.first(where: { $0.title == "Driver" }) {
                     mapView.removeAnnotation(existingDriver)
-                    print("🚗 Removed driver annotation")
+                    AppLog.debug("🚗 Removed driver annotation")
                 }
             }
         }
@@ -190,7 +190,7 @@ struct MapViewWrapper: UIViewRepresentable {
                     currentDisplayMode = displayMode
 
                     let routeType = displayMode == .approach ? "approach (driver → pickup)" : "active ride (pickup → destination)"
-                    print("🛣️ Displaying \(routeType) route")
+                    AppLog.debug("🛣️ Displaying \(routeType) route")
                 }
             }
         }
@@ -256,7 +256,7 @@ struct MapViewWrapper: UIViewRepresentable {
             } else if annotation.title == "Destination" {
                 annotationView?.image = createPinImage(color: .systemBlue, iconName: "mappin")
             } else if annotation.title == "Driver" {
-                print("🚗 Creating view for driver annotation")
+                AppLog.debug("🚗 Creating view for driver annotation")
                 annotationView?.image = createCarImage()
                 annotationView?.centerOffset = CGPoint(x: 0, y: 0) // Center the car icon
             }

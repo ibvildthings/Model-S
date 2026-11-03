@@ -45,7 +45,7 @@ class DriverFlowController: NSObject, ObservableObject {
         statsUpdateTask?.cancel()
         rideOfferExpiryTask?.cancel()
         offerPollingTask?.cancel()
-        print("🧹 DriverFlowController deallocated, cleaned up resources")
+        AppLog.debug("🧹 DriverFlowController deallocated, cleaned up resources")
     }
 
     // MARK: - Setup
@@ -61,7 +61,7 @@ class DriverFlowController: NSObject, ObservableObject {
     /// Login driver
     func login(driverId: String) async {
         guard case .offline = currentState else {
-            print("⚠️ Cannot login - already logged in")
+            AppLog.warning("⚠️ Cannot login - already logged in")
             return
         }
 
@@ -102,10 +102,10 @@ class DriverFlowController: NSObject, ObservableObject {
             // Start location updates
             locationManager.startUpdatingLocation()
 
-            print("✅ Driver \(response.driver.name) logged in successfully")
+            AppLog.debug("✅ Driver \(response.driver.name) logged in successfully")
 
         } catch {
-            print("❌ Login failed: \(error)")
+            AppLog.error("❌ Login failed: \(error)")
             transition(to: .error(message: "Login failed: \(error.localizedDescription)", previousState: .offline))
         }
     }
@@ -113,7 +113,7 @@ class DriverFlowController: NSObject, ObservableObject {
     /// Logout driver
     func logout() async {
         guard let driverId = driverId else {
-            print("⚠️ No driver ID set")
+            AppLog.warning("⚠️ No driver ID set")
             return
         }
 
@@ -132,10 +132,10 @@ class DriverFlowController: NSObject, ObservableObject {
 
             self.driverId = nil
 
-            print("✅ Driver logged out successfully")
+            AppLog.debug("✅ Driver logged out successfully")
 
         } catch {
-            print("❌ Logout failed: \(error)")
+            AppLog.error("❌ Logout failed: \(error)")
             // Force offline anyway
             transition(to: .offline)
             self.driverId = nil
@@ -148,13 +148,13 @@ class DriverFlowController: NSObject, ObservableObject {
     func toggleAvailability() async {
         guard driverId != nil,
               currentState.currentStats != nil else {
-            print("⚠️ Cannot toggle availability - not logged in")
+            AppLog.warning("⚠️ Cannot toggle availability - not logged in")
             return
         }
 
         // Can only toggle when online (not on active ride)
         guard case .online = currentState else {
-            print("⚠️ Cannot toggle availability - not in online state")
+            AppLog.warning("⚠️ Cannot toggle availability - not in online state")
             return
         }
 
@@ -168,7 +168,7 @@ class DriverFlowController: NSObject, ObservableObject {
     /// Receive a new ride offer
     func receiveRideOffer(_ request: RideRequest) {
         guard case .online(let stats) = currentState else {
-            print("⚠️ Cannot receive ride offer - not online")
+            AppLog.warning("⚠️ Cannot receive ride offer - not online")
             return
         }
 
@@ -179,14 +179,14 @@ class DriverFlowController: NSObject, ObservableObject {
         // Start expiry task
         startRideOfferExpiryTask(request: request)
 
-        print("📱 New ride offer received: \(request.rideId)")
+        AppLog.debug("📱 New ride offer received: \(request.rideId)")
     }
 
     /// Accept current ride offer
     func acceptRide() async {
         guard case .rideOffered(let request, let stats) = currentState,
               let driverId = driverId else {
-            print("⚠️ Cannot accept ride - no active offer")
+            AppLog.warning("⚠️ Cannot accept ride - no active offer")
             return
         }
 
@@ -218,10 +218,10 @@ class DriverFlowController: NSObject, ObservableObject {
             let newState = DriverStateMachine.acceptRide(ride: activeRide, stats: stats)
             transition(to: newState)
 
-            print("✅ Ride accepted: \(request.rideId)")
+            AppLog.debug("✅ Ride accepted: \(request.rideId)")
 
         } catch {
-            print("❌ Failed to accept ride: \(error)")
+            AppLog.error("❌ Failed to accept ride: \(error)")
             transition(to: .error(message: "Failed to accept ride", previousState: currentState))
         }
     }
@@ -230,7 +230,7 @@ class DriverFlowController: NSObject, ObservableObject {
     func rejectRide() async {
         guard case .rideOffered(let request, let stats) = currentState,
               let driverId = driverId else {
-            print("⚠️ Cannot reject ride - no active offer")
+            AppLog.warning("⚠️ Cannot reject ride - no active offer")
             return
         }
 
@@ -248,10 +248,10 @@ class DriverFlowController: NSObject, ObservableObject {
             // Resume polling for new offers
             startOfferPolling()
 
-            print("❌ Ride rejected: \(request.rideId)")
+            AppLog.error("❌ Ride rejected: \(request.rideId)")
 
         } catch {
-            print("❌ Failed to reject ride: \(error)")
+            AppLog.error("❌ Failed to reject ride: \(error)")
             // Still transition to online
             transition(to: .online(stats: stats))
             // Resume polling
@@ -263,20 +263,20 @@ class DriverFlowController: NSObject, ObservableObject {
     func handleOfferExpiry() async {
         guard case .rideOffered(let request, let stats) = currentState,
               let driverId = driverId else {
-            print("⚠️ Cannot handle expiry - no active offer")
+            AppLog.warning("⚠️ Cannot handle expiry - no active offer")
             return
         }
 
         // Stop expiry task
         rideOfferExpiryTask?.cancel()
 
-        print("⏰ Ride offer expired: \(request.rideId)")
+        AppLog.debug("⏰ Ride offer expired: \(request.rideId)")
 
         // Send rejection to backend (offer expired)
         do {
             try await apiClient.rejectRide(driverId: driverId, rideId: request.rideId)
         } catch {
-            print("⚠️ Failed to send expiry notification to backend: \(error)")
+            AppLog.warning("⚠️ Failed to send expiry notification to backend: \(error)")
             // Continue anyway - we still want to dismiss the offer
         }
 
@@ -294,7 +294,7 @@ class DriverFlowController: NSObject, ObservableObject {
     func arriveAtPickup() async {
         guard case .headingToPickup(let ride, let stats) = currentState,
               let driverId = driverId else {
-            print("⚠️ Cannot mark arrival - not heading to pickup")
+            AppLog.warning("⚠️ Cannot mark arrival - not heading to pickup")
             return
         }
 
@@ -306,10 +306,10 @@ class DriverFlowController: NSObject, ObservableObject {
             let newState = DriverStateMachine.arriveAtPickup(ride: ride, stats: stats)
             transition(to: newState)
 
-            print("📍 Arrived at pickup")
+            AppLog.debug("📍 Arrived at pickup")
 
         } catch {
-            print("❌ Failed to update arrival status: \(error)")
+            AppLog.error("❌ Failed to update arrival status: \(error)")
         }
     }
 
@@ -317,7 +317,7 @@ class DriverFlowController: NSObject, ObservableObject {
     func pickupPassenger() async {
         guard case .arrivedAtPickup(let ride, let stats) = currentState,
               let driverId = driverId else {
-            print("⚠️ Cannot pickup passenger - not at pickup location")
+            AppLog.warning("⚠️ Cannot pickup passenger - not at pickup location")
             return
         }
 
@@ -329,10 +329,10 @@ class DriverFlowController: NSObject, ObservableObject {
             let newState = DriverStateMachine.pickupPassenger(ride: ride, stats: stats)
             transition(to: newState)
 
-            print("🚗 Passenger picked up")
+            AppLog.debug("🚗 Passenger picked up")
 
         } catch {
-            print("❌ Failed to update pickup status: \(error)")
+            AppLog.error("❌ Failed to update pickup status: \(error)")
         }
     }
 
@@ -340,7 +340,7 @@ class DriverFlowController: NSObject, ObservableObject {
     func completeRide() async {
         guard case .rideInProgress(let ride, let stats) = currentState,
               let driverId = driverId else {
-            print("⚠️ Cannot complete ride - ride not in progress")
+            AppLog.warning("⚠️ Cannot complete ride - ride not in progress")
             return
         }
 
@@ -369,17 +369,17 @@ class DriverFlowController: NSObject, ObservableObject {
             let newState = DriverStateMachine.completeRide(summary: summary, updatedStats: updatedStats)
             transition(to: newState)
 
-            print("✅ Ride completed")
+            AppLog.debug("✅ Ride completed")
 
         } catch {
-            print("❌ Failed to complete ride: \(error)")
+            AppLog.error("❌ Failed to complete ride: \(error)")
         }
     }
 
     /// Finish viewing ride summary and return to online
     func finishRideSummary() {
         guard case .rideCompleted(_, let stats) = currentState else {
-            print("⚠️ Cannot finish summary - no completed ride")
+            AppLog.warning("⚠️ Cannot finish summary - no completed ride")
             return
         }
 
@@ -404,7 +404,7 @@ class DriverFlowController: NSObject, ObservableObject {
             try await apiClient.updateLocation(driverId: driverId, location: location)
         } catch {
             // Silent failure for location updates
-            print("⚠️ Failed to update location: \(error)")
+            AppLog.warning("⚠️ Failed to update location: \(error)")
         }
     }
 
@@ -413,7 +413,7 @@ class DriverFlowController: NSObject, ObservableObject {
     private func transition(to newState: DriverState) {
         // Validate transition
         guard let validatedState = DriverStateMachine.transition(from: currentState, to: newState) else {
-            print("❌ Invalid state transition attempted")
+            AppLog.error("❌ Invalid state transition attempted")
             return
         }
 
@@ -473,7 +473,7 @@ class DriverFlowController: NSObject, ObservableObject {
             return
         }
 
-        print("⏱️ Ride offer expired: \(request.rideId)")
+        AppLog.debug("⏱️ Ride offer expired: \(request.rideId)")
 
         // Automatically transition back to online
         transition(to: .online(stats: stats))
@@ -493,7 +493,7 @@ class DriverFlowController: NSObject, ObservableObject {
 
             if response.hasOffer, let offer = response.offer {
                 // Received a ride offer!
-                print("🎯 Received ride offer: \(offer.rideId)")
+                AppLog.debug("🎯 Received ride offer: \(offer.rideId)")
 
                 let request = RideRequest(
                     rideId: offer.rideId,
@@ -511,7 +511,7 @@ class DriverFlowController: NSObject, ObservableObject {
             }
         } catch {
             // Silent failure for offer polling
-            print("⚠️ Failed to check for offers: \(error)")
+            AppLog.warning("⚠️ Failed to check for offers: \(error)")
         }
     }
 
@@ -534,7 +534,7 @@ class DriverFlowController: NSObject, ObservableObject {
             currentState = updatedState
 
         } catch {
-            print("⚠️ Failed to update stats: \(error)")
+            AppLog.warning("⚠️ Failed to update stats: \(error)")
         }
     }
 
@@ -560,12 +560,12 @@ extension DriverFlowController: CLLocationManagerDelegate {
     }
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("❌ Location error: \(error.localizedDescription)")
+        AppLog.error("❌ Location error: \(error.localizedDescription)")
     }
 
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         let status = manager.authorizationStatus
-        print("📍 Location authorization changed: \(status.rawValue)")
+        AppLog.debug("📍 Location authorization changed: \(status.rawValue)")
     }
 
     /// Update driver location on backend
@@ -579,7 +579,7 @@ extension DriverFlowController: CLLocationManagerDelegate {
             try await apiClient.updateLocation(driverId: driverId, location: coordinate)
         } catch {
             // Silent failure for location updates
-            print("⚠️ Failed to update location: \(error)")
+            AppLog.warning("⚠️ Failed to update location: \(error)")
         }
     }
 }

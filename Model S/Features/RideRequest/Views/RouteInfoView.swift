@@ -7,39 +7,45 @@
 
 import SwiftUI
 
-/// Displays route information like ETA and distance
+/// Compact ETA / distance banner shown above the location card once a route is ready
 struct RouteInfoView: View {
-    let travelTime: String?
-    let distance: String?
+    let route: RouteInfo
 
     var body: some View {
-        HStack(spacing: 16) {
-            if let time = travelTime {
-                Label(time, systemImage: "clock.fill")
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "clock.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
+                Text("\(Int(route.estimatedTravelTime / 60)) min")
                     .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
             }
 
-            if let dist = distance {
-                Label(dist, systemImage: "arrow.triangle.turn.up.right.diamond.fill")
+            Divider()
+                .frame(height: 16)
+
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.triangle.swap")
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
+                Text(String(format: "%.1f mi", route.distance / 1609.34))
                     .font(.subheadline)
-                    .fontWeight(.medium)
-                    .foregroundColor(.secondary)
+                    .fontWeight(.semibold)
             }
+
+            Spacer()
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
         .background(.ultraThinMaterial)
-        .cornerRadius(16)
+        .cornerRadius(12)
         .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
     }
 }
 
 #Preview {
-    VStack {
-        RouteInfoView(travelTime: "15 min", distance: "3.2 mi")
-    }
-    .padding()
-    .background(Color.gray.opacity(0.2))
+    RouteInfoView(route: RouteInfo(distance: 5150, estimatedTravelTime: 900, polyline: ""))
+        .padding()
+        .background(Color.gray.opacity(0.2))
 }

@@ -10,25 +10,25 @@
 import SwiftUI
 
 struct MapProviderSettingsView: View {
-    @StateObject private var manager = MapProviderManager.shared
+    @ObservedObject private var providerService = MapProviderService.shared
 
     var body: some View {
         List {
             Section {
-                ForEach([MapProvider.apple, MapProvider.google], id: \.self) { provider in
+                ForEach(MapProvider.allCases, id: \.self) { provider in
                     ProviderRow(
                         provider: provider,
-                        isSelected: manager.currentProvider == provider,
-                        isAvailable: provider == .apple || manager.isGoogleMapsReady
+                        isSelected: providerService.currentProvider == provider,
+                        isAvailable: providerService.isProviderAvailable(provider)
                     ) {
-                        manager.switchTo(provider: provider)
+                        _ = providerService.switchTo(provider: provider)
                     }
                 }
             } header: {
                 Text("Map Provider")
             } footer: {
-                if !manager.isGoogleMapsReady {
-                    Text("To use Google Maps, add your API key in MapServiceConfiguration.google")
+                if !providerService.isGoogleMapsAvailable {
+                    Text("To use Google Maps, add GoogleMapsAPIKey to Secrets.plist (see GOOGLE_MAPS_SETUP.md)")
                         .font(.caption)
                         .foregroundColor(.orange)
                 }
@@ -38,11 +38,11 @@ struct MapProviderSettingsView: View {
                 HStack {
                     Text("Current Provider")
                     Spacer()
-                    Label(manager.currentProvider.displayName, systemImage: manager.currentProvider.icon)
+                    Label(providerService.currentProvider.displayName, systemImage: providerService.currentProvider.icon)
                         .foregroundColor(.blue)
                 }
 
-                if manager.currentProvider == .google && !manager.isGoogleMapsReady {
+                if providerService.currentProvider == .google && !providerService.isGoogleMapsAvailable {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.orange)
@@ -151,7 +151,7 @@ struct InfoRow: View {
 // MARK: - Preview
 
 #Preview {
-    NavigationView {
+    NavigationStack {
         MapProviderSettingsView()
     }
 }

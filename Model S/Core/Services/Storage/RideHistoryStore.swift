@@ -78,7 +78,7 @@ class RideHistoryStore: ObservableObject {
             let decoder = JSONDecoder()
             rides = try decoder.decode([RideHistory].self, from: data)
         } catch {
-            print("❌ Failed to decode ride history: \(error)")
+            AppLog.error("❌ Failed to decode ride history: \(error)")
             rides = []
         }
     }
@@ -89,7 +89,7 @@ class RideHistoryStore: ObservableObject {
             let data = try encoder.encode(rides)
             UserDefaults.standard.set(data, forKey: userDefaultsKey)
         } catch {
-            print("❌ Failed to encode ride history: \(error)")
+            AppLog.error("❌ Failed to encode ride history: \(error)")
         }
     }
 }

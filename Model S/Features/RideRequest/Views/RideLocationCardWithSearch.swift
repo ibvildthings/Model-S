@@ -9,10 +9,16 @@ import SwiftUI
 import MapKit
 
 /// Enhanced location card with address autocomplete suggestions
+/// Which text field of the location card has focus
+enum RideLocationField {
+    case pickup
+    case destination
+}
+
 struct RideLocationCardWithSearch: View {
     @Binding var pickupText: String
     @Binding var destinationText: String
-    @FocusState.Binding var focusedField: RideLocationCard.LocationField?
+    @FocusState.Binding var focusedField: RideLocationField?
     @ObservedObject private var providerService = MapProviderService.shared
 
     var configuration: RideRequestConfiguration = .default
@@ -25,7 +31,7 @@ struct RideLocationCardWithSearch: View {
     init(
         pickupText: Binding<String>,
         destinationText: Binding<String>,
-        focusedField: FocusState<RideLocationCard.LocationField?>.Binding,
+        focusedField: FocusState<RideLocationField?>.Binding,
         configuration: RideRequestConfiguration = .default,
         userLocation: CLLocationCoordinate2D? = nil,
         onPickupTap: @escaping () -> Void,
@@ -210,7 +216,7 @@ struct RideLocationCardWithSearch: View {
                     focusedField = nil
                 }
             } catch {
-                print("Failed to get coordinate: \(error)")
+                AppLog.debug("Failed to get coordinate: \(error)")
             }
         }
     }
@@ -219,7 +225,7 @@ struct RideLocationCardWithSearch: View {
 #Preview {
     @Previewable @State var pickupText = ""
     @Previewable @State var destinationText = ""
-    @Previewable @FocusState var focusedField: RideLocationCard.LocationField?
+    @Previewable @FocusState var focusedField: RideLocationField?
 
     ZStack {
         Color.gray.ignoresSafeArea()
@@ -237,7 +243,7 @@ struct RideLocationCardWithSearch: View {
                     focusedField = .destination
                 },
                 onLocationSelected: { coordinate, name, isPickup in
-                    print("Selected: \(name) at \(coordinate)")
+                    AppLog.debug("Selected: \(name) at \(coordinate)")
                 }
             )
             .padding(.top, 60)

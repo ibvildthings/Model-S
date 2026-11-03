@@ -78,16 +78,16 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
         mapView.settings.myLocationButton = true
 
         // Debug logging
-        print("🗺️ Google Maps view created")
-        print("   📍 Location: \(region.center.latitude), \(region.center.longitude)")
-        print("   🔍 Zoom: \(region.span.zoomLevel)")
-        print("   🗺️ Map type: normal")
-        print("")
-        print("⏳ Waiting for map tiles to load...")
-        print("   If tiles don't load, check Google Cloud Console:")
-        print("   1. Billing enabled? (MOST COMMON ISSUE)")
-        print("   2. 'Maps SDK for iOS' enabled? (not just 'Maps SDK')")
-        print("   3. API key restrictions correct?")
+        AppLog.debug("🗺️ Google Maps view created")
+        AppLog.debug("   📍 Location: \(region.center.latitude), \(region.center.longitude)")
+        AppLog.debug("   🔍 Zoom: \(region.span.zoomLevel)")
+        AppLog.debug("   🗺️ Map type: normal")
+        AppLog.debug("")
+        AppLog.debug("⏳ Waiting for map tiles to load...")
+        AppLog.debug("   If tiles don't load, check Google Cloud Console:")
+        AppLog.debug("   1. Billing enabled? (MOST COMMON ISSUE)")
+        AppLog.debug("   2. 'Maps SDK for iOS' enabled? (not just 'Maps SDK')")
+        AppLog.debug("   3. API key restrictions correct?")
 
         context.coordinator.mapView = mapView
 
@@ -96,25 +96,25 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
             guard let coordinator = coordinator else { return }
 
             if !coordinator.tilesLoaded {
-                print("")
-                print("⚠️ WARNING: Map tiles have NOT loaded after 3 seconds")
-                print("   You should only see a blue dot (your location)")
-                print("   No map tiles = Google Cloud Console issue")
-                print("")
-                print("🔧 SOLUTION - Go to Google Cloud Console:")
-                print("")
-                print("   Step 1: Enable Billing (99% of the time this is the issue)")
-                print("   https://console.cloud.google.com/billing")
-                print("   Even the free tier requires a billing account!")
-                print("")
-                print("   Step 2: Enable 'Maps SDK for iOS' API")
-                print("   https://console.cloud.google.com/apis/library/maps-ios-backend.googleapis.com")
-                print("   Click 'Enable' button")
-                print("")
-                print("   Step 3: Check API Key Restrictions")
-                print("   https://console.cloud.google.com/apis/credentials")
-                print("   Set to 'None' for testing")
-                print("")
+                AppLog.debug("")
+                AppLog.warning("⚠️ WARNING: Map tiles have NOT loaded after 3 seconds")
+                AppLog.debug("   You should only see a blue dot (your location)")
+                AppLog.debug("   No map tiles = Google Cloud Console issue")
+                AppLog.debug("")
+                AppLog.debug("🔧 SOLUTION - Go to Google Cloud Console:")
+                AppLog.debug("")
+                AppLog.debug("   Step 1: Enable Billing (99% of the time this is the issue)")
+                AppLog.debug("   https://console.cloud.google.com/billing")
+                AppLog.debug("   Even the free tier requires a billing account!")
+                AppLog.debug("")
+                AppLog.debug("   Step 2: Enable 'Maps SDK for iOS' API")
+                AppLog.debug("   https://console.cloud.google.com/apis/library/maps-ios-backend.googleapis.com")
+                AppLog.debug("   Click 'Enable' button")
+                AppLog.debug("")
+                AppLog.debug("   Step 3: Check API Key Restrictions")
+                AppLog.debug("   https://console.cloud.google.com/apis/credentials")
+                AppLog.debug("   Set to 'None' for testing")
+                AppLog.debug("")
             }
         }
 
@@ -286,7 +286,7 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
                     currentDisplayMode = displayMode
 
                     let routeType = displayMode == .approach ? "approach (driver → pickup)" : "active ride (pickup → destination)"
-                    print("🛣️ Displaying \(routeType) route")
+                    AppLog.debug("🛣️ Displaying \(routeType) route")
                 }
             }
         }
@@ -322,37 +322,37 @@ struct GoogleMapViewWrapper: UIViewRepresentable {
         func mapViewDidFinishTileRendering(_ mapView: GMSMapView) {
             if !tilesLoaded {
                 tilesLoaded = true
-                print("")
-                print("✅ Google Maps tiles finished rendering successfully!")
-                print("   Map is now fully loaded and visible")
+                AppLog.debug("")
+                AppLog.debug("✅ Google Maps tiles finished rendering successfully!")
+                AppLog.debug("   Map is now fully loaded and visible")
             }
         }
 
         func mapView(_ mapView: GMSMapView, didFailLoadingMapWithError error: Error) {
-            print("")
-            print("❌ Google Maps FAILED to load map tiles")
-            print("   Error: \(error.localizedDescription)")
-            print("")
-            print("🔧 How to fix this:")
-            print("   1. Go to: https://console.cloud.google.com/billing")
-            print("      ➜ Enable billing for your project (REQUIRED even for free tier)")
-            print("")
-            print("   2. Go to: https://console.cloud.google.com/apis/library")
-            print("      ➜ Search: 'Maps SDK for iOS'")
-            print("      ➜ Click: Enable (make sure it's iOS, not JavaScript)")
-            print("")
-            print("   3. Go to: https://console.cloud.google.com/apis/credentials")
-            print("      ➜ Click your API key")
-            print("      ➜ Application restrictions: Set to 'None' for testing")
-            print("      ➜ Or add bundle ID: com.degenrides.Model-S")
-            print("")
+            AppLog.debug("")
+            AppLog.error("❌ Google Maps FAILED to load map tiles")
+            AppLog.debug("   Error: \(error.localizedDescription)")
+            AppLog.debug("")
+            AppLog.debug("🔧 How to fix this:")
+            AppLog.debug("   1. Go to: https://console.cloud.google.com/billing")
+            AppLog.debug("      ➜ Enable billing for your project (REQUIRED even for free tier)")
+            AppLog.debug("")
+            AppLog.debug("   2. Go to: https://console.cloud.google.com/apis/library")
+            AppLog.debug("      ➜ Search: 'Maps SDK for iOS'")
+            AppLog.debug("      ➜ Click: Enable (make sure it's iOS, not JavaScript)")
+            AppLog.debug("")
+            AppLog.debug("   3. Go to: https://console.cloud.google.com/apis/credentials")
+            AppLog.debug("      ➜ Click your API key")
+            AppLog.debug("      ➜ Application restrictions: Set to 'None' for testing")
+            AppLog.debug("      ➜ Or add bundle ID: com.degenrides.Model-S")
+            AppLog.debug("")
         }
 
         func mapView(_ mapView: GMSMapView, didTapAt coordinate: CLLocationCoordinate2D) {
             if !tilesLoaded {
-                print("")
-                print("⚠️ Map tapped but tiles haven't loaded yet")
-                print("   This confirms tiles are not loading from Google")
+                AppLog.debug("")
+                AppLog.warning("⚠️ Map tapped but tiles haven't loaded yet")
+                AppLog.debug("   This confirms tiles are not loading from Google")
             }
         }
 

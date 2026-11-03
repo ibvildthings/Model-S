@@ -9,30 +9,6 @@ import Foundation
 import CoreLocation
 import Combine
 
-// MARK: - Map Provider Selection
-
-/// Manages user's map provider preference
-@MainActor
-class MapProviderPreference: ObservableObject {
-    static let shared = MapProviderPreference()
-
-    @Published var selectedProvider: MapProvider {
-        didSet {
-            // Save to UserDefaults
-            let providerString = selectedProvider == .apple ? "apple" : "google"
-            UserDefaults.standard.set(providerString, forKey: "selectedMapProvider")
-            print("📍 Map provider switched to: \(providerString)")
-        }
-    }
-
-    private init() {
-        // Load saved preference or default to Apple Maps
-        let savedProvider = UserDefaults.standard.string(forKey: "selectedMapProvider")
-        self._selectedProvider = Published(initialValue: savedProvider == "google" ? .google : .apple)
-        print("📍 Initialized map provider preference: \(savedProvider ?? "default to apple")")
-    }
-}
-
 // MARK: - Provider-Agnostic Map Types
 
 /// Provider-agnostic coordinate span (similar to MKCoordinateSpan but with zoom support)
@@ -236,57 +212,6 @@ protocol LocationSearchService: ObservableObject {
     func getCoordinate(for result: LocationSearchResult) async throws -> (CLLocationCoordinate2D, String)
 }
 
-/// Type-erased wrapper for LocationSearchService to work with SwiftUI property wrappers
-/// This allows views to use @ObservedObject with any LocationSearchService implementation
-@MainActor
-class AnyLocationSearchService: ObservableObject {
-    var searchResults: [LocationSearchResult] {
-        _getSearchResults()
-    }
-
-    var isSearching: Bool {
-        _getIsSearching()
-    }
-
-    private let _search: (String) -> Void
-    private let _updateSearchRegion: (CLLocationCoordinate2D, Double) -> Void
-    private let _clearResults: () -> Void
-    private let _getCoordinate: (LocationSearchResult) async throws -> (CLLocationCoordinate2D, String)
-    private let _getSearchResults: () -> [LocationSearchResult]
-    private let _getIsSearching: () -> Bool
-    private var cancellables = Set<AnyCancellable>()
-
-    init<S: LocationSearchService>(_ service: S) {
-        self._search = service.search
-        self._updateSearchRegion = service.updateSearchRegion
-        self._clearResults = service.clearResults
-        self._getCoordinate = service.getCoordinate
-        self._getSearchResults = { service.searchResults }
-        self._getIsSearching = { service.isSearching }
-
-        // Forward objectWillChange notifications from the wrapped service
-        service.objectWillChange.sink { [weak self] _ in
-            self?.objectWillChange.send()
-        }.store(in: &cancellables)
-    }
-
-    func search(query: String) {
-        _search(query)
-    }
-
-    func updateSearchRegion(center: CLLocationCoordinate2D, radiusMiles: Double) {
-        _updateSearchRegion(center, radiusMiles)
-    }
-
-    func clearResults() {
-        _clearResults()
-    }
-
-    func getCoordinate(for result: LocationSearchResult) async throws -> (CLLocationCoordinate2D, String) {
-        try await _getCoordinate(result)
-    }
-}
-
 // MARK: - Geocoding Service
 
 /// Protocol for geocoding services (address ↔ coordinates)
@@ -322,98 +247,26 @@ protocol RouteCalculationService {
     func calculateRoute(from: CLLocationCoordinate2D, to: CLLocationCoordinate2D) async throws -> RouteResult
 }
 
-// MARK: - Map Service Provider
+// MARK: - Map Provider
 
-/// Enum to specify which map provider to use
+/// Which map SDK / web APIs back the map, search, geocoding and routing.
+/// The current selection is owned by `MapProviderService`.
 enum MapProvider: String, CaseIterable, Hashable {
     case apple
     case google
-}
 
-/// Configuration for map services
-struct MapServiceConfiguration {
-    let provider: MapProvider
-    let apiKey: String? // For Google Maps
-
-    /// Apple Maps configuration (no API key required)
-    static let apple = MapServiceConfiguration(provider: .apple, apiKey: nil)
-
-    /// Google Maps configuration with API key
-    /// API key is loaded securely from Secrets.plist (gitignored)
-    /// See Secrets.example.plist for setup instructions
-    static let google = MapServiceConfiguration(
-        provider: .google,
-        apiKey: SecretsManager.googleMapsAPIKey
-    )
-
-    /// Default configuration - now uses Google Maps
-    /// Switch to .apple if you prefer Apple Maps
-    static let `default` = google
-}
-
-// MARK: - Map Service Factory
-
-/// Factory to create map service instances based on provider
-@MainActor
-class MapServiceFactory {
-    static let shared = MapServiceFactory()
-
-    private(set) var configuration: MapServiceConfiguration
-
-    init(configuration: MapServiceConfiguration = .default) {
-        self.configuration = configuration
-    }
-
-    /// Update the map provider configuration
-    func configure(with configuration: MapServiceConfiguration) {
-        self.configuration = configuration
-    }
-
-    /// Create a location search service instance
-    /// Uses the current user preference for map provider
-    func createLocationSearchService() -> any LocationSearchService {
-        let provider = MapProviderPreference.shared.selectedProvider
-        switch provider {
-        case .apple:
-            return AppleLocationSearchService()
-        case .google:
-            guard let apiKey = configuration.apiKey else {
-                print("⚠️ Google Maps API key not configured. Falling back to Apple services.")
-                return AppleLocationSearchService()
-            }
-            return GoogleLocationSearchService(apiKey: apiKey)
+    var displayName: String {
+        switch self {
+        case .apple: return "Apple Maps"
+        case .google: return "Google Maps"
         }
     }
 
-    /// Create a geocoding service instance
-    /// Uses the current user preference for map provider
-    func createGeocodingService() -> any GeocodingService {
-        let provider = MapProviderPreference.shared.selectedProvider
-        switch provider {
-        case .apple:
-            return AppleGeocodingService()
-        case .google:
-            guard let apiKey = configuration.apiKey else {
-                print("⚠️ Google Maps API key not configured. Falling back to Apple services.")
-                return AppleGeocodingService()
-            }
-            return GoogleGeocodingService(apiKey: apiKey)
-        }
-    }
-
-    /// Create a route calculation service instance
-    /// Uses the current user preference for map provider
-    func createRouteCalculationService() -> any RouteCalculationService {
-        let provider = MapProviderPreference.shared.selectedProvider
-        switch provider {
-        case .apple:
-            return AppleRouteCalculationService()
-        case .google:
-            guard let apiKey = configuration.apiKey else {
-                print("⚠️ Google Maps API key not configured. Falling back to Apple services.")
-                return AppleRouteCalculationService()
-            }
-            return GoogleRouteCalculationService(apiKey: apiKey)
+    /// SF Symbol name used in provider pickers
+    var icon: String {
+        switch self {
+        case .apple: return "map.fill"
+        case .google: return "globe.americas.fill"
         }
     }
 }

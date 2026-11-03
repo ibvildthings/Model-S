@@ -32,54 +32,41 @@ class RideFlowController: ObservableObject {
 
     private let stateMachine: RideStateMachine
     private let rideService: RideRequestService
-    private let mapService: AnyMapService
-    private let stateStore: AppStateStore?
+
+    /// Explicitly injected map service (tests). When nil, the provider's
+    /// *current* service is used so a provider switch takes effect immediately.
+    private let injectedMapService: AnyMapService?
+
+    private var mapService: AnyMapService {
+        injectedMapService ?? MapProviderService.shared.currentService
+    }
 
     // MARK: - Route Storage
 
-    /// Stores the actual MKRoute for map display (Apple Maps)
-    private(set) var currentMKRoute: MKRoute?
-
-    /// Stores the polyline for Google Maps display
-    private(set) var currentPolyline: MKPolyline?
-
-    /// Stores the driver route MKRoute (Apple Maps)
-    private(set) var currentDriverMKRoute: MKRoute?
-
-    /// Stores the driver route polyline (Google Maps)
-    private(set) var currentDriverPolyline: MKPolyline?
+    /// Pickup → destination route geometry (provider-agnostic), set before
+    /// transitioning to `.routeReady`
+    private(set) var routeCoordinates: [CLLocationCoordinate2D]?
 
     /// Timer for polling backend ride status
     private var statusPollingTimer: Timer?
-
-    // MARK: - Route Management
-
-    /// Updates the stored polyline (for Google Maps route updates during active ride)
-    func updateStoredPolyline(_ polyline: MKPolyline) {
-        self.currentPolyline = polyline
-    }
 
     // MARK: - Initialization
 
     init(
         rideService: RideRequestService? = nil,
-        mapService: AnyMapService? = nil,
-        stateStore: AppStateStore? = nil
+        mapService: AnyMapService? = nil
     ) {
         self.stateMachine = RideStateMachine()
-        // 🌐 Using REAL backend server (change useMock to true for mock mode)
-        self.rideService = rideService ?? RideRequestServiceFactory.shared.createRideRequestService(useMock: false)
-        // Use unified map service
-        self.mapService = mapService ?? MapProviderService.shared.currentService
-        // Optional state store for global state synchronization
-        self.stateStore = stateStore
+        // Backend vs. mock is decided in one place: BackendConfiguration
+        self.rideService = rideService ?? BackendConfiguration.makeRideRequestService()
+        self.injectedMapService = mapService
     }
 
     deinit {
         // Clean up timer to prevent memory leaks
         statusPollingTimer?.invalidate()
         statusPollingTimer = nil
-        print("🧹 RideFlowController deallocated, cleaned up resources")
+        AppLog.debug("🧹 RideFlowController deallocated, cleaned up resources")
     }
 
     // MARK: - State Transitions
@@ -125,12 +112,8 @@ class RideFlowController: ObservableObject {
                 to: destination.coordinate
             )
 
-            // Route polyline is returned as [CLLocationCoordinate2D]
-            let coordinates = result.polyline
-            let polyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
-            currentMKRoute = nil
-            currentPolyline = polyline
-            print("📍 Route polyline received with \(coordinates.count) coordinates")
+            routeCoordinates = result.coordinates
+            AppLog.debug("📍 Route received with \(result.coordinates.count) coordinates")
 
             let routeInfo = RouteInfo(
                 distance: result.distance,
@@ -145,25 +128,14 @@ class RideFlowController: ObservableObject {
         }
     }
 
-    /// Calculate driver route from driver's location to pickup
-    /// Returns the MKRoute if successful, nil otherwise
-    func calculateDriverRoute(from driverLocation: CLLocationCoordinate2D, to pickup: CLLocationCoordinate2D) async -> MKRoute? {
+    /// Calculate the route from the driver's current position to a target
+    /// (pickup or destination). Returns the route geometry, or nil on failure.
+    func calculateDriverRoute(from driverLocation: CLLocationCoordinate2D, to target: CLLocationCoordinate2D) async -> [CLLocationCoordinate2D]? {
         do {
-            let result = try await mapService.calculateRoute(
-                from: driverLocation,
-                to: pickup
-            )
-
-            // Route polyline is returned as [CLLocationCoordinate2D]
-            let coordinates = result.polyline
-            print("📍 Driver route received with \(coordinates.count) coordinates")
-
-            let polyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
-            currentDriverPolyline = polyline
-            currentDriverMKRoute = nil
-            return nil  // Coordinator will check currentDriverPolyline
+            let result = try await mapService.calculateRoute(from: driverLocation, to: target)
+            return result.coordinates
         } catch {
-            print("❌ Failed to calculate driver route: \(error)")
+            AppLog.error("❌ Failed to calculate driver route: \(error)")
             return nil
         }
     }
@@ -171,7 +143,7 @@ class RideFlowController: ObservableObject {
     /// Start the ride request (called when user confirms)
     func requestRide() async {
         guard case .routeReady(let pickup, let destination, _) = currentState else {
-            print("❌ Cannot request ride - not in routeReady state")
+            AppLog.error("❌ Cannot request ride - not in routeReady state")
             return
         }
 
@@ -196,7 +168,7 @@ class RideFlowController: ObservableObject {
 
             repeat {
                 attempts += 1
-                print("🔄 Polling for driver assignment (attempt \(attempts))...")
+                AppLog.debug("🔄 Polling for driver assignment (attempt \(attempts))...")
 
                 // Wait 1 second between polls
                 try await Task.sleep(nanoseconds: 1_000_000_000)
@@ -205,7 +177,7 @@ class RideFlowController: ObservableObject {
 
                 // Break if driver found
                 if statusResult.driver != nil {
-                    print("✅ Driver found after \(attempts) attempts!")
+                    AppLog.debug("✅ Driver found after \(attempts) attempts!")
                     break
                 }
             } while attempts < maxAttempts
@@ -263,7 +235,7 @@ class RideFlowController: ObservableObject {
     /// Reset to initial state
     func reset() {
         stopPollingRideStatus()
-        currentMKRoute = nil
+        routeCoordinates = nil
         realTimeDriverLocation = nil // Clear backend driver position
         realTimeETA = nil // Clear backend ETA
         transition(to: .idle)
@@ -271,7 +243,7 @@ class RideFlowController: ObservableObject {
 
     /// Start polling backend for ride status updates
     private func startPollingRideStatus(rideId: String, pickup: LocationPoint, destination: LocationPoint) {
-        print("🔄 Starting ride status polling for ride \(rideId)")
+        AppLog.debug("🔄 Starting ride status polling for ride \(rideId)")
 
         // Stop any existing polling
         stopPollingRideStatus()
@@ -297,7 +269,7 @@ class RideFlowController: ObservableObject {
     private func stopPollingRideStatus() {
         statusPollingTimer?.invalidate()
         statusPollingTimer = nil
-        print("🔄 Stopped ride status polling")
+        AppLog.debug("🔄 Stopped ride status polling")
     }
 
     /// Check ride status from backend and update state accordingly
@@ -315,7 +287,7 @@ class RideFlowController: ObservableObject {
             if let driverLocation = driver.currentLocation {
                 realTimeDriverLocation = driverLocation
                 // Log position updates (every 2s) to show backend is driving the animation
-                print("📍 Backend position update: \(String(format: "%.4f", driverLocation.latitude)), \(String(format: "%.4f", driverLocation.longitude))")
+                AppLog.debug("📍 Backend position update: \(String(format: "%.4f", driverLocation.latitude)), \(String(format: "%.4f", driverLocation.longitude))")
             }
 
             // Update real-time ETA without triggering state changes (avoids map re-renders)
@@ -352,7 +324,7 @@ class RideFlowController: ObservableObject {
             case .driverArriving:
                 // Driver is arriving at pickup (< 1 min away)
                 if case .driverEnRoute = currentState {
-                    print("🚗 Backend says driver is arriving")
+                    AppLog.debug("🚗 Backend says driver is arriving")
                     transition(to: .driverArriving(
                         rideId: rideId,
                         driver: driver,
@@ -364,7 +336,7 @@ class RideFlowController: ObservableObject {
             case .rideInProgress:
                 // Driver picked up passenger, heading to destination
                 if case .driverArriving = currentState {
-                    print("🚗 Backend says ride is in progress")
+                    AppLog.debug("🚗 Backend says ride is in progress")
                     transition(to: .rideInProgress(
                         rideId: rideId,
                         driver: driver,
@@ -374,7 +346,7 @@ class RideFlowController: ObservableObject {
                     ))
                 } else if case .driverEnRoute = currentState {
                     // Sometimes we might skip arriving state if it's too fast
-                    print("🚗 Backend says ride is in progress (skipped arriving)")
+                    AppLog.debug("🚗 Backend says ride is in progress (skipped arriving)")
                     transition(to: .rideInProgress(
                         rideId: rideId,
                         driver: driver,
@@ -388,7 +360,7 @@ class RideFlowController: ObservableObject {
             case .approachingDestination:
                 // Approaching destination
                 if case .rideInProgress = currentState {
-                    print("🏁 Backend says approaching destination")
+                    AppLog.debug("🏁 Backend says approaching destination")
                     transition(to: .approachingDestination(
                         rideId: rideId,
                         driver: driver,
@@ -399,7 +371,7 @@ class RideFlowController: ObservableObject {
 
             case .rideCompleted:
                 // Ride completed
-                print("✅ Backend says ride is completed")
+                AppLog.debug("✅ Backend says ride is completed")
                 stopPollingRideStatus()
                 transition(to: .rideCompleted(
                     rideId: rideId,
@@ -414,7 +386,7 @@ class RideFlowController: ObservableObject {
             }
 
         } catch {
-            print("⚠️ Error polling ride status: \(error)")
+            AppLog.warning("⚠️ Error polling ride status: \(error)")
             // Don't transition to error state, just keep polling
         }
     }
@@ -428,9 +400,6 @@ class RideFlowController: ObservableObject {
     /// Perform a validated state transition
     private func transition(to newState: RideState) {
         currentState = stateMachine.transition(from: currentState, to: newState)
-
-        // Sync with global state store if available
-        stateStore?.dispatch(.updateRideState(currentState))
     }
 
     // MARK: - Computed Properties for UI
