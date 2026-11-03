@@ -1,298 +1,103 @@
-# Model S Architecture Guide
+# Architecture
 
-Welcome to the Model S codebase! This guide will help you understand the architecture and get productive quickly.
+This describes the code as it runs. Keep it in sync when the structure changes.
 
-## 🎯 Design Philosophy
-
-The codebase follows these core principles:
-
-1. **Simplicity First** - Code should be easy to understand at a glance
-2. **Single Responsibility** - Each file/class does ONE thing well
-3. **Clear Naming** - No ambiguity about what code does
-4. **Minimal Coupling** - Components are loosely connected
-5. **Unidirectional Data Flow** - Easy to trace how state changes
-
-## 📁 Project Structure
+## Overview
 
 ```
-Model S/
-├── Core Files
-│   ├── Model_SApp.swift          - App entry point
-│   ├── ContentView.swift          - Root view
-│   └── HomeView.swift             - Main navigation hub
-│
-├── Ride Request Feature
-│   ├── RideRequestCoordinator.swift       - 🎯 Business logic orchestrator
-│   ├── RideRequestViewModel.swift         - Domain state management
-│   ├── MapViewModel.swift                 - Map display state
-│   ├── ProductionExampleView.swift        - Production integration example
-│   │
-│   ├── Views/
-│   │   ├── RideRequestView.swift          - Main ride request UI
-│   │   ├── RideMapView.swift              - Map with pins and routes
-│   │   ├── RideLocationCard.swift         - Location input (basic)
-│   │   ├── RideLocationCardWithSearch.swift - Location input + autocomplete
-│   │   ├── LocationSearchSuggestionsView.swift - Search dropdown
-│   │   ├── RideConfirmSlider.swift        - Slide to confirm
-│   │   ├── RouteInfoView.swift            - ETA and distance display
-│   │   └── ErrorBannerView.swift          - Error messages
-│   │
-│   └── Models/
-│       ├── RideRequestError.swift         - Error types
-│       ├── RideRequestConfiguration.swift - UI configuration
-│       └── Models.swift                   - LocationPoint, RideRequestState
-│
-├── Map Services (Adapter Pattern)
-│   ├── MapServiceProtocols.swift          - Service abstractions
-│   ├── AppleMapServices.swift             - Apple Maps implementation
-│   └── MapServiceFactory.swift            - Service creation (in Protocols file)
-│
-└── Shared Utilities
-    ├── Constants.swift                    - Centralized configuration values
-    ├── Debounce.swift                     - Reusable debouncing utility
-    └── CLLocationCoordinate2D+Equatable.swift - Extension for Equatable
-
+iOS app (SwiftUI)                                   Node backend (backend/)
+─────────────────                                   ───────────────────────
+HomeView
+ ├─ RideRequestScreen ── RideRequestCoordinator
+ │                          ├─ RideFlowController ── RideAPIClient ──HTTP──▶ routes/rides.js
+ │                          │    └─ RideStateMachine                 (poll 1s)   └─ store/rideStore
+ │                          └─ MapViewModel (pins, routes, region)              └─ services/driverSimulator
+ ├─ DriverAppView ─ DriverViewModel
+ │                    └─ DriverFlowController ── DriverAPIClient ──HTTP──▶ routes/drivers.js
+ │                         └─ DriverStateMachine                          └─ store/driverStore
+ ├─ RideHistoryView ── RideHistoryStore (UserDefaults)
+ └─ MapProviderSettingsView ─┐
+                             MapProviderService ── AnyMapService (Apple | Google)
 ```
 
-## 🏗️ Architecture Pattern: MVVM + Coordinator
+## iOS app (`Model S/`)
 
-### The Coordinator Pattern (★ Key Simplification)
+### Layers
 
-**Problem:** Views were doing too much - managing state, coordinating between multiple ViewModels, handling business logic.
+| Layer | Responsibility | Examples |
+|---|---|---|
+| **Views** | Render state, forward user intents. No business logic. | `RideRequestScreen`, `RideStatusBanner`, `DriverHomeView` |
+| **Coordinator / ViewModel** | Adapt a flow controller to views; derive presentation state. | `RideRequestCoordinator`, `MapViewModel`, `DriverViewModel` |
+| **Flow controllers** | Own a flow's state; the only place state changes. Validated by a state machine. | `RideFlowController` + `RideStateMachine`, `DriverFlowController` + `DriverStateMachine` |
+| **Services** | I/O behind protocols: backend, maps, persistence. | `RideRequestService` (`RideAPIClient`, `MockRideRequestService`), `MapService`, `RideHistoryStore` |
 
-**Solution:** `RideRequestCoordinator` centralizes ALL complex logic.
+### Rider flow: one source of truth
 
-```
-┌─────────────────────────────────────────┐
-│      RideRequestCoordinator             │
-│  (Orchestrates everything)              │
-│                                         │
-│  ✓ Manages RideRequestViewModel        │
-│  ✓ Manages MapViewModel                │
-│  ✓ Handles location selection           │
-│  ✓ Coordinates route calculation        │
-│  ✓ Manages debouncing                   │
-│  ✓ Validates ride requests              │
-└─────────────────────────────────────────┘
-         ↓                    ↓
-┌──────────────────┐   ┌──────────────────┐
-│ RideRequestViewModel│   │  MapViewModel    │
-│ (Domain State)      │   │ (Presentation)   │
-│                     │   │                  │
-│ • Pickup location   │   │ • Pin locations  │
-│ • Destination       │   │ • Map region     │
-│ • Route             │   │ • Polyline       │
-│ • Errors            │   │ • User location  │
-└──────────────────┘   └──────────────────┘
-         ↓                    ↓
-┌─────────────────────────────────────────┐
-│          View Layer                      │
-│  (Just presents state - NO logic)       │
-└─────────────────────────────────────────┘
-```
-
-### Data Flow
-
-**Simple, unidirectional flow:**
+`RideFlowController.currentState` (a `RideState` enum) is the **only** owner of
+pickup, destination, route, driver and ride status. Data flows one way:
 
 ```
-User Action → Coordinator → ViewModel(s) → View Updates
+user intent ─▶ RideRequestCoordinator.selectLocation(...)
+             ─▶ RideFlowController.updatePickup / updateDestination / requestRide
+             ─▶ RideStateMachine validates transition ─▶ currentState
+             ─▶ RideRequestCoordinator.handleStateChange(state) projects onto MapViewModel
 ```
 
-**Example: User selects a location**
+`MapViewModel` is presentation-only (pins, polylines, region, user GPS). Views
+never write pickup/destination to it directly.
 
-```swift
-1. User taps suggestion in LocationSearchSuggestionsView
-   ↓
-2. View calls: coordinator.selectLocation(coordinate, name, isPickup)
-   ↓
-3. Coordinator updates both ViewModels:
-   - viewModel.pickupLocation = location
-   - mapViewModel.updatePickupLocation(coordinate, name)
-   ↓
-4. Coordinator auto-calculates route if ready
-   ↓
-5. View observes changes and re-renders
-```
+Once a ride is requested, `RideFlowController` polls `GET /api/rides/:id`
+every second. The backend's status drives state transitions; the driver's
+position and ETA are published separately (`realTimeDriverLocation`,
+`realTimeETA`) so they don't create a new state every second.
 
-**No complex view logic!** The view just calls coordinator methods.
+> `@Published` emits in `willSet`. Subscribers must use the value they are given,
+> not re-read the property (see `RideRequestCoordinator.handleStateChange`).
 
-## 📚 Key Components Explained
+### Map providers
 
-### 1. RideRequestCoordinator (The Brain)
+- `MapProviderService.shared` is the single owner of the selected provider and
+  the only reader/writer of the `selectedMapProvider` preference.
+- It vends `currentService: AnyMapService`, a type-erased `MapService`
+  (search, geocode, reverse-geocode, route) backed by `AppleMapService` or
+  `GoogleMapService`. Those compose the per-capability services in
+  `AppleMapServices.swift` / `GoogleMapServices.swift`.
+- Switching providers creates a new service, so consumers read
+  `MapProviderService.shared.currentService` at call time and do not cache it.
+- Google Maps is enabled only when `Secrets.plist` has a `GoogleMapsAPIKey`
+  (see `GOOGLE_MAPS_SETUP.md`); otherwise Apple Maps is used.
 
-**Purpose:** Orchestrates all ride request logic
+### Configuration
 
-**When to use:** Views call coordinator methods instead of managing state directly
+| What | Where |
+|---|---|
+| Backend URL, mock vs real backend | `Core/Configuration/BackendConfiguration.swift` (scheme env vars `BACKEND_BASE_URL`, `USE_MOCK_BACKEND`) |
+| Google Maps key | `Core/Configuration/Secrets.plist` (gitignored; template `Secrets.example.plist`) |
+| Rider UI options | `Core/Models/RideRequestConfiguration.swift` |
+| Map/timing constants | `Core/Utilities/Constants.swift` |
 
-**Key Methods:**
-```swift
-// Location management
-func selectLocation(coordinate:, name:, isPickup:) async
-func addressTextChanged(_:, isPickup:) // Auto-debounced
+### Logging
 
-// State management
-func confirmRide() -> (pickup, destination)?
-func reset()
+Use `AppLog.debug/info/warning/error(...)` (an `os.Logger` wrapper, category =
+calling file), not `print`. Filter by subsystem in Console.app.
 
-// Focus events
-func didFocusPickup()
-func didFocusDestination()
-```
+### Tests (`Model STests/`)
 
-**Benefits:**
-- Views are thin (just presentation)
-- Easy to test (mock the coordinator)
-- Single source of truth for business logic
+- `RideStateMachineTests`, `DriverStateMachineTests`: transition rules
+- `MapServiceTests`: provider selection, unified and component map services
 
-### 2. ViewModels
+## Backend (`backend/`)
 
-#### RideRequestViewModel (Domain State)
-- Manages ride-specific data
-- Calls geocoding and routing services
-- Publishes errors and loading state
-- **Does NOT** coordinate with map
+See `backend/README.md` for endpoints and setup.
 
-#### MapViewModel (Presentation State)
-- Shows pins on map
-- Manages user location
-- Handles location permissions
-- Updates map region
-- **Does NOT** know about ride business logic
+- `app.js` is the Express app (routes only), so tests use it without a port.
+  `server.js` adds the HTTP listener and the WebSocket server.
+- `store/` holds all in-memory state behind small modules. Replace them with a
+  database without touching routes.
+- When a rider requests a ride, the nearest driver **logged in through the
+  driver app** gets an offer (30s timeout). Otherwise `driverMatcher` assigns a
+  simulated driver and `driverSimulator` moves it along a route.
+- A WebSocket endpoint (`subscribe` by `rideId`) broadcasts ride updates and
+  simulated driver positions. The iOS app does not use it yet; it polls.
 
-### 3. Service Layer (Adapter Pattern)
-
-**Protocols:**
-```swift
-LocationSearchService  - Autocomplete search
-GeocodingService      - Address ↔ Coordinates
-RouteCalculationService - Calculate routes
-```
-
-**Current Implementation:**
-- `AppleLocationSearchService`
-- `AppleGeocodingService`
-- `AppleRouteCalculationService`
-
-**Future:** Can add Google Maps, Mapbox, etc. without changing app code!
-
-**Factory Pattern:**
-```swift
-MapServiceFactory.shared.createLocationSearchService()
-```
-
-### 4. Utilities
-
-#### Debounce.swift
-Prevents excessive API calls while user types:
-
-```swift
-let debouncer = Debouncer(delay: 1.0)
-debouncer.debounce {
-    await performExpensiveOperation()
-}
-```
-
-#### Constants.swift
-Centralized configuration - NO magic numbers:
-
-```swift
-MapConstants.defaultCenter          // Default map location
-MapConstants.searchRadiusMiles      // Search radius
-TimingConstants.geocodingDebounceDelay  // Debounce delay
-```
-
-## 🔄 Common Tasks
-
-### Adding a New Feature
-
-1. **Determine scope:** Is it ride-request specific or general?
-2. **Update Coordinator** if it involves business logic
-3. **Update ViewModel** if it's new state
-4. **Update View** for presentation only
-
-### Debugging
-
-1. **State issues?** Check the Coordinator
-2. **Map not updating?** Check MapViewModel
-3. **Routes not calculating?** Check RideRequestViewModel
-4. **UI not rendering?** Check the View observing the right properties
-
-### Testing
-
-Mock the Coordinator for view tests:
-```swift
-class MockCoordinator: RideRequestCoordinator {
-    var selectLocationCalled = false
-
-    override func selectLocation(...) {
-        selectLocationCalled = true
-    }
-}
-```
-
-## 🎨 Code Style
-
-### Naming Conventions
-
-- **ViewModels:** `<Feature>ViewModel` (e.g., `RideRequestViewModel`)
-- **Views:** `<Feature>View` (e.g., `RideMapView`)
-- **Services:** `Apple<Service>Service` (e.g., `AppleGeocodingService`)
-- **Coordinators:** `<Feature>Coordinator`
-
-### Comments
-
-- Use `///` for documentation (shows in Xcode Quick Help)
-- Use `//` for inline explanations
-- Use `// MARK: -` to organize code sections
-
-### File Length
-
-- **Target:** < 200 lines per file
-- **Max:** 300 lines
-- **If longer:** Extract to separate files
-
-## 🚀 Getting Started
-
-### For New Developers
-
-1. **Read this guide** (you're here!)
-2. **Run the app** and explore `ProductionExampleView`
-3. **Set a breakpoint** in `RideRequestCoordinator.selectLocation()`
-4. **Trigger it** by selecting a location in the app
-5. **Step through** to see the data flow
-
-### Common Gotchas
-
-1. **@MainActor required** - Many components use `@MainActor` for thread safety
-2. **Async/await everywhere** - Location and routing are async
-3. **Published properties** - Changes trigger view updates
-4. **StateObject vs ObservedObject** - StateObject owns, ObservedObject observes
-
-## 📖 Further Reading
-
-- **SwiftUI MVVM:** [Apple's SwiftUI Tutorials](https://developer.apple.com/tutorials/swiftui)
-- **Coordinator Pattern:** [Coordinator Pattern in SwiftUI](https://www.hackingwithswift.com/articles/216/complete-guide-to-navigationstack-in-swiftui)
-- **MapKit:** [Apple MapKit Documentation](https://developer.apple.com/documentation/mapkit)
-
-## 🤝 Contributing
-
-When adding code:
-
-1. ✅ Keep it simple
-2. ✅ Add documentation comments
-3. ✅ Use Constants instead of magic numbers
-4. ✅ Put business logic in Coordinator
-5. ✅ Keep views thin (presentation only)
-6. ✅ Write clear commit messages
-
-## 💡 Questions?
-
-- Check this guide first
-- Look at `ProductionExampleView.swift` for usage examples
-- Examine `RideRequestCoordinator.swift` to understand flow
-- Read inline comments - they explain "why" not just "what"
-
----
-
-**Remember:** Simple code is maintainable code. When in doubt, favor clarity over cleverness! 🎯
+Tests: `npm test` (geo utils, matcher, HTTP routes via supertest).
