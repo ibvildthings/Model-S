@@ -7,17 +7,17 @@ const express = require('express');
 const driverPool = require('../services/driverPool');
 const rideRequestSimulator = require('../services/rideRequestSimulator');
 const { v4: uuidv4 } = require('uuid');
+const driverStore = require('../store/driverStore');
+const { getPendingOfferForDriver, assignDriverToRide, updateRideStatus } = require('./rides');
 
 const router = express.Router();
 
-// In-memory driver sessions (replace with database in production)
-const driverSessions = new Map(); // driverId -> session data
-
-// Simulated ride offers for driver testing
-const simulatedRideOffers = new Map(); // driverId -> current simulated offer
-
-// Active simulated rides
-const activeSimulatedRides = new Map(); // rideId -> { driverId, pickup, destination, status, passenger }
+// State lives in the driver store (swap for a DB in production)
+const {
+  sessions: driverSessions,
+  simulatedOffers: simulatedRideOffers,
+  activeSimulatedRides
+} = driverStore;
 
 /**
  * POST /api/drivers/login
@@ -225,7 +225,6 @@ router.get('/:driverId/offers', (req, res) => {
   }
 
   // First check for real ride offers from passengers
-  const { getPendingOfferForDriver } = require('./rides');
   const realOffer = getPendingOfferForDriver(driverId);
 
   if (realOffer) {
@@ -330,7 +329,6 @@ router.post('/:driverId/rides/:rideId/accept', (req, res) => {
 
   } else {
     // Handle real ride acceptance
-    const { assignDriverToRide } = require('./rides');
     const success = assignDriverToRide(rideId, driver);
 
     if (!success) {
@@ -473,7 +471,6 @@ router.put('/:driverId/rides/:rideId/status', (req, res) => {
 
   } else {
     // Update real ride status
-    const { updateRideStatus } = require('./rides');
     updateRideStatus(rideId, status);
 
     // If ride completed, update session
@@ -569,6 +566,5 @@ function calculateFare() {
 }
 
 module.exports = {
-  router,
-  driverSessions
+  router
 };

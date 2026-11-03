@@ -1,31 +1,19 @@
 /**
  * Model S Backend Server
- * Real-time ride-sharing backend with automatic driver simulation
+ * Starts the HTTP server (see app.js for routes) and the WebSocket server
+ * that pushes ride updates and driver positions to subscribed clients.
  */
 
-const express = require('express');
-const cors = require('cors');
 const http = require('http');
 const WebSocket = require('ws');
-const { router: ridesRouter, setBroadcastFunctions } = require('./routes/rides');
-const { router: driversRouter } = require('./routes/drivers');
+const app = require('./app');
+const { setBroadcastFunctions } = require('./routes/rides');
 const driverPool = require('./services/driverPool');
 
-const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 3000;
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-// Request logging
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
-  next();
-});
 
 // WebSocket connection handling
 const clients = new Map(); // rideId -> Set of WebSocket clients
@@ -118,64 +106,6 @@ function broadcastDriverPosition(positionUpdate) {
 
 // Set broadcast functions in routes
 setBroadcastFunctions(broadcastRideUpdate, broadcastDriverPosition);
-
-// Routes
-app.get('/', (req, res) => {
-  res.json({
-    message: 'Model S Backend Server',
-    version: '1.0.0',
-    status: 'running',
-    endpoints: {
-      rides: '/api/rides',
-      websocket: `ws://localhost:${PORT}`
-    }
-  });
-});
-
-// Health check
-app.get('/health', (req, res) => {
-  const availableDrivers = driverPool.getAvailableDrivers();
-  res.json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    drivers: {
-      total: driverPool.getAllDrivers().length,
-      available: availableDrivers.length
-    }
-  });
-});
-
-// Drivers endpoint (for debugging)
-app.get('/api/drivers', (req, res) => {
-  const drivers = driverPool.getAllDrivers().map(d => d.toJSON());
-  res.json({
-    count: drivers.length,
-    drivers
-  });
-});
-
-// Rides routes
-app.use('/api/rides', ridesRouter);
-
-// Driver routes
-app.use('/api/drivers', driversRouter);
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Not found',
-    message: `Route ${req.method} ${req.path} not found`
-  });
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: err.message
-  });
-});
 
 // Start server
 server.listen(PORT, () => {

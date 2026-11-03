@@ -43,14 +43,15 @@ You should see:
 
 ### 3. Configure iOS App
 
-Update your iOS app to use this backend:
+The app uses `http://localhost:3000` by default (fine for the simulator).
+To point it elsewhere, set environment variables on the Xcode scheme
+(Edit Scheme → Run → Arguments → Environment Variables), read by
+`BackendConfiguration.swift`:
 
-```swift
-// In RideRequestServiceFactory or similar
-let baseURL = "http://localhost:3000"  // Simulator
-// or
-let baseURL = "http://YOUR_IP:3000"    // Physical device
-```
+| Variable | Example | Effect |
+|---|---|---|
+| `BACKEND_BASE_URL` | `http://192.168.1.20:3000` | Backend for rider and driver flows |
+| `USE_MOCK_BACKEND` | `1` | Rider flow uses an in-app mock, no server needed |
 
 **For physical devices:** Find your computer's IP address:
 - Mac: System Preferences → Network
@@ -312,6 +313,28 @@ curl -X POST http://localhost:3000/api/rides/{RIDE_ID}/cancel
 
 Import the collection (create one with above endpoints) or test manually.
 
+## Project Layout
+
+```
+app.js            Express app: middleware + HTTP routes (no port, no sockets)
+server.js         Starts HTTP + WebSocket servers, wires broadcasts
+routes/           rides.js (rider API), drivers.js (driver app API)
+store/            In-memory state (rideStore, driverStore) – swap for a DB
+services/         driverPool, driverMatcher, driverSimulator, rideRequestSimulator
+models/           Ride, Driver
+utils/geoUtils.js Distance, ETA, interpolation helpers
+```
+
+## Tests
+
+```bash
+npm test                # all suites
+npx jest routes         # HTTP route tests only (supertest, simulations mocked)
+```
+
+> The iOS app currently **polls** `GET /api/rides/:rideId` every second.
+> The WebSocket endpoint below is available but not yet used by the app.
+
 ## Troubleshooting
 
 ### "Cannot connect to localhost:3000" from iOS device
@@ -320,7 +343,7 @@ Import the collection (create one with above endpoints) or test manually.
 - **Fix:** Use your computer's IP address instead
   - Mac: `ifconfig | grep "inet "`
   - Windows: `ipconfig`
-  - Update iOS app to use `http://192.168.x.x:3000`
+  - Set `BACKEND_BASE_URL=http://192.168.x.x:3000` on the Xcode scheme
 
 ### "No drivers available"
 
